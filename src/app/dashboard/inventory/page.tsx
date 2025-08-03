@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Combobox } from "@/components/ui/combobox";
+import { cn } from "@/lib/utils";
 
 type Material = {
   id: string;
@@ -25,13 +26,13 @@ type Material = {
 };
 
 const initialAvailableMaterials: Material[] = [
-  { id: "MAT001", name: "Rose Absolute", quantity: 500, unit: "ml", category: "bibit parfum", purchasePrice: 1500 },
+  { id: "MAT001", name: "Rose Absolute", quantity: 50, unit: "ml", category: "bibit parfum", purchasePrice: 1500 },
   { id: "MAT002", name: "Jasmine Sambac", quantity: 350, unit: "ml", category: "bibit parfum", purchasePrice: 1800 },
   { id: "MAT003", name: "Bergamot Oil", quantity: 1200, unit: "ml", category: "bibit parfum", purchasePrice: 800 },
-  { id: "MAT004", name: "Sandalwood", quantity: 200, unit: "g", category: "bibit parfum", purchasePrice: 2500 },
+  { id: "MAT004", name: "Sandalwood", quantity: 0, unit: "g", category: "bibit parfum", purchasePrice: 2500 },
   { id: "MAT005", name: "Vanilla Extract", quantity: 800, unit: "ml", category: "bibit parfum", purchasePrice: 950 },
   { id: "MAT006", name: "Ethanol (Perfumer's Alcohol)", quantity: 5000, unit: "ml", category: "pelarut", purchasePrice: 100 },
-  { id: "MAT007", name: "Iso E Super", quantity: 2500, unit: "ml", category: "bahan sintetis", purchasePrice: 400 },
+  { id: "MAT007", name: "Iso E Super", quantity: 180, unit: "ml", category: "bahan sintetis", purchasePrice: 400 },
   { id: "MAT008", name: "Ambroxan", quantity: 150, unit: "g", category: "bahan sintetis", purchasePrice: 3000 },
   { id: "MAT009", name: "Botol Kaca 50ml", quantity: 150, unit: "pcs", category: "kemasan", purchasePrice: 3500 },
   { id: "MAT010", name: "Botol Kaca 100ml", quantity: 80, unit: "pcs", category: "kemasan", purchasePrice: 5000 },
@@ -61,9 +62,10 @@ export default function InventoryPage() {
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
 
-  // In a real app, these would come from a database, probably fetched in a layout or context
+  // In a real app, these would come from a database or a global state management solution
   const [categories, setCategories] = useState(initialCategories);
   const [units, setUnits] = useState(initialUnits);
+  const [lowStockThreshold, setLowStockThreshold] = useState(200); // This would also come from settings
 
   const emptyMaterial: Material = { id: "", name: "", quantity: 0, unit: "", category: "", purchasePrice: 0 };
 
@@ -189,28 +191,41 @@ export default function InventoryPage() {
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
-                                  {items.map((material) => (
-                                      <TableRow key={material.id}>
-                                          <TableCell className="font-medium">{material.name}</TableCell>
-                                           <TableCell>{formatCurrency(material.purchasePrice)}</TableCell>
-                                          <TableCell className="text-right">{material.quantity.toLocaleString('id-ID')} {material.unit}</TableCell>
-                                          <TableCell className="text-right font-semibold">{formatCurrency(material.quantity * material.purchasePrice)}</TableCell>
-                                          <TableCell>
-                                            <DropdownMenu>
-                                                  <DropdownMenuTrigger asChild>
-                                                      <Button variant="ghost" className="h-8 w-8 p-0">
-                                                          <span className="sr-only">Buka menu</span>
-                                                          <MoreHorizontal className="h-4 w-4" />
-                                                      </Button>
-                                                  </DropdownMenuTrigger>
-                                                  <DropdownMenuContent align="end">
-                                                      <DropdownMenuItem onClick={() => handleOpenDialog(material)}>Ubah</DropdownMenuItem>
-                                                      <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteMaterial(material.id)}>Hapus</DropdownMenuItem>
-                                                  </DropdownMenuContent>
-                                              </DropdownMenu>
-                                          </TableCell>
-                                      </TableRow>
-                                  ))}
+                                  {items.map((material) => {
+                                      const isLowStock = material.quantity > 0 && material.quantity < lowStockThreshold;
+                                      const isOutOfStock = material.quantity === 0;
+                                      return (
+                                        <TableRow key={material.id}>
+                                            <TableCell className="font-medium">{material.name}</TableCell>
+                                            <TableCell>{formatCurrency(material.purchasePrice)}</TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                     {(isLowStock || isOutOfStock) && (
+                                                        <span className={cn("h-2 w-2 rounded-full", {
+                                                            "bg-yellow-500": isLowStock,
+                                                            "bg-red-500": isOutOfStock,
+                                                        })} title={isOutOfStock ? "Stok Habis" : "Stok Menipis"}></span>
+                                                     )}
+                                                    {material.quantity.toLocaleString('id-ID')} {material.unit}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-right font-semibold">{formatCurrency(material.quantity * material.purchasePrice)}</TableCell>
+                                            <TableCell>
+                                              <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" className="h-8 w-8 p-0">
+                                                            <span className="sr-only">Buka menu</span>
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem onClick={() => handleOpenDialog(material)}>Ubah</DropdownMenuItem>
+                                                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteMaterial(material.id)}>Hapus</DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                        </TableRow>
+                                    )})}
                               </TableBody>
                           </Table>
                         </AccordionContent>

@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tag, User, Languages, Key, Store, MoreHorizontal, PlusCircle, Package } from "lucide-react";
+import { Tag, User, Languages, Key, Store, MoreHorizontal, PlusCircle, Package, Bell } from "lucide-react";
 import Link from "next/link";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -70,6 +70,10 @@ export default function SettingsPage() {
     const [units, setUnits] = useState<Attribute[]>(initialUnits);
     const [isAttrDialogOpen, setAttrDialogOpen] = useState(false);
     const [editingAttr, setEditingAttr] = useState<Attribute & {type: 'Kategori' | 'Unit'} | null>(null);
+    
+    // In a real app, this would be saved to a database and probably managed via context/global state
+    const [lowStockThreshold, setLowStockThreshold] = useState(200);
+
 
     const handleCreateKey = () => {
         if (!newKeyLabel) {
@@ -184,6 +188,27 @@ export default function SettingsPage() {
         <div className="flex flex-col gap-6">
             <h1 className="font-headline text-3xl font-bold">Pengaturan</h1>
             <div className="grid gap-6">
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5" /> Notifikasi</CardTitle>
+                        <CardDescription>Atur pemberitahuan untuk berbagai peristiwa dalam aplikasi.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid max-w-md gap-1.5">
+                            <Label htmlFor="low-stock-threshold">Ambang Batas Stok Rendah</Label>
+                            <Input
+                                id="low-stock-threshold"
+                                type="number"
+                                value={lowStockThreshold}
+                                onChange={(e) => setLowStockThreshold(parseInt(e.target.value, 10) || 0)}
+                            />
+                            <p className="text-sm text-muted-foreground">
+                                Dapatkan notifikasi di dasbor ketika kuantitas bahan berada di bawah angka ini.
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
+
                  <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" /> Atribut Inventaris</CardTitle>

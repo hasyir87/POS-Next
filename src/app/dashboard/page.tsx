@@ -1,7 +1,13 @@
+
+"use client";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DollarSign, Package, Users, Activity } from "lucide-react";
+import { DollarSign, Package, Users, Activity, AlertCircle, ArchiveX } from "lucide-react";
 import { SalesChart } from "@/components/sales-chart";
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 const kpiData = [
   { title: "Pendapatan Hari Ini", value: "Rp 2.150.000", change: "+12.1% dari kemarin", icon: DollarSign },
@@ -28,7 +34,33 @@ const recentTransactions = [
   { id: "TRX005", customer: "Ava Jones", amount: "Rp 60.250", item: "Custom Blend (Citrus)", status: "Paid" },
 ];
 
+type Material = {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+};
+
+// --- SIMULASI DATA ---
+// Di aplikasi nyata, data ini akan datang dari database (Firestore) atau state management global.
+const initialAvailableMaterials: Material[] = [
+  { id: "MAT001", name: "Rose Absolute", quantity: 50, unit: "ml" },
+  { id: "MAT002", name: "Jasmine Sambac", quantity: 350, unit: "ml" },
+  { id: "MAT004", name: "Sandalwood", quantity: 0, unit: "g" },
+  { id: "MAT007", name: "Iso E Super", quantity: 180, unit: "ml" },
+];
+
+
 export default function DashboardPage() {
+    // In a real app, this would be fetched or come from a global state
+    const [materials, setMaterials] = useState<Material[]>(initialAvailableMaterials);
+    const [lowStockThreshold, setLowStockThreshold] = useState(200);
+
+    const lowStockItems = materials.filter(m => m.quantity > 0 && m.quantity < lowStockThreshold);
+    const outOfStockItems = materials.filter(m => m.quantity === 0);
+    const notifications = [...lowStockItems, ...outOfStockItems];
+
+
   return (
     <div className="flex flex-col gap-6">
       <h1 className="font-headline text-3xl font-bold">Dasbor</h1>
@@ -49,15 +81,53 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="lg:col-span-4">
-          <CardHeader>
-            <CardTitle>Performa Penjualan</CardTitle>
-            <CardDescription>Penjualan minggu ini dibandingkan minggu lalu.</CardDescription>
-          </CardHeader>
-          <CardContent className="pl-2">
-            <SalesChart data={salesData} />
-          </CardContent>
-        </Card>
+        <div className="lg:col-span-4 flex flex-col gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Performa Penjualan</CardTitle>
+                <CardDescription>Penjualan minggu ini dibandingkan minggu lalu.</CardDescription>
+              </CardHeader>
+              <CardContent className="pl-2">
+                <SalesChart data={salesData} />
+              </CardContent>
+            </Card>
+             <Card>
+                <CardHeader>
+                    <CardTitle>Pemberitahuan & Tugas</CardTitle>
+                    <CardDescription>Item yang memerlukan perhatian segera.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {notifications.length > 0 ? (
+                        <ul className="space-y-3">
+                            {outOfStockItems.map(item => (
+                                <li key={item.id} className="flex items-start gap-3">
+                                    <ArchiveX className="h-5 w-5 text-red-500 mt-0.5" />
+                                    <div className="flex-1">
+                                        <p className="font-medium leading-tight">Stok Habis: {item.name}</p>
+                                        <p className="text-sm text-muted-foreground">Segera lakukan pemesanan ulang.</p>
+                                    </div>
+                                    <Button asChild variant="secondary" size="sm"><Link href="/dashboard/inventory">Lihat</Link></Button>
+                                </li>
+                            ))}
+                            {lowStockItems.map(item => (
+                                <li key={item.id} className="flex items-start gap-3">
+                                    <AlertCircle className="h-5 w-5 text-yellow-500 mt-0.5" />
+                                    <div className="flex-1">
+                                        <p className="font-medium leading-tight">Stok Menipis: {item.name}</p>
+                                        <p className="text-sm text-muted-foreground">Sisa {item.quantity} {item.unit}. Pertimbangkan untuk memesan ulang.</p>
+                                    </div>
+                                     <Button asChild variant="secondary" size="sm"><Link href="/dashboard/inventory">Lihat</Link></Button>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                       <div className="text-center text-muted-foreground py-4">
+                         <p>Tidak ada pemberitahuan. Semuanya baik-baik saja!</p>
+                       </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
         <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>Transaksi Terkini</CardTitle>
