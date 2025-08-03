@@ -9,6 +9,7 @@ import { MoreHorizontal, PlusCircle } from "lucide-react";
 const allPermissions = [
     // Dashboard / Reporting Permissions
     { id: "dashboard.view", label: "Lihat Dasbor", category: "Dasbor" },
+    { id: "dashboard.view.alloutlets", label: "Lihat Semua Outlet", category: "Dasbor" },
     { id: "reports.view", label: "Lihat Laporan", category: "Laporan" },
     { id: "reports.export", label: "Ekspor Laporan", category: "Laporan" },
     
@@ -35,12 +36,12 @@ const allPermissions = [
 const roles = [
   {
     name: "Pemilik",
-    description: "Memiliki semua izin secara default.",
+    description: "Memiliki semua izin dan akses ke semua outlet.",
     permissions: allPermissions.map(p => p.id),
   },
   {
     name: "Admin",
-    description: "Mengelola operasi sehari-hari.",
+    description: "Mengelola operasi harian untuk satu outlet.",
     permissions: [
       "dashboard.view",
       "reports.view",
@@ -55,7 +56,7 @@ const roles = [
   },
   {
     name: "Kasir",
-    description: "Menangani transaksi penjualan melalui POS.",
+    description: "Menangani transaksi penjualan untuk satu outlet.",
     permissions: [
         "transactions.create",
         "shifts.own.manage"
