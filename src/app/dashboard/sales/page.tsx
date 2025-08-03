@@ -1,7 +1,11 @@
+
+"use client";
+
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { PlusCircle, Tag } from "lucide-react";
+import { PlusCircle, Tag, Trash2 } from "lucide-react";
 import Image from 'next/image';
 
 const products = [
@@ -13,17 +17,37 @@ const products = [
   { name: "Vanilla Dream", price: 68.75, image: "https://placehold.co/300x200", hint: "vanilla bean" },
 ];
 
-const order = {
-  items: [
-    { name: "Ocean Breeze", price: 79.99, quantity: 1 },
-    { name: "Custom Blend", price: 95.00, quantity: 1 },
-  ],
-  subtotal: 174.99,
-  tax: 14.00,
-  total: 188.99
-};
+interface OrderItem {
+    name: string;
+    price: number;
+    quantity: number;
+}
 
 export default function SalesPage() {
+    const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+
+    const addToOrder = (product: { name: string; price: number }) => {
+        setOrderItems(prevItems => {
+            const existingItem = prevItems.find(item => item.name === product.name);
+            if (existingItem) {
+                return prevItems.map(item =>
+                    item.name === product.name ? { ...item, quantity: item.quantity + 1 } : item
+                );
+            }
+            return [...prevItems, { ...product, quantity: 1 }];
+        });
+    };
+
+    const removeFromOrder = (productName: string) => {
+        setOrderItems(prevItems => prevItems.filter(item => item.name !== productName));
+    }
+
+    const subtotal = orderItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+    const taxRate = 0.08; // 8% tax
+    const tax = subtotal * taxRate;
+    const total = subtotal + tax;
+
+
   return (
     <div className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8 lg:grid-cols-3 xl:grid-cols-3">
       <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2">
@@ -49,7 +73,7 @@ export default function SalesPage() {
                   <CardFooter className="flex flex-col items-start p-4 bg-card">
                     <p className="font-semibold">{product.name}</p>
                     <p className="text-sm text-muted-foreground">${product.price.toFixed(2)}</p>
-                    <Button size="sm" variant="outline" className="w-full mt-2">
+                    <Button size="sm" variant="outline" className="w-full mt-2" onClick={() => addToOrder(product)}>
                       <PlusCircle className="mr-2 h-4 w-4" />
                       Add to Order
                     </Button>
@@ -62,7 +86,7 @@ export default function SalesPage() {
                   <CardDescription>Create a unique blend for the customer.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button>Create Custom Blend</Button>
+                  <Button onClick={() => addToOrder({name: 'Custom Blend', price: 95.00})}>Create Custom Blend</Button>
                 </CardContent>
               </Card>
             </div>
@@ -75,41 +99,57 @@ export default function SalesPage() {
             <CardTitle>Current Order</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <div className="flex flex-col gap-2">
-              {order.items.map((item, index) => (
-                <div key={index} className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
-                  </div>
-                  <p>${item.price.toFixed(2)}</p>
-                </div>
-              ))}
+            <div className="flex flex-col gap-3">
+              {orderItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center">No items in order.</p>
+              ) : (
+                orderItems.map((item, index) => (
+                    <div key={index} className="flex justify-between items-center">
+                    <div>
+                        <p className="font-medium">{item.name}</p>
+                        <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <p>${(item.price * item.quantity).toFixed(2)}</p>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeFromOrder(item.name)}>
+                           <Trash2 className="h-4 w-4 text-destructive" />
+                           <span className="sr-only">Remove item</span>
+                        </Button>
+                    </div>
+                    </div>
+                ))
+              )}
             </div>
-            <Separator />
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span>${order.subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Tax</span>
-                <span>${order.tax.toFixed(2)}</span>
-              </div>
-              <Button variant="link" size="sm" className="p-0 h-auto text-primary">
-                <Tag className="mr-2 h-4 w-4" />
-                Apply Promotion
-              </Button>
-              <Separator />
-              <div className="flex justify-between font-semibold text-lg">
-                <span>Total</span>
-                <span>${order.total.toFixed(2)}</span>
-              </div>
-            </div>
+            {orderItems.length > 0 && (
+                <>
+                    <Separator />
+                    <div className="space-y-2">
+                    <div className="flex justify-between">
+                        <span>Subtotal</span>
+                        <span>${subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span>Tax</span>
+                        <span>${tax.toFixed(2)}</span>
+                    </div>
+                    <Button variant="link" size="sm" className="p-0 h-auto text-primary">
+                        <Tag className="mr-2 h-4 w-4" />
+                        Apply Promotion
+                    </Button>
+                    <Separator />
+                    <div className="flex justify-between font-semibold text-lg">
+                        <span>Total</span>
+                        <span>${total.toFixed(2)}</span>
+                    </div>
+                    </div>
+                </>
+            )}
           </CardContent>
-          <CardFooter>
-            <Button className="w-full">Complete Sale</Button>
-          </CardFooter>
+          {orderItems.length > 0 && (
+            <CardFooter>
+              <Button className="w-full">Complete Sale</Button>
+            </CardFooter>
+          )}
         </Card>
       </div>
     </div>
