@@ -13,6 +13,7 @@ import { MoreHorizontal, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Combobox } from "@/components/ui/combobox";
 
 type Material = {
   id: string;
@@ -35,11 +36,29 @@ const initialAvailableMaterials: Material[] = [
   { id: "MAT010", name: "Botol Kaca 100ml", quantity: 80, unit: "pcs", category: "Kemasan" },
 ];
 
+const initialCategories = [
+    { value: "bibit parfum", label: "Bibit Parfum" },
+    { value: "pelarut", label: "Pelarut" },
+    { value: "bahan sintetis", label: "Bahan Sintetis" },
+    { value: "kemasan", label: "Kemasan" },
+]
+
+const initialUnits = [
+    { value: "ml", label: "ml" },
+    { value: "g", label: "g" },
+    { value: "pcs", label: "pcs" },
+]
+
+
 export default function InventoryPage() {
   const { toast } = useToast();
   const [materials, setMaterials] = useState<Material[]>(initialAvailableMaterials);
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
+
+  // In a real app, these would come from a database, probably fetched in a layout or context
+  const [categories, setCategories] = useState(initialCategories);
+  const [units, setUnits] = useState(initialUnits);
 
   const emptyMaterial: Material = { id: "", name: "", quantity: 0, unit: "", category: "" };
 
@@ -72,11 +91,11 @@ export default function InventoryPage() {
   };
   
   const groupedMaterials = materials.reduce((acc, material) => {
-    const { category } = material;
-    if (!acc[category]) {
-      acc[category] = [];
+    const categoryLabel = categories.find(c => c.value === material.category)?.label || material.category;
+    if (!acc[categoryLabel]) {
+      acc[categoryLabel] = [];
     }
-    acc[category].push(material);
+    acc[categoryLabel].push(material);
     return acc;
   }, {} as Record<string, Material[]>);
 
@@ -109,7 +128,16 @@ export default function InventoryPage() {
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="category" className="text-right">Kategori</Label>
-                                <Input id="category" className="col-span-3" value={editingMaterial?.category || ''} onChange={(e) => setEditingMaterial(prev => prev ? {...prev, category: e.target.value} : null)} placeholder="e.g., Bibit Parfum, Kemasan"/>
+                                <div className="col-span-3">
+                                  <Combobox
+                                    options={categories}
+                                    value={editingMaterial?.category}
+                                    onChange={(value) => setEditingMaterial(prev => prev ? {...prev, category: value} : null)}
+                                    placeholder="Pilih kategori..."
+                                    searchPlaceholder="Cari kategori..."
+                                    emptyPlaceholder="Kategori tidak ditemukan."
+                                  />
+                                </div>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="quantity" className="text-right">Kuantitas</Label>
@@ -117,7 +145,16 @@ export default function InventoryPage() {
                             </div>
                              <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="unit" className="text-right">Unit</Label>
-                                <Input id="unit" className="col-span-3" value={editingMaterial?.unit || ''} onChange={(e) => setEditingMaterial(prev => prev ? {...prev, unit: e.target.value} : null)} placeholder="e.g., ml, g, pcs" />
+                                <div className="col-span-3">
+                                    <Combobox
+                                        options={units}
+                                        value={editingMaterial?.unit}
+                                        onChange={(value) => setEditingMaterial(prev => prev ? {...prev, unit: value} : null)}
+                                        placeholder="Pilih unit..."
+                                        searchPlaceholder="Cari unit..."
+                                        emptyPlaceholder="Unit tidak ditemukan."
+                                    />
+                                </div>
                             </div>
                         </div>
                         <DialogFooter>

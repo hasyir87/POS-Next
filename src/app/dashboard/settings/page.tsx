@@ -9,15 +9,19 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tag, User, Languages, Key, Store, MoreHorizontal, PlusCircle } from "lucide-react";
+import { Tag, User, Languages, Key, Store, MoreHorizontal, PlusCircle, Package } from "lucide-react";
 import Link from "next/link";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 
 type ApiKey = { id: string; label: string; key: string; created: string };
 type Outlet = { id: string; name: string; location: string };
 type Promotion = { id: string; name: string; type: string; value: string; };
+type Attribute = { id: string; name: string };
+
 
 const initialApiKeys: ApiKey[] = [
     { id: "key_1", label: "Aplikasi POS Flutter", key: "sk_live_Abc123DeF4G5H6i7...", created: "29 Oktober 2023" },
@@ -32,6 +36,19 @@ const initialPromotions: Promotion[] = [
     { id: "promo_1", name: "Diskon Akhir Pekan", type: "Persentase", value: "15%" },
     { id: "promo_2", name: "Beli 1 Gratis 1 Parfum Mini", type: "BOGO", value: "Parfum Mini" },
 ];
+
+const initialCategories: Attribute[] = [
+    { id: "cat_1", name: "Bibit Parfum" },
+    { id: "cat_2", name: "Pelarut" },
+    { id: "cat_3", name: "Bahan Sintetis" },
+    { id: "cat_4", name: "Kemasan" },
+]
+
+const initialUnits: Attribute[] = [
+    { id: "unit_1", name: "ml" },
+    { id: "unit_2", name: "g" },
+    { id: "unit_3", name: "pcs" },
+]
 
 export default function SettingsPage() {
     const { toast } = useToast();
@@ -49,6 +66,10 @@ export default function SettingsPage() {
     const [isPromoDialogOpen, setPromoDialogOpen] = useState(false);
     const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
 
+    const [categories, setCategories] = useState<Attribute[]>(initialCategories);
+    const [units, setUnits] = useState<Attribute[]>(initialUnits);
+    const [isAttrDialogOpen, setAttrDialogOpen] = useState(false);
+    const [editingAttr, setEditingAttr] = useState<Attribute & {type: 'Kategori' | 'Unit'} | null>(null);
 
     const handleCreateKey = () => {
         if (!newKeyLabel) {
@@ -126,11 +147,120 @@ export default function SettingsPage() {
         toast({ title: "Sukses", description: "Promosi berhasil dihapus." });
     };
 
+    const handleOpenAttrDialog = (attr: Attribute | null, type: 'Kategori' | 'Unit') => {
+        setEditingAttr(attr ? { ...attr, type } : { id: "", name: "", type });
+        setAttrDialogOpen(true);
+    };
+
+    const handleSaveAttr = () => {
+        if (!editingAttr || !editingAttr.name) {
+            toast({ variant: "destructive", title: "Error", description: "Nama atribut harus diisi." });
+            return;
+        }
+        
+        const list = editingAttr.type === 'Kategori' ? categories : units;
+        const setList = editingAttr.type === 'Kategori' ? setCategories : setUnits;
+        const prefix = editingAttr.type === 'Kategori' ? 'cat' : 'unit';
+
+        if (editingAttr.id) {
+            setList(list.map(item => item.id === editingAttr.id ? {id: item.id, name: editingAttr.name} : item));
+        } else {
+            const newItem = { id: `${prefix}_${Date.now()}`, name: editingAttr.name };
+            setList(prev => [...prev, newItem]);
+        }
+        toast({ title: "Sukses", description: `${editingAttr.type} berhasil disimpan.` });
+        setAttrDialogOpen(false);
+        setEditingAttr(null);
+    };
+
+     const handleDeleteAttr = (id: string, type: 'Kategori' | 'Unit') => {
+        const setList = type === 'Kategori' ? setCategories : setUnits;
+        setList(prev => prev.filter(item => item.id !== id));
+        toast({ title: "Sukses", description: `${type} berhasil dihapus.` });
+    };
+
 
     return (
         <div className="flex flex-col gap-6">
             <h1 className="font-headline text-3xl font-bold">Pengaturan</h1>
             <div className="grid gap-6">
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" /> Atribut Inventaris</CardTitle>
+                        <CardDescription>Kelola atribut yang digunakan untuk item inventaris, seperti kategori dan unit pengukuran.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Tabs defaultValue="categories">
+                            <TabsList>
+                                <TabsTrigger value="categories">Kategori</TabsTrigger>
+                                <TabsTrigger value="units">Unit</TabsTrigger>
+                            </TabsList>
+                            <Dialog open={isAttrDialogOpen} onOpenChange={setAttrDialogOpen}>
+                                <DialogContent>
+                                    <DialogHeader><DialogTitle className="font-headline">
+                                        {editingAttr?.id ? `Ubah ${editingAttr?.type}` : `Tambah ${editingAttr?.type} Baru`}
+                                    </DialogTitle></DialogHeader>
+                                    <div className="grid gap-4 py-4">
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label htmlFor="attr-name" className="text-right">Nama</Label>
+                                            <Input id="attr-name" value={editingAttr?.name || ''} onChange={e => setEditingAttr(prev => prev ? {...prev, name: e.target.value} : null)} className="col-span-3" />
+                                        </div>
+                                    </div>
+                                    <DialogFooter><Button onClick={handleSaveAttr}>Simpan</Button></DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                            <TabsContent value="categories">
+                                <div className="flex justify-end mb-4">
+                                    <Button onClick={() => handleOpenAttrDialog(null, 'Kategori')}><PlusCircle className="mr-2" /> Tambah Kategori</Button>
+                                </div>
+                                <Table>
+                                    <TableHeader><TableRow><TableHead>Nama Kategori</TableHead><TableHead className="w-[100px] text-right">Aksi</TableHead></TableRow></TableHeader>
+                                    <TableBody>
+                                        {categories.map(cat => (
+                                            <TableRow key={cat.id}>
+                                                <TableCell>{cat.name}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal /></Button></DropdownMenuTrigger>
+                                                        <DropdownMenuContent>
+                                                            <DropdownMenuItem onClick={() => handleOpenAttrDialog(cat, 'Kategori')}>Ubah</DropdownMenuItem>
+                                                            <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteAttr(cat.id, 'Kategori')}>Hapus</DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TabsContent>
+                            <TabsContent value="units">
+                                <div className="flex justify-end mb-4">
+                                     <Button onClick={() => handleOpenAttrDialog(null, 'Unit')}><PlusCircle className="mr-2" /> Tambah Unit</Button>
+                                </div>
+                                <Table>
+                                    <TableHeader><TableRow><TableHead>Nama Unit</TableHead><TableHead className="w-[100px] text-right">Aksi</TableHead></TableRow></TableHeader>
+                                    <TableBody>
+                                        {units.map(unit => (
+                                            <TableRow key={unit.id}>
+                                                <TableCell>{unit.name}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal /></Button></DropdownMenuTrigger>
+                                                        <DropdownMenuContent>
+                                                            <DropdownMenuItem onClick={() => handleOpenAttrDialog(unit, 'Unit')}>Ubah</DropdownMenuItem>
+                                                            <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteAttr(unit.id, 'Unit')}>Hapus</DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TabsContent>
+                        </Tabs>
+                    </CardContent>
+                </Card>
+
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Key className="h-5 w-5" /> Manajemen Kunci API</CardTitle>
