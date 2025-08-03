@@ -12,23 +12,27 @@ import { Label } from "@/components/ui/label";
 import { MoreHorizontal, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 type Material = {
   id: string;
   name: string;
   quantity: number;
   unit: string;
+  category: string;
 };
 
 const initialAvailableMaterials: Material[] = [
-  { id: "MAT001", name: "Rose Absolute", quantity: 500, unit: "ml" },
-  { id: "MAT002", name: "Jasmine Sambac", quantity: 350, unit: "ml" },
-  { id: "MAT003", name: "Bergamot Oil", quantity: 1200, unit: "ml" },
-  { id: "MAT004", name: "Sandalwood", quantity: 200, unit: "g" },
-  { id: "MAT005", name: "Vanilla Extract", quantity: 800, unit: "ml" },
-  { id: "MAT006", name: "Ethanol (Perfumer's Alcohol)", quantity: 5000, unit: "ml" },
-  { id: "MAT007", name: "Iso E Super", quantity: 2500, unit: "ml" },
-  { id: "MAT008", name: "Ambroxan", quantity: 150, unit: "g" },
+  { id: "MAT001", name: "Rose Absolute", quantity: 500, unit: "ml", category: "Bibit Parfum" },
+  { id: "MAT002", name: "Jasmine Sambac", quantity: 350, unit: "ml", category: "Bibit Parfum" },
+  { id: "MAT003", name: "Bergamot Oil", quantity: 1200, unit: "ml", category: "Bibit Parfum" },
+  { id: "MAT004", name: "Sandalwood", quantity: 200, unit: "g", category: "Bibit Parfum" },
+  { id: "MAT005", name: "Vanilla Extract", quantity: 800, unit: "ml", category: "Bibit Parfum" },
+  { id: "MAT006", name: "Ethanol (Perfumer's Alcohol)", quantity: 5000, unit: "ml", category: "Pelarut" },
+  { id: "MAT007", name: "Iso E Super", quantity: 2500, unit: "ml", category: "Bahan Sintetis" },
+  { id: "MAT008", name: "Ambroxan", quantity: 150, unit: "g", category: "Bahan Sintetis" },
+  { id: "MAT009", name: "Botol Kaca 50ml", quantity: 150, unit: "pcs", category: "Kemasan" },
+  { id: "MAT010", name: "Botol Kaca 100ml", quantity: 80, unit: "pcs", category: "Kemasan" },
 ];
 
 export default function InventoryPage() {
@@ -37,7 +41,7 @@ export default function InventoryPage() {
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
 
-  const emptyMaterial = { id: "", name: "", quantity: 0, unit: "" };
+  const emptyMaterial: Material = { id: "", name: "", quantity: 0, unit: "", category: "" };
 
   const handleOpenDialog = (material: Material | null = null) => {
     setEditingMaterial(material ? { ...material } : emptyMaterial);
@@ -45,8 +49,8 @@ export default function InventoryPage() {
   };
 
   const handleSaveMaterial = () => {
-    if (!editingMaterial || !editingMaterial.name || !editingMaterial.unit) {
-      toast({ variant: "destructive", title: "Error", description: "Nama dan unit bahan harus diisi." });
+    if (!editingMaterial || !editingMaterial.name || !editingMaterial.unit || !editingMaterial.category) {
+      toast({ variant: "destructive", title: "Error", description: "Nama, unit, dan kategori bahan harus diisi." });
       return;
     }
 
@@ -66,6 +70,15 @@ export default function InventoryPage() {
     setMaterials(materials.filter(mat => mat.id !== id));
     toast({ title: "Sukses", description: "Bahan berhasil dihapus." });
   };
+  
+  const groupedMaterials = materials.reduce((acc, material) => {
+    const { category } = material;
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(material);
+    return acc;
+  }, {} as Record<string, Material[]>);
 
 
   return (
@@ -79,7 +92,7 @@ export default function InventoryPage() {
                 <CardHeader className="flex flex-row items-center justify-between">
                     <div>
                       <CardTitle>Inventaris Langsung</CardTitle>
-                      <CardDescription>Tingkat stok bahan baku saat ini.</CardDescription>
+                      <CardDescription>Tingkat stok bahan baku saat ini dikelompokkan berdasarkan kategori.</CardDescription>
                     </div>
                     <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
                       <DialogTrigger asChild>
@@ -93,6 +106,10 @@ export default function InventoryPage() {
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="name" className="text-right">Nama</Label>
                                 <Input id="name" className="col-span-3" value={editingMaterial?.name || ''} onChange={(e) => setEditingMaterial(prev => prev ? {...prev, name: e.target.value} : null)} />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="category" className="text-right">Kategori</Label>
+                                <Input id="category" className="col-span-3" value={editingMaterial?.category || ''} onChange={(e) => setEditingMaterial(prev => prev ? {...prev, category: e.target.value} : null)} placeholder="e.g., Bibit Parfum, Kemasan"/>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="quantity" className="text-right">Kuantitas</Label>
@@ -110,37 +127,46 @@ export default function InventoryPage() {
                     </Dialog>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Bahan</TableHead>
-                                <TableHead className="text-right">Kuantitas</TableHead>
-                                <TableHead className="w-[50px]"></TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {materials.map((material) => (
-                                <TableRow key={material.id}>
-                                    <TableCell>{material.name}</TableCell>
-                                    <TableCell className="text-right">{material.quantity} {material.unit}</TableCell>
-                                     <TableCell>
-                                       <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                                    <span className="sr-only">Buka menu</span>
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => handleOpenDialog(material)}>Ubah</DropdownMenuItem>
-                                                <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteMaterial(material.id)}>Hapus</DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                  <Accordion type="multiple" className="w-full" defaultValue={Object.keys(groupedMaterials)}>
+                    {Object.entries(groupedMaterials).map(([category, items]) => (
+                      <AccordionItem value={category} key={category}>
+                        <AccordionTrigger className="text-base font-medium">{category}</AccordionTrigger>
+                        <AccordionContent>
+                          <Table>
+                              <TableHeader>
+                                  <TableRow>
+                                      <TableHead>Bahan</TableHead>
+                                      <TableHead className="text-right">Kuantitas</TableHead>
+                                      <TableHead className="w-[50px]"></TableHead>
+                                  </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                  {items.map((material) => (
+                                      <TableRow key={material.id}>
+                                          <TableCell>{material.name}</TableCell>
+                                          <TableCell className="text-right">{material.quantity} {material.unit}</TableCell>
+                                          <TableCell>
+                                            <DropdownMenu>
+                                                  <DropdownMenuTrigger asChild>
+                                                      <Button variant="ghost" className="h-8 w-8 p-0">
+                                                          <span className="sr-only">Buka menu</span>
+                                                          <MoreHorizontal className="h-4 w-4" />
+                                                      </Button>
+                                                  </DropdownMenuTrigger>
+                                                  <DropdownMenuContent align="end">
+                                                      <DropdownMenuItem onClick={() => handleOpenDialog(material)}>Ubah</DropdownMenuItem>
+                                                      <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteMaterial(material.id)}>Hapus</DropdownMenuItem>
+                                                  </DropdownMenuContent>
+                                              </DropdownMenu>
+                                          </TableCell>
+                                      </TableRow>
+                                  ))}
+                              </TableBody>
+                          </Table>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
                 </CardContent>
             </Card>
         </div>
@@ -151,5 +177,3 @@ export default function InventoryPage() {
     </div>
   );
 }
-
-    
