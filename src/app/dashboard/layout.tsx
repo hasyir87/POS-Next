@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { BarChart2, Clock, FlaskConical, Home, LogOut, Menu, Settings } from "lucide-react";
+import { BarChart2, Clock, FlaskConical, Home, LogOut, Menu, Settings, DollarSign } from "lucide-react";
 import Link from "next/link";
 import { ScentSationLogo } from "@/components/scent-sation-logo";
 
@@ -15,6 +15,7 @@ export default function DashboardLayout({
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: Home },
     { href: "/dashboard/inventory", label: "Inventory", icon: FlaskConical },
+    { href: "/dashboard/expenses", label: "Expenses", icon: DollarSign },
     { href: "/dashboard/reports", label: "Reports", icon: BarChart2 },
     { href: "/dashboard/shifts", label: "Shifts", icon: Clock },
     { href: "/dashboard/settings", label: "Settings", icon: Settings },
