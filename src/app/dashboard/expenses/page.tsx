@@ -42,7 +42,7 @@ export default function ExpensesPage() {
     const [isDialogOpen, setDialogOpen] = useState(false);
     const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
-    const emptyExpense = { id: "", date: new Date().toISOString().substring(0, 10), category: "", description: "", amount: 0 };
+    const emptyExpense = { id: "", date: new Date().toISOString().substring(0, 10), category: "" as ExpenseCategory, description: "", amount: 0 };
 
     const handleOpenDialog = (expense: Expense | null = null) => {
         setEditingExpense(expense ? { ...expense } : emptyExpense);
@@ -177,5 +177,4 @@ export default function ExpensesPage() {
         </div>
     );
 }
-
     

@@ -41,6 +41,7 @@ const availableAromas = [
 const recipeBook = [
     { aromaId: "ARO003", bottleSize: 30, essenceMl: 13, solventMl: 17, basePrice: 55000 },
     { aromaId: "ARO003", bottleSize: 50, essenceMl: 22, solventMl: 28, basePrice: 85000 },
+    { aromaId: "ARO003", bottleSize: 100, essenceMl: 40, solventMl: 60, basePrice: 150000 },
     { aromaId: "ARO001", bottleSize: 30, essenceMl: 15, solventMl: 15, basePrice: 45000 },
 ];
 
@@ -360,3 +361,4 @@ export default function PosPage() {
         </div>
     );
 }
+    
