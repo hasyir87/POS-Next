@@ -62,8 +62,9 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
     const { toast } = useToast();
     const [selectedGrade, setSelectedGrade] = useState<string>('');
     const [selectedAroma, setSelectedAroma] = useState<string>('');
-    const [selectedBottleSize, setSelectedBottleSize, setSolventMl] = useState<number>(0);
+    const [selectedBottleSize, setSelectedBottleSize] = useState<number>(0);
     const [essenceMl, setEssenceMl] = useState<number>(0);
+    const [solventMl, setSolventMl] = useState<number>(0);
     const [totalPrice, setTotalPrice] = useState<number>(0);
 
     const filteredAromas = availableAromas.filter(a => a.grade === selectedGrade);
@@ -152,7 +153,7 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
                 {/* Step 2: Bottle Size */}
                 <div className="space-y-2">
                     <Label>Langkah 2: Pilih Ukuran Botol</Label>
-                    <Select value={selectedBottleSize.toString()} onValueChange={(val) => setSelectedBottleSize(parseInt(val))} disabled={!selectedAroma}>
+                    <Select value={selectedBottleSize.toString()} onValueChange={(val) => setSelectedBottleSize(parseInt(val, 10))} disabled={!selectedAroma}>
                         <SelectTrigger><SelectValue placeholder="Pilih Ukuran..." /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="30">30 ml</SelectItem>
@@ -358,5 +359,3 @@ export default function PosPage() {
         </div>
     );
 }
-
-    
