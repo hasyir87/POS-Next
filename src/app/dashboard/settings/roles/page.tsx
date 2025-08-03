@@ -2,54 +2,76 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MoreHorizontal, PlusCircle } from "lucide-react";
 
+const allPermissions = [
+    // Dashboard / Reporting Permissions
+    { id: "dashboard.view", label: "View Dashboard", category: "Dashboard" },
+    { id: "reports.view", label: "View Reports", category: "Reports" },
+    { id: "reports.export", label: "Export Reports", category: "Reports" },
+    
+    // Transaction / Sales Permissions
+    { id: "transactions.create", label: "Create Transactions", category: "Sales" },
+    { id: "transactions.view", label: "View Transactions", category: "Sales" },
+
+    // Inventory Permissions
+    { id: "inventory.view", label: "View Inventory", category: "Inventory" },
+    { id: "inventory.manage", label: "Manage Inventory", category: "Inventory" },
+    { id: "inventory.ai", label: "Use AI Mixologist", category: "Inventory" },
+
+    // Staff & Shift Management
+    { id: "shifts.manage", label: "Manage All Shifts", category: "Shifts" },
+    { id: "shifts.own.manage", label: "Manage Own Shift", category: "Shifts" },
+
+    // Settings & User Management
+    { id: "users.manage", label: "Manage Users", category: "Settings" },
+    { id: "roles.manage", label: "Manage Roles", category: "Settings" },
+    { id: "settings.manage", label: "Manage App Settings", category: "Settings" },
+];
+
+
 const roles = [
   {
     name: "Owner",
-    permissions: [
-      { id: "dashboard", label: "View Dashboard" },
-      { id: "sales", label: "Access Sales Terminal" },
-      { id: "inventory", label: "Manage Inventory" },
-      { id: "reports", label: "View Reports" },
-      { id: "shifts", label: "Manage Shifts" },
-      { id: "settings", label: "Edit Settings" },
-      { id: "users", label: "Manage Users" },
-      { id: "roles", label: "Manage Roles" },
-    ],
+    description: "Has all permissions by default.",
+    permissions: allPermissions.map(p => p.id),
   },
   {
     name: "Admin",
+    description: "Manages day-to-day operations.",
     permissions: [
-      { id: "dashboard", label: "View Dashboard" },
-      { id: "sales", label: "Access Sales Terminal" },
-      { id: "inventory", label: "Manage Inventory" },
-      { id: "reports", label: "View Reports" },
-      { id: "shifts", label: "Manage Shifts" },
+      "dashboard.view",
+      "reports.view",
+      "reports.export",
+      "transactions.view",
+      "inventory.view",
+      "inventory.manage",
+      "inventory.ai",
+      "shifts.manage",
+      "users.manage",
     ],
   },
   {
     name: "Cashier",
+    description: "Handles sales transactions via POS.",
     permissions: [
-      { id: "sales", label: "Access Sales Terminal" },
-      { id: "shifts", label: "Start/End Own Shift" },
+        "transactions.create",
+        "shifts.own.manage"
+    ],
+  },
+  {
+    name: "API Client",
+    description: "For backend services like the Flutter POS.",
+    permissions: [
+        "transactions.create",
+        "inventory.view"
     ],
   },
 ];
 
-const allPermissions = [
-    { id: "dashboard", label: "View Dashboard" },
-    { id: "sales", label: "Access Sales Terminal" },
-    { id: "inventory", label: "Manage Inventory" },
-    { id: "reports", label: "View Reports" },
-    { id: "shifts", label: "Manage Shifts" },
-    { id: "settings", label: "Edit Settings" },
-    { id: "users", label: "Manage Users" },
-    { id: "roles", label: "Manage Roles" },
-];
+const permissionCategories = ["Dashboard", "Reports", "Sales", "Inventory", "Shifts", "Settings"];
 
 
 export default function RolesPage() {
@@ -66,7 +88,7 @@ export default function RolesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Roles & Permissions</CardTitle>
-          <CardDescription>Define what each role can access and do within the application.</CardDescription>
+          <CardDescription>Define what each role can access and do within the application and API.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="border rounded-md">
@@ -74,38 +96,46 @@ export default function RolesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[200px]">Role</TableHead>
-                  <TableHead>Permissions</TableHead>
+                  {permissionCategories.map(cat => (
+                    <TableHead key={cat}>{cat}</TableHead>
+                  ))}
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {roles.map((role) => (
                   <TableRow key={role.name}>
-                    <TableCell className="font-medium">{role.name}</TableCell>
-                    <TableCell>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {allPermissions.map((permission) => (
-                          <div key={permission.id} className="flex items-center gap-2">
-                            <Checkbox 
-                              id={`${role.name}-${permission.id}`} 
-                              checked={role.permissions.some(p => p.id === permission.id)}
-                            />
-                            <Label htmlFor={`${role.name}-${permission.id}`} className="font-normal text-sm">{permission.label}</Label>
-                          </div>
-                        ))}
-                      </div>
+                    <TableCell className="font-medium">
+                        <div>{role.name}</div>
+                        <div className="text-xs text-muted-foreground font-normal">{role.description}</div>
                     </TableCell>
+                    {permissionCategories.map(cat => (
+                        <TableCell key={cat}>
+                           <div className="flex flex-col gap-2">
+                             {allPermissions.filter(p => p.category === cat).map((permission) => (
+                               <div key={permission.id} className="flex items-center gap-2">
+                                 <Checkbox 
+                                   id={`${role.name}-${permission.id}`} 
+                                   checked={role.permissions.includes(permission.id)}
+                                   disabled={role.name === 'Owner'}
+                                 />
+                                 <Label htmlFor={`${role.name}-${permission.id}`} className="font-normal text-sm">{permission.label}</Label>
+                               </div>
+                             ))}
+                           </div>
+                        </TableCell>
+                    ))}
                     <TableCell>
                        <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                <Button variant="ghost" className="h-8 w-8 p-0" disabled={role.name === 'Owner'}>
                                     <span className="sr-only">Open menu</span>
                                     <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                                <DropdownMenuItem>Edit Name</DropdownMenuItem>
-                                <DropdownMenuItem className="text-destructive">Delete Role</DropdownMenuItem>
+                                <DropdownMenuItem>Edit</DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </TableCell>
