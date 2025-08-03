@@ -1,40 +1,48 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, MinusCircle, X, Search, UserPlus, Droplets, SprayCan } from "lucide-react";
+import { PlusCircle, MinusCircle, X, Search, UserPlus, Droplets, SprayCan, Bot } from "lucide-react";
 import Image from "next/image";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 // --- SIMULASI DATA ---
-// Di aplikasi nyata, data ini akan datang dari database (Firestore)
+// Produk Jadi
 const productCatalog = [
-  { id: "PROD001", name: "Ocean Breeze", price: 79990, image: "https://placehold.co/100x100.png", stock: 15 },
-  { id: "PROD002", name: "Mystic Woods", price: 85000, image: "https://placehold.co/100x100.png", stock: 10 },
-  { id: "PROD003", name: "Citrus Grove", price: 75500, image: "https://placehold.co/100x100.png", stock: 20 },
-  { id: "PROD004", name: "Floral Fantasy", price: 92000, image: "https://placehold.co/100x100.png", stock: 8 },
-  { id: "PROD005", name: "Spiced Amber", price: 110000, image: "https://placehold.co/100x100.png", stock: 12 },
-  { id: "PROD006", name: "Vanilla Dream", price: 68000, image: "https://placehold.co/100x100.png", stock: 25 },
+  { id: "PROD001", name: "Ocean Breeze", price: 79990, image: "https://placehold.co/100x100.png", stock: 15, "data-ai-hint": "perfume bottle" },
+  { id: "PROD002", name: "Mystic Woods", price: 85000, image: "https://placehold.co/100x100.png", stock: 10, "data-ai-hint": "perfume bottle" },
+  { id: "PROD003", name: "Citrus Grove", price: 75500, image: "https://placehold.co/100x100.png", stock: 20, "data-ai-hint": "perfume bottle" },
+  { id: "PROD004", name: "Floral Fantasy", price: 92000, image: "https://placehold.co/100x100.png", stock: 8, "data-ai-hint": "perfume bottle" },
 ];
 
-const availableEssences = [
-    { id: "MAT001", name: "Rose Absolute", pricePerMl: 1500 },
-    { id: "MAT002", name: "Jasmine Sambac", pricePerMl: 1800 },
-    { id: "MAT003", name: "Bergamot Oil", pricePerMl: 800 },
+// Resep & Bibit Parfum untuk Isi Ulang
+const perfumeGrades = [
+    { value: "standard", label: "Standar" },
+    { value: "premium", label: "Premium" },
 ];
 
-const availableBottles = [
-    { id: "MAT009", name: "Botol Kaca 50ml", price: 3500 },
-    { id: "MAT010", name: "Botol Kaca 100ml", price: 5000 },
-]
+const availableAromas = [
+    { id: "ARO001", name: "Sandalwood Supreme", grade: "standard", pricePerMlExtra: 3000 },
+    { id: "ARO002", name: "Vanilla Orchid", grade: "standard", pricePerMlExtra: 2500 },
+    { id: "ARO003", name: "YSL Black Opium", grade: "premium", pricePerMlExtra: 3500 },
+    { id: "ARO004", name: "Baccarat Rouge", grade: "premium", pricePerMlExtra: 4500 },
+];
+
+const recipeBook = [
+    { aromaId: "ARO003", bottleSize: 30, essenceMl: 13, solventMl: 17, basePrice: 55000 },
+    { aromaId: "ARO003", bottleSize: 50, essenceMl: 22, solventMl: 28, basePrice: 85000 },
+    { aromaId: "ARO001", bottleSize: 30, essenceMl: 15, solventMl: 15, basePrice: 45000 },
+];
 
 type CartItem = {
   id: string;
@@ -42,17 +50,159 @@ type CartItem = {
   price: number;
   quantity: number;
   type: 'product' | 'refill';
+  details?: string;
 };
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
 };
 
+// Komponen Form Isi Ulang
+const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) => {
+    const { toast } = useToast();
+    const [selectedGrade, setSelectedGrade] = useState<string>('');
+    const [selectedAroma, setSelectedAroma] = useState<string>('');
+    const [selectedBottleSize, setSelectedBottleSize, setSolventMl] = useState<number>(0);
+    const [essenceMl, setEssenceMl] = useState<number>(0);
+    const [totalPrice, setTotalPrice] = useState<number>(0);
+
+    const filteredAromas = availableAromas.filter(a => a.grade === selectedGrade);
+    const recipe = recipeBook.find(r => r.aromaId === selectedAroma && r.bottleSize === selectedBottleSize);
+
+    useEffect(() => {
+        if (recipe) {
+            setEssenceMl(recipe.essenceMl);
+            setSolventMl(recipe.solventMl);
+        } else {
+            setEssenceMl(0);
+            setSolventMl(0);
+        }
+    }, [recipe]);
+    
+    useEffect(() => {
+        if(recipe) {
+            const aromaDetails = availableAromas.find(a => a.id === selectedAroma);
+            const extraEssence = Math.max(0, essenceMl - recipe.essenceMl);
+            const extraCost = extraEssence * (aromaDetails?.pricePerMlExtra || 0);
+            setTotalPrice(recipe.basePrice + extraCost);
+        } else {
+            setTotalPrice(0);
+        }
+    }, [essenceMl, recipe, selectedAroma]);
+
+    const handleEssenceChange = (newEssenceMl: number) => {
+        if (newEssenceMl < 0) newEssenceMl = 0;
+        if (newEssenceMl > selectedBottleSize) newEssenceMl = selectedBottleSize;
+
+        setEssenceMl(newEssenceMl);
+        setSolventMl(selectedBottleSize - newEssenceMl);
+    };
+    
+    const handleAddToCart = () => {
+        const aroma = availableAromas.find(a => a.id === selectedAroma);
+        if (!aroma || !recipe) {
+             toast({ variant: "destructive", title: "Error", description: "Harap lengkapi semua pilihan resep." });
+            return;
+        }
+
+        const cartItem: CartItem = {
+            id: `refill-${Date.now()}`,
+            name: `Isi Ulang: ${aroma.name}`,
+            price: totalPrice,
+            quantity: 1,
+            type: 'refill',
+            details: `${selectedBottleSize}ml (${essenceMl}ml bibit / ${solventMl}ml pelarut)`
+        };
+
+        onAddToCart(cartItem);
+        // Reset form
+        setSelectedGrade('');
+        setSelectedAroma('');
+        setSelectedBottleSize(0);
+        toast({ title: "Sukses", description: `${aroma.name} ditambahkan ke keranjang.` });
+    };
+
+    return (
+        <Card>
+            <CardHeader><CardTitle>Formulir Isi Ulang Kustom</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+                 {/* Step 1: Grade & Aroma */}
+                <div className="space-y-2">
+                    <Label>Langkah 1: Pilih Aroma</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                        <Select value={selectedGrade} onValueChange={setSelectedGrade}>
+                            <SelectTrigger><SelectValue placeholder="Pilih Grade..." /></SelectTrigger>
+                            <SelectContent>
+                                {perfumeGrades.map(grade => (
+                                    <SelectItem key={grade.value} value={grade.value}>{grade.label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                         <Select value={selectedAroma} onValueChange={setSelectedAroma} disabled={!selectedGrade}>
+                            <SelectTrigger><SelectValue placeholder="Pilih Aroma..." /></SelectTrigger>
+                            <SelectContent>
+                                {filteredAromas.map(aroma => (
+                                    <SelectItem key={aroma.id} value={aroma.id}>{aroma.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+
+                {/* Step 2: Bottle Size */}
+                <div className="space-y-2">
+                    <Label>Langkah 2: Pilih Ukuran Botol</Label>
+                    <Select value={selectedBottleSize.toString()} onValueChange={(val) => setSelectedBottleSize(parseInt(val))} disabled={!selectedAroma}>
+                        <SelectTrigger><SelectValue placeholder="Pilih Ukuran..." /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="30">30 ml</SelectItem>
+                            <SelectItem value="50">50 ml</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                
+                {/* Step 3: Customization */}
+                {recipe && (
+                     <Card className="bg-secondary/50">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-lg">Langkah 3: Atur Komposisi</CardTitle>
+                            <CardDescription>Resep dasar: {recipe.essenceMl}ml Bibit & {recipe.solventMl}ml Pelarut</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label htmlFor="essence-ml">Bibit (ml)</Label>
+                                    <Input id="essence-ml" type="number" value={essenceMl} onChange={e => handleEssenceChange(parseInt(e.target.value) || 0)} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="solvent-ml">Pelarut (ml)</Label>
+                                    <Input id="solvent-ml" type="number" value={solventMl} readOnly disabled />
+                                </div>
+                            </div>
+                             <div className="text-right">
+                                <p className="text-sm text-muted-foreground">Harga Dasar: {formatCurrency(recipe.basePrice)}</p>
+                                {totalPrice > recipe.basePrice && (
+                                    <p className="text-sm text-green-600 font-medium">Biaya Tambahan: +{formatCurrency(totalPrice - recipe.basePrice)}</p>
+                                )}
+                                <p className="text-xl font-bold">Total: {formatCurrency(totalPrice)}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+            </CardContent>
+            <CardFooter>
+                <Button className="w-full" onClick={handleAddToCart} disabled={!recipe}>
+                    <PlusCircle className="mr-2"/> Tambah ke Keranjang
+                </Button>
+            </CardFooter>
+        </Card>
+    )
+}
+
 export default function PosPage() {
     const [cart, setCart] = useState<CartItem[]>([]);
-    const [refillForm, setRefillForm] = useState({ essenceId: "", bottleId: "", quantityMl: 30 });
 
-    const addToCart = (product: typeof productCatalog[0]) => {
+    const addProductToCart = (product: typeof productCatalog[0]) => {
         setCart(prevCart => {
             const existingItem = prevCart.find(item => item.id === product.id);
             if (existingItem) {
@@ -63,29 +213,10 @@ export default function PosPage() {
             return [...prevCart, { ...product, quantity: 1, type: 'product' }];
         });
     };
-
-    const addRefillToCart = () => {
-        const essence = availableEssences.find(e => e.id === refillForm.essenceId);
-        const bottle = availableBottles.find(b => b.id === refillForm.bottleId);
-
-        if (!essence || !refillForm.quantityMl) return;
-
-        const essencePrice = essence.pricePerMl * refillForm.quantityMl;
-        const bottlePrice = bottle?.price || 0;
-        const totalRefillPrice = essencePrice + bottlePrice;
-
-        const refillName = `Isi Ulang: ${essence.name} (${refillForm.quantityMl}ml)${bottle ? ` + ${bottle.name}` : ''}`;
-        
-        const newCartItem: CartItem = {
-            id: `refill-${Date.now()}`,
-            name: refillName,
-            price: totalRefillPrice,
-            quantity: 1,
-            type: 'refill'
-        };
-
-        setCart(prev => [...prev, newCartItem]);
-    };
+    
+    const addRefillToCart = (item: CartItem) => {
+        setCart(prev => [...prev, item]);
+    }
 
     const updateQuantity = (itemId: string, newQuantity: number) => {
         if (newQuantity <= 0) {
@@ -122,9 +253,9 @@ export default function PosPage() {
                         <ScrollArea className="h-full">
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pr-4">
                                 {productCatalog.map(product => (
-                                    <Card key={product.id} className="cursor-pointer hover:border-primary transition-colors flex flex-col" onClick={() => addToCart(product)}>
+                                    <Card key={product.id} className="cursor-pointer hover:border-primary transition-colors flex flex-col" onClick={() => addProductToCart(product)}>
                                         <CardContent className="p-2 flex-grow">
-                                             <Image src={product.image} alt={product.name} width={100} height={100} className="w-full h-auto rounded-md aspect-square object-cover" data-ai-hint="perfume bottle"/>
+                                             <Image src={product.image} alt={product.name} width={100} height={100} className="w-full h-auto rounded-md aspect-square object-cover" data-ai-hint={product['data-ai-hint']}/>
                                         </CardContent>
                                         <CardFooter className="p-2 flex-col items-start">
                                             <p className="font-semibold text-sm leading-tight">{product.name}</p>
@@ -136,47 +267,7 @@ export default function PosPage() {
                         </ScrollArea>
                     </TabsContent>
                     <TabsContent value="refills" className="flex-grow mt-4">
-                        <Card>
-                            <CardHeader><CardTitle>Formulir Isi Ulang</CardTitle></CardHeader>
-                            <CardContent className="space-y-4">
-                                 <div className="space-y-2">
-                                    <Label htmlFor="essence">Pilih Bibit Parfum</Label>
-                                    <Select onValueChange={(value) => setRefillForm(prev => ({...prev, essenceId: value}))}>
-                                        <SelectTrigger id="essence">
-                                            <SelectValue placeholder="Pilih bibit parfum..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {availableEssences.map(essence => (
-                                                <SelectItem key={essence.id} value={essence.id}>{essence.name} ({formatCurrency(essence.pricePerMl)}/ml)</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="bottle">Pilih Botol (Opsional)</Label>
-                                    <Select onValueChange={(value) => setRefillForm(prev => ({...prev, bottleId: value}))}>
-                                        <SelectTrigger id="bottle">
-                                            <SelectValue placeholder="Botol milik pelanggan" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="customer-bottle">Botol milik pelanggan</SelectItem>
-                                            {availableBottles.map(bottle => (
-                                                <SelectItem key={bottle.id} value={bottle.id}>{bottle.name} (+{formatCurrency(bottle.price)})</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="quantity">Jumlah (ml)</Label>
-                                    <Input id="quantity" type="number" value={refillForm.quantityMl} onChange={(e) => setRefillForm(prev => ({...prev, quantityMl: parseInt(e.target.value) || 0}))} placeholder="e.g. 50" />
-                                </div>
-                            </CardContent>
-                            <CardFooter>
-                                <Button className="w-full" onClick={addRefillToCart}>
-                                    <PlusCircle className="mr-2"/> Tambah ke Keranjang
-                                </Button>
-                            </CardFooter>
-                        </Card>
+                        <RefillForm onAddToCart={addRefillToCart} />
                     </TabsContent>
                 </Tabs>
             </div>
@@ -206,17 +297,17 @@ export default function PosPage() {
                                     <TableBody>
                                         {cart.map(item => (
                                             <TableRow key={item.id}>
-                                                <TableCell className="font-medium p-2">
-                                                    <div className="flex gap-2 items-center">
-                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => updateQuantity(item.id, 0)}><X className="h-4 w-4 text-destructive" /></Button>
+                                                <TableCell className="font-medium p-2 align-top">
+                                                    <div className="flex gap-2 items-start">
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 mt-1" onClick={() => updateQuantity(item.id, 0)}><X className="h-4 w-4 text-destructive" /></Button>
                                                         <div>
-                                                            <p className="leading-tight">{item.name}</p>
-                                                            <p className="text-xs text-muted-foreground">{formatCurrency(item.price)}</p>
+                                                            <p className="leading-tight font-semibold">{item.name}</p>
+                                                            <p className="text-xs text-muted-foreground">{item.details ? item.details : formatCurrency(item.price)}</p>
                                                         </div>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="p-2">
-                                                    <div className="flex items-center justify-center gap-1">
+                                                <TableCell className="p-2 align-top">
+                                                    <div className="flex items-center justify-center gap-1 mt-1">
                                                          <Button variant="outline" size="icon" className="h-6 w-6" disabled={item.type === 'refill'} onClick={() => updateQuantity(item.id, item.quantity - 1)}>
                                                             <MinusCircle className="h-4 w-4" />
                                                          </Button>
@@ -226,7 +317,7 @@ export default function PosPage() {
                                                          </Button>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="text-right p-2">{formatCurrency(item.price * item.quantity)}</TableCell>
+                                                <TableCell className="text-right p-2 align-top">{formatCurrency(item.price * item.quantity)}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -267,3 +358,5 @@ export default function PosPage() {
         </div>
     );
 }
+
+    
