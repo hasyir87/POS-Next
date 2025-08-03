@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 import { DollarSign, Package, Users, Activity } from "lucide-react";
+import { SalesChart } from "@/components/sales-chart";
 
 const kpiData = [
   { title: "Today's Revenue", value: "$1,482.50", change: "+12.1% from yesterday", icon: DollarSign },
@@ -55,21 +55,7 @@ export default function DashboardPage() {
             <CardDescription>This week's sales compared to last week.</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={salesData}>
-                <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--background))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: 'var(--radius)'
-                  }}
-                  cursor={{fill: 'hsl(var(--accent))', opacity: 0.2}}
-                />
-                <Bar dataKey="sales" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <SalesChart data={salesData} />
           </CardContent>
         </Card>
         <Card className="lg:col-span-3">
