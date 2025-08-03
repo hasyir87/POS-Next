@@ -10,59 +10,59 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoreHorizontal, PlusCircle } from "lucide-react";
 
 const payables = [
-    { id: "PAY001", vendor: "Aroma Utama Supplier", dueDate: "2023-11-15", amount: "$850.00", status: "Pending" },
-    { id: "PAY002", vendor: "Glass Bottle Supplier", dueDate: "2023-11-20", amount: "$420.50", status: "Pending" },
-    { id: "PAY003", vendor: "Label Design Service", dueDate: "2023-10-30", amount: "$300.00", status: "Paid" },
+    { id: "PAY001", vendor: "Aroma Utama Supplier", dueDate: "2023-11-15", amount: "Rp 850.000", status: "Tertunda" },
+    { id: "PAY002", vendor: "Glass Bottle Supplier", dueDate: "2023-11-20", amount: "Rp 420.500", status: "Tertunda" },
+    { id: "PAY003", vendor: "Label Design Service", dueDate: "2023-10-30", amount: "Rp 300.000", status: "Lunas" },
 ];
 
 const receivables = [
-    { id: "REC001", customer: "Luxury Hotel", dueDate: "2023-12-01", amount: "$2,500.00", status: "Pending" },
-    { id: "REC002", customer: "Corporate Client", dueDate: "2023-11-25", amount: "$1,200.00", status: "Pending" },
-    { id: "REC003", customer: "Event Organizer", dueDate: "2023-10-28", amount: "$600.00", status: "Paid" },
+    { id: "REC001", customer: "Luxury Hotel", dueDate: "2023-12-01", amount: "Rp 2.500.000", status: "Tertunda" },
+    { id: "REC002", customer: "Corporate Client", dueDate: "2023-11-25", amount: "Rp 1.200.000", status: "Tertunda" },
+    { id: "REC003", customer: "Event Organizer", dueDate: "2023-10-28", amount: "Rp 600.000", status: "Lunas" },
 ];
 
 
 export default function AccountsPage() {
     return (
         <div className="flex flex-col gap-6">
-            <h1 className="font-headline text-3xl font-bold">Accounts</h1>
+            <h1 className="font-headline text-3xl font-bold">Akun</h1>
 
             <Tabs defaultValue="payables">
                 <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="payables">Accounts Payable</TabsTrigger>
-                    <TabsTrigger value="receivables">Accounts Receivable</TabsTrigger>
+                    <TabsTrigger value="payables">Utang Usaha</TabsTrigger>
+                    <TabsTrigger value="receivables">Piutang Usaha</TabsTrigger>
                 </TabsList>
                 <TabsContent value="payables">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <div>
-                                <CardTitle>Payables</CardTitle>
-                                <CardDescription>Track all invoices and payments to suppliers.</CardDescription>
+                                <CardTitle>Utang</CardTitle>
+                                <CardDescription>Lacak semua faktur dan pembayaran ke pemasok.</CardDescription>
                             </div>
                              <Dialog>
                                 <DialogTrigger asChild>
-                                    <Button><PlusCircle className="mr-2" /> Add Payable</Button>
+                                    <Button><PlusCircle className="mr-2" /> Tambah Utang</Button>
                                 </DialogTrigger>
                                 <DialogContent>
                                     <DialogHeader>
-                                        <DialogTitle className="font-headline">Add New Payable</DialogTitle>
+                                        <DialogTitle className="font-headline">Tambah Utang Baru</DialogTitle>
                                     </DialogHeader>
                                     <div className="grid gap-4 py-4">
                                         <div className="grid grid-cols-4 items-center gap-4">
-                                            <Label htmlFor="vendor" className="text-right">Supplier</Label>
-                                            <Input id="vendor" placeholder="Name of supplier or creditor" className="col-span-3" />
+                                            <Label htmlFor="vendor" className="text-right">Pemasok</Label>
+                                            <Input id="vendor" placeholder="Nama pemasok atau kreditur" className="col-span-3" />
                                         </div>
                                         <div className="grid grid-cols-4 items-center gap-4">
-                                            <Label htmlFor="amount" className="text-right">Amount</Label>
-                                            <Input id="amount" type="number" placeholder="$0.00" className="col-span-3" />
+                                            <Label htmlFor="amount" className="text-right">Jumlah</Label>
+                                            <Input id="amount" type="number" placeholder="Rp 0" className="col-span-3" />
                                         </div>
                                          <div className="grid grid-cols-4 items-center gap-4">
-                                            <Label htmlFor="due-date" className="text-right">Due Date</Label>
+                                            <Label htmlFor="due-date" className="text-right">Tanggal Jatuh Tempo</Label>
                                             <Input id="due-date" type="date" className="col-span-3" />
                                         </div>
                                     </div>
                                     <DialogFooter>
-                                        <Button type="submit">Save</Button>
+                                        <Button type="submit">Simpan</Button>
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
@@ -71,9 +71,9 @@ export default function AccountsPage() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Supplier</TableHead>
-                                        <TableHead>Due Date</TableHead>
-                                        <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead>Pemasok</TableHead>
+                                        <TableHead>Jatuh Tempo</TableHead>
+                                        <TableHead className="text-right">Jumlah</TableHead>
                                         <TableHead className="text-center">Status</TableHead>
                                         <TableHead className="w-[50px]"></TableHead>
                                     </TableRow>
@@ -85,7 +85,7 @@ export default function AccountsPage() {
                                             <TableCell>{item.dueDate}</TableCell>
                                             <TableCell className="text-right">{item.amount}</TableCell>
                                             <TableCell className="text-center">
-                                                <Badge variant={item.status === 'Paid' ? 'secondary' : 'destructive'}>{item.status}</Badge>
+                                                <Badge variant={item.status === 'Lunas' ? 'secondary' : 'destructive'}>{item.status}</Badge>
                                             </TableCell>
                                             <TableCell>
                                                 <DropdownMenu>
@@ -95,8 +95,8 @@ export default function AccountsPage() {
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent>
-                                                        <DropdownMenuItem>Mark as Paid</DropdownMenuItem>
-                                                        <DropdownMenuItem>Delete</DropdownMenuItem>
+                                                        <DropdownMenuItem>Tandai sebagai Lunas</DropdownMenuItem>
+                                                        <DropdownMenuItem>Hapus</DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </TableCell>
@@ -111,33 +111,33 @@ export default function AccountsPage() {
                    <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <div>
-                                <CardTitle>Receivables</CardTitle>
-                                <CardDescription>Track all invoices and payments from customers.</CardDescription>
+                                <CardTitle>Piutang</CardTitle>
+                                <CardDescription>Lacak semua faktur dan pembayaran dari pelanggan.</CardDescription>
                             </div>
                             <Dialog>
                                 <DialogTrigger asChild>
-                                    <Button><PlusCircle className="mr-2" /> Add Receivable</Button>
+                                    <Button><PlusCircle className="mr-2" /> Tambah Piutang</Button>
                                 </DialogTrigger>
                                 <DialogContent>
                                     <DialogHeader>
-                                        <DialogTitle className="font-headline">Add New Receivable</DialogTitle>
+                                        <DialogTitle className="font-headline">Tambah Piutang Baru</DialogTitle>
                                     </DialogHeader>
                                      <div className="grid gap-4 py-4">
                                         <div className="grid grid-cols-4 items-center gap-4">
-                                            <Label htmlFor="customer" className="text-right">Customer</Label>
-                                            <Input id="customer" placeholder="Customer name" className="col-span-3" />
+                                            <Label htmlFor="customer" className="text-right">Pelanggan</Label>
+                                            <Input id="customer" placeholder="Nama pelanggan" className="col-span-3" />
                                         </div>
                                         <div className="grid grid-cols-4 items-center gap-4">
-                                            <Label htmlFor="amount-rec" className="text-right">Amount</Label>
-                                            <Input id="amount-rec" type="number" placeholder="$0.00" className="col-span-3" />
+                                            <Label htmlFor="amount-rec" className="text-right">Jumlah</Label>
+                                            <Input id="amount-rec" type="number" placeholder="Rp 0" className="col-span-3" />
                                         </div>
                                          <div className="grid grid-cols-4 items-center gap-4">
-                                            <Label htmlFor="due-date-rec" className="text-right">Due Date</Label>
+                                            <Label htmlFor="due-date-rec" className="text-right">Tanggal Jatuh Tempo</Label>
                                             <Input id="due-date-rec" type="date" className="col-span-3" />
                                         </div>
                                     </div>
                                     <DialogFooter>
-                                        <Button type="submit">Save</Button>
+                                        <Button type="submit">Simpan</Button>
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
@@ -146,9 +146,9 @@ export default function AccountsPage() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Customer</TableHead>
-                                        <TableHead>Due Date</TableHead>
-                                        <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead>Pelanggan</TableHead>
+                                        <TableHead>Jatuh Tempo</TableHead>
+                                        <TableHead className="text-right">Jumlah</TableHead>
                                         <TableHead className="text-center">Status</TableHead>
                                         <TableHead className="w-[50px]"></TableHead>
                                     </TableRow>
@@ -160,7 +160,7 @@ export default function AccountsPage() {
                                             <TableCell>{item.dueDate}</TableCell>
                                             <TableCell className="text-right">{item.amount}</TableCell>
                                             <TableCell className="text-center">
-                                                <Badge variant={item.status === 'Paid' ? 'secondary' : 'destructive'}>{item.status}</Badge>
+                                                <Badge variant={item.status === 'Lunas' ? 'secondary' : 'destructive'}>{item.status}</Badge>
                                             </TableCell>
                                             <TableCell>
                                                 <DropdownMenu>
@@ -170,8 +170,8 @@ export default function AccountsPage() {
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent>
-                                                        <DropdownMenuItem>Mark as Paid</DropdownMenuItem>
-                                                        <DropdownMenuItem>Delete</DropdownMenuItem>
+                                                        <DropdownMenuItem>Tandai sebagai Lunas</DropdownMenuItem>
+                                                        <DropdownMenuItem>Hapus</DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </TableCell>

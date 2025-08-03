@@ -8,39 +8,39 @@ import { MoreHorizontal, PlusCircle } from "lucide-react";
 
 const allPermissions = [
     // Dashboard / Reporting Permissions
-    { id: "dashboard.view", label: "View Dashboard", category: "Dashboard" },
-    { id: "reports.view", label: "View Reports", category: "Reports" },
-    { id: "reports.export", label: "Export Reports", category: "Reports" },
+    { id: "dashboard.view", label: "Lihat Dasbor", category: "Dasbor" },
+    { id: "reports.view", label: "Lihat Laporan", category: "Laporan" },
+    { id: "reports.export", label: "Ekspor Laporan", category: "Laporan" },
     
     // Transaction / Sales Permissions
-    { id: "transactions.create", label: "Create Transactions", category: "Sales" },
-    { id: "transactions.view", label: "View Transactions", category: "Sales" },
+    { id: "transactions.create", label: "Buat Transaksi", category: "Penjualan" },
+    { id: "transactions.view", label: "Lihat Transaksi", category: "Penjualan" },
 
     // Inventory Permissions
-    { id: "inventory.view", label: "View Inventory", category: "Inventory" },
-    { id: "inventory.manage", label: "Manage Inventory", category: "Inventory" },
-    { id: "inventory.ai", label: "Use AI Mixologist", category: "Inventory" },
+    { id: "inventory.view", label: "Lihat Inventaris", category: "Inventaris" },
+    { id: "inventory.manage", label: "Kelola Inventaris", category: "Inventaris" },
+    { id: "inventory.ai", label: "Gunakan AI Mixologist", category: "Inventaris" },
 
     // Staff & Shift Management
-    { id: "shifts.manage", label: "Manage All Shifts", category: "Shifts" },
-    { id: "shifts.own.manage", label: "Manage Own Shift", category: "Shifts" },
+    { id: "shifts.manage", label: "Kelola Semua Shift", category: "Shift" },
+    { id: "shifts.own.manage", label: "Kelola Shift Sendiri", category: "Shift" },
 
     // Settings & User Management
-    { id: "users.manage", label: "Manage Users", category: "Settings" },
-    { id: "roles.manage", label: "Manage Roles", category: "Settings" },
-    { id: "settings.manage", label: "Manage App Settings", category: "Settings" },
+    { id: "users.manage", label: "Kelola Pengguna", category: "Pengaturan" },
+    { id: "roles.manage", label: "Kelola Peran", category: "Pengaturan" },
+    { id: "settings.manage", label: "Kelola Pengaturan Aplikasi", category: "Pengaturan" },
 ];
 
 
 const roles = [
   {
-    name: "Owner",
-    description: "Has all permissions by default.",
+    name: "Pemilik",
+    description: "Memiliki semua izin secara default.",
     permissions: allPermissions.map(p => p.id),
   },
   {
     name: "Admin",
-    description: "Manages day-to-day operations.",
+    description: "Mengelola operasi sehari-hari.",
     permissions: [
       "dashboard.view",
       "reports.view",
@@ -54,16 +54,16 @@ const roles = [
     ],
   },
   {
-    name: "Cashier",
-    description: "Handles sales transactions via POS.",
+    name: "Kasir",
+    description: "Menangani transaksi penjualan melalui POS.",
     permissions: [
         "transactions.create",
         "shifts.own.manage"
     ],
   },
   {
-    name: "API Client",
-    description: "For backend services like the Flutter POS.",
+    name: "Klien API",
+    description: "Untuk layanan backend seperti POS Flutter.",
     permissions: [
         "transactions.create",
         "inventory.view"
@@ -71,31 +71,31 @@ const roles = [
   },
 ];
 
-const permissionCategories = ["Dashboard", "Reports", "Sales", "Inventory", "Shifts", "Settings"];
+const permissionCategories = ["Dasbor", "Laporan", "Penjualan", "Inventaris", "Shift", "Pengaturan"];
 
 
 export default function RolesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-headline text-3xl font-bold">Role Management</h1>
+        <h1 className="font-headline text-3xl font-bold">Manajemen Peran</h1>
         <Button>
           <PlusCircle className="mr-2 h-4 w-4" />
-          Add New Role
+          Tambah Peran Baru
         </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Roles & Permissions</CardTitle>
-          <CardDescription>Define what each role can access and do within the application and API.</CardDescription>
+          <CardTitle>Peran & Izin</CardTitle>
+          <CardDescription>Tentukan apa yang dapat diakses dan dilakukan setiap peran dalam aplikasi dan API.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="border rounded-md">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[200px]">Role</TableHead>
+                  <TableHead className="w-[200px]">Peran</TableHead>
                   {permissionCategories.map(cat => (
                     <TableHead key={cat}>{cat}</TableHead>
                   ))}
@@ -117,7 +117,7 @@ export default function RolesPage() {
                                  <Checkbox 
                                    id={`${role.name}-${permission.id}`} 
                                    checked={role.permissions.includes(permission.id)}
-                                   disabled={role.name === 'Owner'}
+                                   disabled={role.name === 'Pemilik'}
                                  />
                                  <Label htmlFor={`${role.name}-${permission.id}`} className="font-normal text-sm">{permission.label}</Label>
                                </div>
@@ -128,14 +128,14 @@ export default function RolesPage() {
                     <TableCell>
                        <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0" disabled={role.name === 'Owner'}>
-                                    <span className="sr-only">Open menu</span>
+                                <Button variant="ghost" className="h-8 w-8 p-0" disabled={role.name === 'Pemilik'}>
+                                    <span className="sr-only">Buka menu</span>
                                     <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                                <DropdownMenuItem>Edit</DropdownMenuItem>
-                                <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+                                <DropdownMenuItem>Ubah</DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive">Hapus</DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </TableCell>
@@ -147,7 +147,7 @@ export default function RolesPage() {
         </CardContent>
       </Card>
       <div className="flex justify-end">
-          <Button>Save Changes</Button>
+          <Button>Simpan Perubahan</Button>
       </div>
     </div>
   );

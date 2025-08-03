@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import { addDays, format } from "date-fns"
-import { Calendar as CalendarIcon, Download, FileDown } from "lucide-react"
+import { id } from "date-fns/locale"
+import { Calendar as CalendarIcon, FileDown } from "lucide-react"
 import { DateRange } from "react-day-picker"
 import jsPDF from "jspdf"
 import autoTable from 'jspdf-autotable'
@@ -41,21 +42,21 @@ export function ReportControls({ data, className }: ReportControlsProps) {
   const handleDownloadExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Report");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan");
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
-    saveAs(blob, "report.xlsx");
+    saveAs(blob, "laporan.xlsx");
   };
 
   const handleDownloadPdf = () => {
     const doc = new jsPDF();
-    doc.text("Profit & Loss Report", 14, 16);
+    doc.text("Laporan Laba & Rugi", 14, 16);
     autoTable(doc, {
-        head: [['Period', 'Revenue', 'COGS', 'Profit']],
-        body: data.map(row => [row.name, `$${row.revenue}`, `$${row.cogs}`, `$${row.profit}`]),
+        head: [['Periode', 'Pendapatan', 'HPP', 'Laba']],
+        body: data.map(row => [row.name, `Rp ${row.revenue}`, `Rp ${row.cogs}`, `Rp ${row.profit}`]),
         startY: 20
     });
-    doc.save('report.pdf');
+    doc.save('laporan.pdf');
   };
 
 
@@ -75,14 +76,14 @@ export function ReportControls({ data, className }: ReportControlsProps) {
               {date?.from ? (
                 date.to ? (
                   <>
-                    {format(date.from, "LLL dd, y")} -{" "}
-                    {format(date.to, "LLL dd, y")}
+                    {format(date.from, "LLL dd, y", { locale: id })} -{" "}
+                    {format(date.to, "LLL dd, y", { locale: id })}
                   </>
                 ) : (
-                  format(date.from, "LLL dd, y")
+                  format(date.from, "LLL dd, y", { locale: id })
                 )
               ) : (
-                <span>Pick a date</span>
+                <span>Pilih tanggal</span>
               )}
             </Button>
           </PopoverTrigger>
@@ -94,6 +95,7 @@ export function ReportControls({ data, className }: ReportControlsProps) {
               selected={date}
               onSelect={setDate}
               numberOfMonths={2}
+              locale={id}
             />
             <div className="p-2 border-t">
                 <Select onValueChange={(value) => {
@@ -107,12 +109,12 @@ export function ReportControls({ data, className }: ReportControlsProps) {
                     }
                 }}>
                     <SelectTrigger>
-                        <SelectValue placeholder="Select a preset" />
+                        <SelectValue placeholder="Pilih preset" />
                     </SelectTrigger>
                     <SelectContent position="popper">
-                        <SelectItem value="this-month">This Month</SelectItem>
-                        <SelectItem value="last-month">Last Month</SelectItem>
-                        <SelectItem value="last-3-months">Last 3 Months</SelectItem>
+                        <SelectItem value="this-month">Bulan Ini</SelectItem>
+                        <SelectItem value="last-month">Bulan Lalu</SelectItem>
+                        <SelectItem value="last-3-months">3 Bulan Terakhir</SelectItem>
                     </SelectContent>
                 </Select>
             </div>

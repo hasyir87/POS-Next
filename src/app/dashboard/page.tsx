@@ -4,34 +4,34 @@ import { DollarSign, Package, Users, Activity } from "lucide-react";
 import { SalesChart } from "@/components/sales-chart";
 
 const kpiData = [
-  { title: "Today's Revenue", value: "$1,482.50", change: "+12.1% from yesterday", icon: DollarSign },
-  { title: "Today's Sales", value: "+89", change: "+25 from yesterday", icon: Package },
-  { title: "New Customers", value: "+12", change: "+5 since last week", icon: Users },
-  { title: "Shift Cash Balance", value: "$345.00", change: "Started at $150.00", icon: Activity },
+  { title: "Pendapatan Hari Ini", value: "Rp 2.150.000", change: "+12.1% dari kemarin", icon: DollarSign },
+  { title: "Penjualan Hari Ini", value: "+89", change: "+25 dari kemarin", icon: Package },
+  { title: "Pelanggan Baru", value: "+12", change: "+5 sejak minggu lalu", icon: Users },
+  { title: "Saldo Kas Shift", value: "Rp 345.000", change: "Dimulai dari Rp 150.000", icon: Activity },
 ];
 
 const salesData = [
-  { name: "Mon", sales: 4000 },
-  { name: "Tue", sales: 3000 },
-  { name: "Wed", sales: 2000 },
-  { name: "Thu", sales: 2780 },
-  { name: "Fri", sales: 1890 },
-  { name: "Sat", sales: 2390 },
-  { name: "Sun", sales: 3490 },
+  { name: "Sen", sales: 4000 },
+  { name: "Sel", sales: 3000 },
+  { name: "Rab", sales: 2000 },
+  { name: "Kam", sales: 2780 },
+  { name: "Jum", sales: 1890 },
+  { name: "Sab", sales: 2390 },
+  { name: "Min", sales: 3490 },
 ];
 
 const recentTransactions = [
-  { id: "TRX001", customer: "Olivia Martin", amount: "$45.00", item: "Custom Blend (Floral)", status: "Paid" },
-  { id: "TRX002", customer: "Liam Johnson", amount: "$79.99", item: "Ocean Breeze", status: "Paid" },
-  { id: "TRX003", customer: "Noah Williams", amount: "$25.50", item: "Mystic Woods", status: "Paid" },
-  { id: "TRX004", customer: "Emma Brown", amount: "$150.00", item: "Bulk Order", status: "Pending" },
-  { id: "TRX005", customer: "Ava Jones", amount: "$60.25", item: "Custom Blend (Citrus)", status: "Paid" },
+  { id: "TRX001", customer: "Olivia Martin", amount: "Rp 45.000", item: "Custom Blend (Floral)", status: "Paid" },
+  { id: "TRX002", customer: "Liam Johnson", amount: "Rp 79.990", item: "Ocean Breeze", status: "Paid" },
+  { id: "TRX003", customer: "Noah Williams", amount: "Rp 25.500", item: "Mystic Woods", status: "Paid" },
+  { id: "TRX004", customer: "Emma Brown", amount: "Rp 150.000", item: "Bulk Order", status: "Pending" },
+  { id: "TRX005", customer: "Ava Jones", amount: "Rp 60.250", item: "Custom Blend (Citrus)", status: "Paid" },
 ];
 
 export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-headline text-3xl font-bold">Dashboard</h1>
+      <h1 className="font-headline text-3xl font-bold">Dasbor</h1>
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {kpiData.map((kpi, index) => (
@@ -51,8 +51,8 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="lg:col-span-4">
           <CardHeader>
-            <CardTitle>Sales Performance</CardTitle>
-            <CardDescription>This week's sales compared to last week.</CardDescription>
+            <CardTitle>Performa Penjualan</CardTitle>
+            <CardDescription>Penjualan minggu ini dibandingkan minggu lalu.</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
             <SalesChart data={salesData} />
@@ -60,16 +60,16 @@ export default function DashboardPage() {
         </Card>
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle>Recent Transactions</CardTitle>
-            <CardDescription>A list of the most recent sales.</CardDescription>
+            <CardTitle>Transaksi Terkini</CardTitle>
+            <CardDescription>Daftar penjualan terbaru.</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Customer</TableHead>
+                  <TableHead>Pelanggan</TableHead>
                   <TableHead>Item</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Jumlah</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -17,21 +17,21 @@ export default function InventoryPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-headline text-3xl font-bold">Inventory</h1>
+        <h1 className="font-headline text-3xl font-bold">Inventaris</h1>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <div className="lg:col-span-3">
             <Card>
                 <CardHeader>
-                    <CardTitle>Live Inventory</CardTitle>
-                    <CardDescription>Current stock levels of raw materials.</CardDescription>
+                    <CardTitle>Inventaris Langsung</CardTitle>
+                    <CardDescription>Tingkat stok bahan baku saat ini.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Material</TableHead>
-                                <TableHead className="text-right">Quantity</TableHead>
+                                <TableHead>Bahan</TableHead>
+                                <TableHead className="text-right">Kuantitas</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>

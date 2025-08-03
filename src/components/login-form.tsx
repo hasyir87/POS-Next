@@ -28,13 +28,13 @@ import { ScentSationLogo } from "./scent-sation-logo"
 
 const formSchema = z.object({
   email: z.string().email({
-    message: "Please enter a valid email address.",
+    message: "Harap masukkan alamat email yang valid.",
   }),
   password: z.string().min(6, {
-    message: "Password must be at least 6 characters.",
+    message: "Kata sandi harus minimal 6 karakter.",
   }),
   role: z.enum(["cashier", "admin", "owner"], {
-    required_error: "You need to select a role.",
+    required_error: "Anda harus memilih peran.",
   }),
 })
 
@@ -49,8 +49,8 @@ export function LoginForm() {
   })
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    // In a real app, you'd handle authentication here.
-    // For this scaffold, we'll just redirect to the dashboard.
+    // Di aplikasi nyata, Anda akan menangani otentikasi di sini.
+    // Untuk contoh ini, kita hanya akan mengarahkan ke dasbor.
     console.log(values)
     router.push("/dashboard")
   }
@@ -71,7 +71,7 @@ export function LoginForm() {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="name@example.com" {...field} />
+                    <Input placeholder="nama@contoh.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -82,7 +82,7 @@ export function LoginForm() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>Kata Sandi</FormLabel>
                   <FormControl>
                     <Input type="password" placeholder="********" {...field} />
                   </FormControl>
@@ -95,24 +95,24 @@ export function LoginForm() {
               name="role"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Role</FormLabel>
+                  <FormLabel>Peran</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select your role" />
+                        <SelectValue placeholder="Pilih peran Anda" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="cashier">Cashier</SelectItem>
+                      <SelectItem value="cashier">Kasir</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="owner">Owner</SelectItem>
+                      <SelectItem value="owner">Pemilik</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full">Sign In</Button>
+            <Button type="submit" className="w-full">Masuk</Button>
           </form>
         </Form>
       </CardContent>

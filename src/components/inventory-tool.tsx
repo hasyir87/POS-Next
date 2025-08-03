@@ -28,7 +28,7 @@ interface OptimalMixItem {
 
 const formSchema = z.object({
   fragranceOrder: z.string().min(10, {
-    message: "Please describe the desired fragrance in at least 10 characters.",
+    message: "Harap jelaskan wewangian yang diinginkan minimal 10 karakter.",
   }),
 });
 
@@ -69,14 +69,14 @@ export function InventoryTool({ availableMaterials }: { availableMaterials: Mate
       } catch (error) {
         toast({
           variant: "destructive",
-          title: "Error Parsing Suggestion",
-          description: "The AI returned an invalid format. Please try again.",
+          title: "Gagal Mem-parsing Saran",
+          description: "AI mengembalikan format yang tidak valid. Silakan coba lagi.",
         });
       }
     } else {
       toast({
         variant: "destructive",
-        title: "AI Suggestion Failed",
+        title: "Saran AI Gagal",
         description: result.error,
       });
     }
@@ -87,10 +87,10 @@ export function InventoryTool({ availableMaterials }: { availableMaterials: Mate
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Wand2 className="h-6 w-6 text-primary" />
-          Intelligent Mixologist
+          Ahli Racik Cerdas
         </CardTitle>
         <CardDescription>
-          Describe the customer's desired scent profile, and our AI will suggest an optimal blend using available materials.
+          Jelaskan profil aroma yang diinginkan pelanggan, dan AI kami akan menyarankan campuran optimal menggunakan bahan yang tersedia.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -101,10 +101,10 @@ export function InventoryTool({ availableMaterials }: { availableMaterials: Mate
               name="fragranceOrder"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Customer's Fragrance Request</FormLabel>
+                  <FormLabel>Permintaan Wewangian Pelanggan</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="e.g., 'A light, fresh scent with hints of citrus and a woody base, suitable for summer.'"
+                      placeholder="Contoh: 'Aroma ringan dan segar dengan sentuhan jeruk dan dasar kayu, cocok untuk musim panas.'"
                       rows={4}
                       {...field}
                     />
@@ -119,7 +119,7 @@ export function InventoryTool({ availableMaterials }: { availableMaterials: Mate
               ) : (
                 <Wand2 className="mr-2 h-4 w-4" />
               )}
-              Suggest Mix
+              Sarankan Campuran
             </Button>
           </form>
         </Form>
@@ -127,7 +127,7 @@ export function InventoryTool({ availableMaterials }: { availableMaterials: Mate
         {isLoading && (
             <div className="mt-6 flex flex-col items-center justify-center text-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="mt-2 text-sm text-muted-foreground">Our AI mixologist is thinking...</p>
+                <p className="mt-2 text-sm text-muted-foreground">Ahli racik AI kami sedang berpikir...</p>
             </div>
         )}
 
@@ -135,14 +135,14 @@ export function InventoryTool({ availableMaterials }: { availableMaterials: Mate
           <div className="mt-6 space-y-4">
             <Separator />
             <div>
-              <h3 className="font-headline text-lg font-semibold">Suggested Optimal Mix</h3>
+              <h3 className="font-headline text-lg font-semibold">Saran Campuran Optimal</h3>
               <Card className="mt-2">
                 <CardContent className="p-0">
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Material</TableHead>
-                                <TableHead className="text-right">Quantity</TableHead>
+                                <TableHead>Bahan</TableHead>
+                                <TableHead className="text-right">Kuantitas</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -158,12 +158,12 @@ export function InventoryTool({ availableMaterials }: { availableMaterials: Mate
               </Card>
             </div>
             <div>
-              <h3 className="font-headline text-lg font-semibold">Reasoning</h3>
+              <h3 className="font-headline text-lg font-semibold">Alasan</h3>
               <p className="mt-2 text-sm text-muted-foreground bg-secondary/50 p-3 rounded-md border">
                 {suggestion.reasoning}
               </p>
             </div>
-            <Button className="w-full" variant="outline">Add to Order</Button>
+            <Button className="w-full" variant="outline">Tambah ke Pesanan</Button>
           </div>
         )}
       </CardContent>

@@ -11,34 +11,34 @@ import Link from "next/link";
 export default function SettingsPage() {
     return (
         <div className="flex flex-col gap-6">
-            <h1 className="font-headline text-3xl font-bold">Settings</h1>
+            <h1 className="font-headline text-3xl font-bold">Pengaturan</h1>
             <div className="grid gap-6">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Key className="h-5 w-5" /> API Key Management</CardTitle>
-                        <CardDescription>Create and manage API keys for external applications like your Flutter POS.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Key className="h-5 w-5" /> Manajemen Kunci API</CardTitle>
+                        <CardDescription>Buat dan kelola kunci API untuk aplikasi eksternal seperti POS Flutter Anda.</CardDescription>
                     </CardHeader>
                     <CardContent>
                          <div className="flex justify-end">
-                             <Button>Generate New Key</Button>
+                             <Button>Buat Kunci Baru</Button>
                          </div>
                          <Separator className="my-4" />
                          <Table>
                              <TableHeader>
                                  <TableRow>
                                      <TableHead>Label</TableHead>
-                                     <TableHead>Key (First 8 Chars)</TableHead>
-                                     <TableHead>Created</TableHead>
-                                     <TableHead className="w-[100px] text-right">Actions</TableHead>
+                                     <TableHead>Kunci (8 Karakter Pertama)</TableHead>
+                                     <TableHead>Dibuat</TableHead>
+                                     <TableHead className="w-[100px] text-right">Aksi</TableHead>
                                  </TableRow>
                              </TableHeader>
                              <TableBody>
                                  <TableRow>
-                                     <TableCell className="font-medium">Flutter POS App</TableCell>
+                                     <TableCell className="font-medium">Aplikasi POS Flutter</TableCell>
                                      <TableCell className="font-mono">sk_live_Abc123De...</TableCell>
-                                     <TableCell>October 29, 2023</TableCell>
+                                     <TableCell>29 Oktober 2023</TableCell>
                                      <TableCell className="text-right">
-                                         <Button variant="destructive" size="sm">Revoke</Button>
+                                         <Button variant="destructive" size="sm">Cabut</Button>
                                      </TableCell>
                                  </TableRow>
                              </TableBody>
@@ -47,42 +47,42 @@ export default function SettingsPage() {
                 </Card>
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Tag className="h-5 w-5" /> Promotions</CardTitle>
-                        <CardDescription>Manage discounts and special offers like 'Buy One Get One' or bulk pricing.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Tag className="h-5 w-5" /> Promosi</CardTitle>
+                        <CardDescription>Kelola diskon dan penawaran khusus seperti 'Beli Satu Gratis Satu' atau harga grosir.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <Button>Create New Promotion</Button>
+                        <Button>Buat Promosi Baru</Button>
                     </CardContent>
                 </Card>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><User className="h-5 w-5" /> User Management</CardTitle>
-                        <CardDescription>Manage staff accounts and their roles (Cashier, Admin, Owner).</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><User className="h-5 w-5" /> Manajemen Pengguna</CardTitle>
+                        <CardDescription>Kelola akun staf dan peran mereka (Kasir, Admin, Pemilik).</CardDescription>
                     </CardHeader>
                     <CardContent className="flex gap-2">
-                         <Button>Add New User</Button>
+                         <Button>Tambah Pengguna Baru</Button>
                          <Button variant="outline" asChild>
-                            <Link href="/dashboard/settings/roles">Manage Roles</Link>
+                            <Link href="/dashboard/settings/roles">Kelola Peran</Link>
                          </Button>
                     </CardContent>
                 </Card>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Languages className="h-5 w-5" /> Language & Region</CardTitle>
-                        <CardDescription>Set the application language and currency.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Languages className="h-5 w-5" /> Bahasa & Wilayah</CardTitle>
+                        <CardDescription>Atur bahasa aplikasi dan mata uang.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid w-full max-w-sm items-center gap-1.5">
-                            <Label htmlFor="language">Language</Label>
-                            <Select defaultValue="en">
+                            <Label htmlFor="language">Bahasa</Label>
+                            <Select defaultValue="id">
                                 <SelectTrigger id="language">
-                                    <SelectValue placeholder="Select language" />
+                                    <SelectValue placeholder="Pilih bahasa" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="en">English</SelectItem>
-                                    <SelectItem value="id">Indonesian</SelectItem>
+                                    <SelectItem value="id">Indonesia</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

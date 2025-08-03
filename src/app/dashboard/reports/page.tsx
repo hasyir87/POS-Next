@@ -8,22 +8,22 @@ const profitLossData = [
   { name: 'Feb', revenue: 3000, cogs: 1398, profit: 1602 },
   { name: 'Mar', revenue: 5000, cogs: 3800, profit: 1200 },
   { name: 'Apr', revenue: 4780, cogs: 2908, profit: 1872 },
-  { name: 'May', revenue: 5890, cogs: 3800, profit: 2090 },
+  { name: 'Mei', revenue: 5890, cogs: 3800, profit: 2090 },
   { name: 'Jun', revenue: 4390, cogs: 3100, profit: 1290 },
   { name: 'Jul', revenue: 5490, cogs: 3490, profit: 2000 },
 ];
 
 const summaryData = [
-    { title: "Total Revenue", value: "$250,120.89", icon: TrendingUp, color: "text-green-500" },
-    { title: "Cost of Goods Sold", value: "$142,345.12", icon: TrendingDown, color: "text-red-500" },
-    { title: "Net Profit", value: "$107,775.77", icon: CircleDollarSign, color: "text-primary" },
+    { title: "Total Pendapatan", value: "Rp 250.120.890", icon: TrendingUp, color: "text-green-500" },
+    { title: "Harga Pokok Penjualan", value: "Rp 142.345.120", icon: TrendingDown, color: "text-red-500" },
+    { title: "Laba Bersih", value: "Rp 107.775.770", icon: CircleDollarSign, color: "text-primary" },
 ];
 
 export default function ReportsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="font-headline text-3xl font-bold">Profit & Loss Report</h1>
+        <h1 className="font-headline text-3xl font-bold">Laporan Laba & Rugi</h1>
         <ReportControls data={profitLossData} />
       </div>
       
@@ -36,7 +36,7 @@ export default function ReportsPage() {
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold">{item.value}</div>
-                    <p className="text-xs text-muted-foreground">Year to date</p>
+                    <p className="text-xs text-muted-foreground">Tahun berjalan</p>
                 </CardContent>
             </Card>
         ))}
@@ -44,8 +44,8 @@ export default function ReportsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Monthly Performance</CardTitle>
-          <CardDescription>Revenue vs. Cost of Goods Sold (COGS) over time.</CardDescription>
+          <CardTitle>Kinerja Bulanan</CardTitle>
+          <CardDescription>Pendapatan vs. Harga Pokok Penjualan (HPP) dari waktu ke waktu.</CardDescription>
         </CardHeader>
         <CardContent>
           <ProfitLossChart data={profitLossData} />

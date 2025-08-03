@@ -13,13 +13,13 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const navItems = [
-    { href: "/dashboard", label: "Dashboard", icon: Home },
-    { href: "/dashboard/inventory", label: "Inventory", icon: FlaskConical },
-    { href: "/dashboard/expenses", label: "Expenses", icon: DollarSign },
-    { href: "/dashboard/accounts", label: "Accounts", icon: BookUser },
-    { href: "/dashboard/reports", label: "Reports", icon: BarChart2 },
-    { href: "/dashboard/shifts", label: "Shifts", icon: Clock },
-    { href: "/dashboard/settings", label: "Settings", icon: Settings },
+    { href: "/dashboard", label: "Dasbor", icon: Home },
+    { href: "/dashboard/inventory", label: "Inventaris", icon: FlaskConical },
+    { href: "/dashboard/expenses", label: "Beban", icon: DollarSign },
+    { href: "/dashboard/accounts", label: "Akun", icon: BookUser },
+    { href: "/dashboard/reports", label: "Laporan", icon: BarChart2 },
+    { href: "/dashboard/shifts", label: "Shift", icon: Clock },
+    { href: "/dashboard/settings", label: "Pengaturan", icon: Settings },
   ];
 
   return (
@@ -58,7 +58,7 @@ export default function DashboardLayout({
                 className="shrink-0 md:hidden"
               >
                 <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle navigation menu</span>
+                <span className="sr-only">Buka/tutup menu navigasi</span>
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col">
@@ -93,19 +93,19 @@ export default function DashboardLayout({
                   <AvatarImage src="https://placehold.co/40x40" alt="@shadcn" />
                   <AvatarFallback>AD</AvatarFallback>
                 </Avatar>
-                <span className="sr-only">Toggle user menu</span>
+                <span className="sr-only">Buka/tutup menu pengguna</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Admin</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Profile</DropdownMenuItem>
-              <DropdownMenuItem>Support</DropdownMenuItem>
+              <DropdownMenuItem>Profil</DropdownMenuItem>
+              <DropdownMenuItem>Dukungan</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <Link href="/">
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
+                  <span>Keluar</span>
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
