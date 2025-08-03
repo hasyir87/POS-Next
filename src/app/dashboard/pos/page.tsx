@@ -159,7 +159,7 @@ export default function PosPage() {
                                             <SelectValue placeholder="Botol milik pelanggan" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="">Botol milik pelanggan</SelectItem>
+                                            <SelectItem value="customer-bottle">Botol milik pelanggan</SelectItem>
                                             {availableBottles.map(bottle => (
                                                 <SelectItem key={bottle.id} value={bottle.id}>{bottle.name} (+{formatCurrency(bottle.price)})</SelectItem>
                                             ))}
