@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, MinusCircle, X, Search, UserPlus, Droplets, Spray } from "lucide-react";
+import { PlusCircle, MinusCircle, X, Search, UserPlus, Droplets, SprayCan } from "lucide-react";
 import Image from "next/image";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
@@ -115,7 +115,7 @@ export default function PosPage() {
                 </Card>
                 <Tabs defaultValue="products" className="flex-grow flex flex-col">
                     <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="products"><Spray className="mr-2"/> Produk Jadi</TabsTrigger>
+                        <TabsTrigger value="products"><SprayCan className="mr-2"/> Produk Jadi</TabsTrigger>
                         <TabsTrigger value="refills"><Droplets className="mr-2"/> Isi Ulang</TabsTrigger>
                     </TabsList>
                     <TabsContent value="products" className="flex-grow mt-4">
@@ -267,5 +267,3 @@ export default function PosPage() {
         </div>
     );
 }
-
-    
