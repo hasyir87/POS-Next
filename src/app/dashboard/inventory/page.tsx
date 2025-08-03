@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 type Material = {
   id: string;
   name: string;
+  brand: string;
   quantity: number;
   unit: string;
   category: string;
@@ -26,16 +27,16 @@ type Material = {
 };
 
 const initialAvailableMaterials: Material[] = [
-  { id: "MAT001", name: "Rose Absolute", quantity: 50, unit: "ml", category: "bibit parfum", purchasePrice: 1500 },
-  { id: "MAT002", name: "Jasmine Sambac", quantity: 350, unit: "ml", category: "bibit parfum", purchasePrice: 1800 },
-  { id: "MAT003", name: "Bergamot Oil", quantity: 1200, unit: "ml", category: "bibit parfum", purchasePrice: 800 },
-  { id: "MAT004", name: "Sandalwood", quantity: 0, unit: "g", category: "bibit parfum", purchasePrice: 2500 },
-  { id: "MAT005", name: "Vanilla Extract", quantity: 800, unit: "ml", category: "bibit parfum", purchasePrice: 950 },
-  { id: "MAT006", name: "Ethanol (Perfumer's Alcohol)", quantity: 5000, unit: "ml", category: "pelarut", purchasePrice: 100 },
-  { id: "MAT007", name: "Iso E Super", quantity: 180, unit: "ml", category: "bahan sintetis", purchasePrice: 400 },
-  { id: "MAT008", name: "Ambroxan", quantity: 150, unit: "g", category: "bahan sintetis", purchasePrice: 3000 },
-  { id: "MAT009", name: "Botol Kaca 50ml", quantity: 150, unit: "pcs", category: "kemasan", purchasePrice: 3500 },
-  { id: "MAT010", name: "Botol Kaca 100ml", quantity: 80, unit: "pcs", category: "kemasan", purchasePrice: 5000 },
+  { id: "MAT001", name: "Rose Absolute", brand: "Luxe Fragrance Co.", quantity: 50, unit: "ml", category: "bibit parfum", purchasePrice: 1500 },
+  { id: "MAT002", name: "Jasmine Sambac", brand: "Aroma Natural", quantity: 350, unit: "ml", category: "bibit parfum", purchasePrice: 1800 },
+  { id: "MAT003", name: "Bergamot Oil", brand: "Aroma Natural", quantity: 1200, unit: "ml", category: "bibit parfum", purchasePrice: 800 },
+  { id: "MAT004", name: "Sandalwood", brand: "Luxe Fragrance Co.", quantity: 0, unit: "g", category: "bibit parfum", purchasePrice: 2500 },
+  { id: "MAT005", name: "Vanilla Extract", brand: "Aroma Natural", quantity: 800, unit: "ml", category: "bibit parfum", purchasePrice: 950 },
+  { id: "MAT006", name: "Ethanol (Perfumer's Alcohol)", brand: "Generic Chemical", quantity: 5000, unit: "ml", category: "pelarut", purchasePrice: 100 },
+  { id: "MAT007", name: "Iso E Super", brand: "SynthScents", quantity: 180, unit: "ml", category: "bahan sintetis", purchasePrice: 400 },
+  { id: "MAT008", name: "Ambroxan", brand: "SynthScents", quantity: 150, unit: "g", category: "bahan sintetis", purchasePrice: 3000 },
+  { id: "MAT009", name: "Botol Kaca 50ml", brand: "GlassPack", quantity: 150, unit: "pcs", category: "kemasan", purchasePrice: 3500 },
+  { id: "MAT010", name: "Botol Kaca 100ml", brand: "GlassPack", quantity: 80, unit: "pcs", category: "kemasan", purchasePrice: 5000 },
 ];
 
 const initialCategories = [
@@ -49,6 +50,14 @@ const initialUnits = [
     { value: "ml", label: "ml" },
     { value: "g", label: "g" },
     { value: "pcs", label: "pcs" },
+]
+
+const initialBrands = [
+    { value: "Luxe Fragrance Co.", label: "Luxe Fragrance Co." },
+    { value: "Aroma Natural", label: "Aroma Natural" },
+    { value: "Generic Chemical", label: "Generic Chemical" },
+    { value: "SynthScents", label: "SynthScents" },
+    { value: "GlassPack", label: "GlassPack" },
 ]
 
 const formatCurrency = (amount: number) => {
@@ -65,9 +74,10 @@ export default function InventoryPage() {
   // In a real app, these would come from a database or a global state management solution
   const [categories, setCategories] = useState(initialCategories);
   const [units, setUnits] = useState(initialUnits);
-  const [lowStockThreshold, setLowStockThreshold] = useState(200); // This would also come from settings
+  const [brands, setBrands] = useState(initialBrands);
+  const [lowStockThreshold, setLowStockThreshold] = useState(200);
 
-  const emptyMaterial: Material = { id: "", name: "", quantity: 0, unit: "", category: "", purchasePrice: 0 };
+  const emptyMaterial: Material = { id: "", name: "", brand: "", quantity: 0, unit: "", category: "", purchasePrice: 0 };
 
   const handleOpenDialog = (material: Material | null = null) => {
     setEditingMaterial(material ? { ...material } : emptyMaterial);
@@ -75,8 +85,8 @@ export default function InventoryPage() {
   };
 
   const handleSaveMaterial = () => {
-    if (!editingMaterial || !editingMaterial.name || !editingMaterial.unit || !editingMaterial.category) {
-      toast({ variant: "destructive", title: "Error", description: "Nama, unit, dan kategori bahan harus diisi." });
+    if (!editingMaterial || !editingMaterial.name || !editingMaterial.unit || !editingMaterial.category || !editingMaterial.brand) {
+      toast({ variant: "destructive", title: "Error", description: "Nama, brand, unit, dan kategori bahan harus diisi." });
       return;
     }
 
@@ -134,6 +144,19 @@ export default function InventoryPage() {
                                 <Input id="name" className="col-span-3" value={editingMaterial?.name || ''} onChange={(e) => setEditingMaterial(prev => prev ? {...prev, name: e.target.value} : null)} />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="brand" className="text-right">Brand</Label>
+                                <div className="col-span-3">
+                                  <Combobox
+                                    options={brands}
+                                    value={editingMaterial?.brand}
+                                    onChange={(value) => setEditingMaterial(prev => prev ? {...prev, brand: value} : null)}
+                                    placeholder="Pilih brand..."
+                                    searchPlaceholder="Cari brand..."
+                                    emptyPlaceholder="Brand tidak ditemukan."
+                                  />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="category" className="text-right">Kategori</Label>
                                 <div className="col-span-3">
                                   <Combobox
@@ -184,6 +207,7 @@ export default function InventoryPage() {
                               <TableHeader>
                                   <TableRow>
                                       <TableHead>Bahan</TableHead>
+                                      <TableHead>Brand</TableHead>
                                       <TableHead>Harga Beli</TableHead>
                                       <TableHead className="text-right">Kuantitas</TableHead>
                                       <TableHead className="text-right">Nilai Stok</TableHead>
@@ -197,6 +221,7 @@ export default function InventoryPage() {
                                       return (
                                         <TableRow key={material.id}>
                                             <TableCell className="font-medium">{material.name}</TableCell>
+                                            <TableCell>{material.brand}</TableCell>
                                             <TableCell>{formatCurrency(material.purchasePrice)}</TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-2">

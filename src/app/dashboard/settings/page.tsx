@@ -50,6 +50,15 @@ const initialUnits: Attribute[] = [
     { id: "unit_3", name: "pcs" },
 ]
 
+const initialBrands: Attribute[] = [
+    { id: "brand_1", name: "Luxe Fragrance Co." },
+    { id: "brand_2", name: "Aroma Natural" },
+    { id: "brand_3", name: "Generic Chemical" },
+    { id: "brand_4", name: "SynthScents" },
+    { id: "brand_5", name: "GlassPack" },
+]
+
+
 export default function SettingsPage() {
     const { toast } = useToast();
 
@@ -68,8 +77,9 @@ export default function SettingsPage() {
 
     const [categories, setCategories] = useState<Attribute[]>(initialCategories);
     const [units, setUnits] = useState<Attribute[]>(initialUnits);
+    const [brands, setBrands] = useState<Attribute[]>(initialBrands);
     const [isAttrDialogOpen, setAttrDialogOpen] = useState(false);
-    const [editingAttr, setEditingAttr] = useState<Attribute & {type: 'Kategori' | 'Unit'} | null>(null);
+    const [editingAttr, setEditingAttr] = useState<Attribute & {type: 'Kategori' | 'Unit' | 'Brand'} | null>(null);
     
     // In a real app, this would be saved to a database and probably managed via context/global state
     const [lowStockThreshold, setLowStockThreshold] = useState(200);
@@ -151,7 +161,7 @@ export default function SettingsPage() {
         toast({ title: "Sukses", description: "Promosi berhasil dihapus." });
     };
 
-    const handleOpenAttrDialog = (attr: Attribute | null, type: 'Kategori' | 'Unit') => {
+    const handleOpenAttrDialog = (attr: Attribute | null, type: 'Kategori' | 'Unit' | 'Brand') => {
         setEditingAttr(attr ? { ...attr, type } : { id: "", name: "", type });
         setAttrDialogOpen(true);
     };
@@ -162,9 +172,9 @@ export default function SettingsPage() {
             return;
         }
         
-        const list = editingAttr.type === 'Kategori' ? categories : units;
-        const setList = editingAttr.type === 'Kategori' ? setCategories : setUnits;
-        const prefix = editingAttr.type === 'Kategori' ? 'cat' : 'unit';
+        const list = editingAttr.type === 'Kategori' ? categories : editingAttr.type === 'Unit' ? units : brands;
+        const setList = editingAttr.type === 'Kategori' ? setCategories : editingAttr.type === 'Unit' ? setUnits : setBrands;
+        const prefix = editingAttr.type === 'Kategori' ? 'cat' : editingAttr.type === 'Unit' ? 'unit' : 'brand';
 
         if (editingAttr.id) {
             setList(list.map(item => item.id === editingAttr.id ? {id: item.id, name: editingAttr.name} : item));
@@ -177,8 +187,8 @@ export default function SettingsPage() {
         setEditingAttr(null);
     };
 
-     const handleDeleteAttr = (id: string, type: 'Kategori' | 'Unit') => {
-        const setList = type === 'Kategori' ? setCategories : setUnits;
+     const handleDeleteAttr = (id: string, type: 'Kategori' | 'Unit' | 'Brand') => {
+        const setList = type === 'Kategori' ? setCategories : type === 'Unit' ? setUnits : setBrands;
         setList(prev => prev.filter(item => item.id !== id));
         toast({ title: "Sukses", description: `${type} berhasil dihapus.` });
     };
@@ -216,9 +226,10 @@ export default function SettingsPage() {
                     </CardHeader>
                     <CardContent>
                         <Tabs defaultValue="categories">
-                            <TabsList>
+                            <TabsList className="grid w-full grid-cols-3">
                                 <TabsTrigger value="categories">Kategori</TabsTrigger>
                                 <TabsTrigger value="units">Unit</TabsTrigger>
+                                <TabsTrigger value="brands">Brand</TabsTrigger>
                             </TabsList>
                             <Dialog open={isAttrDialogOpen} onOpenChange={setAttrDialogOpen}>
                                 <DialogContent>
@@ -274,6 +285,30 @@ export default function SettingsPage() {
                                                         <DropdownMenuContent>
                                                             <DropdownMenuItem onClick={() => handleOpenAttrDialog(unit, 'Unit')}>Ubah</DropdownMenuItem>
                                                             <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteAttr(unit.id, 'Unit')}>Hapus</DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TabsContent>
+                             <TabsContent value="brands">
+                                <div className="flex justify-end mb-4">
+                                     <Button onClick={() => handleOpenAttrDialog(null, 'Brand')}><PlusCircle className="mr-2" /> Tambah Brand</Button>
+                                </div>
+                                <Table>
+                                    <TableHeader><TableRow><TableHead>Nama Brand</TableHead><TableHead className="w-[100px] text-right">Aksi</TableHead></TableRow></TableHeader>
+                                    <TableBody>
+                                        {brands.map(brand => (
+                                            <TableRow key={brand.id}>
+                                                <TableCell>{brand.name}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal /></Button></DropdownMenuTrigger>
+                                                        <DropdownMenuContent>
+                                                            <DropdownMenuItem onClick={() => handleOpenAttrDialog(brand, 'Brand')}>Ubah</DropdownMenuItem>
+                                                            <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteAttr(brand.id, 'Brand')}>Hapus</DropdownMenuItem>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
                                                 </TableCell>
