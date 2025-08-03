@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, MinusCircle, X, Search, UserPlus, Droplets, SprayCan, Bot } from "lucide-react";
+import { PlusCircle, MinusCircle, X, Search, UserPlus, Droplets, SprayCan } from "lucide-react";
 import Image from "next/image";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
@@ -158,6 +158,7 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
                         <SelectContent>
                             <SelectItem value="30">30 ml</SelectItem>
                             <SelectItem value="50">50 ml</SelectItem>
+                            <SelectItem value="100">100 ml</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
