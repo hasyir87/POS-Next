@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Tag, User, Languages, ShieldCheck } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tag, User, Languages, Key } from "lucide-react";
 import Link from "next/link";
 
 export default function SettingsPage() {
@@ -12,6 +13,38 @@ export default function SettingsPage() {
         <div className="flex flex-col gap-6">
             <h1 className="font-headline text-3xl font-bold">Settings</h1>
             <div className="grid gap-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Key className="h-5 w-5" /> API Key Management</CardTitle>
+                        <CardDescription>Create and manage API keys for external applications like your Flutter POS.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                         <div className="flex justify-end">
+                             <Button>Generate New Key</Button>
+                         </div>
+                         <Separator className="my-4" />
+                         <Table>
+                             <TableHeader>
+                                 <TableRow>
+                                     <TableHead>Label</TableHead>
+                                     <TableHead>Key (First 8 Chars)</TableHead>
+                                     <TableHead>Created</TableHead>
+                                     <TableHead className="w-[100px] text-right">Actions</TableHead>
+                                 </TableRow>
+                             </TableHeader>
+                             <TableBody>
+                                 <TableRow>
+                                     <TableCell className="font-medium">Flutter POS App</TableCell>
+                                     <TableCell className="font-mono">sk_live_Abc123De...</TableCell>
+                                     <TableCell>October 29, 2023</TableCell>
+                                     <TableCell className="text-right">
+                                         <Button variant="destructive" size="sm">Revoke</Button>
+                                     </TableCell>
+                                 </TableRow>
+                             </TableBody>
+                         </Table>
+                    </CardContent>
+                </Card>
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Tag className="h-5 w-5" /> Promotions</CardTitle>
