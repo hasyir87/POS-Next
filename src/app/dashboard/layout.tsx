@@ -14,7 +14,6 @@ export default function DashboardLayout({
 }) {
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: Home },
-    { href: "/dashboard/sales", label: "Sales", icon: DollarSign },
     { href: "/dashboard/inventory", label: "Inventory", icon: FlaskConical },
     { href: "/dashboard/reports", label: "Reports", icon: BarChart2 },
     { href: "/dashboard/shifts", label: "Shifts", icon: Clock },
