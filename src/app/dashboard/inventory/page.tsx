@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MoreHorizontal, PlusCircle } from "lucide-react";
+import { MoreHorizontal, PlusCircle, PackageSearch } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -21,19 +21,20 @@ type Material = {
   quantity: number;
   unit: string;
   category: string;
+  purchasePrice: number;
 };
 
 const initialAvailableMaterials: Material[] = [
-  { id: "MAT001", name: "Rose Absolute", quantity: 500, unit: "ml", category: "Bibit Parfum" },
-  { id: "MAT002", name: "Jasmine Sambac", quantity: 350, unit: "ml", category: "Bibit Parfum" },
-  { id: "MAT003", name: "Bergamot Oil", quantity: 1200, unit: "ml", category: "Bibit Parfum" },
-  { id: "MAT004", name: "Sandalwood", quantity: 200, unit: "g", category: "Bibit Parfum" },
-  { id: "MAT005", name: "Vanilla Extract", quantity: 800, unit: "ml", category: "Bibit Parfum" },
-  { id: "MAT006", name: "Ethanol (Perfumer's Alcohol)", quantity: 5000, unit: "ml", category: "Pelarut" },
-  { id: "MAT007", name: "Iso E Super", quantity: 2500, unit: "ml", category: "Bahan Sintetis" },
-  { id: "MAT008", name: "Ambroxan", quantity: 150, unit: "g", category: "Bahan Sintetis" },
-  { id: "MAT009", name: "Botol Kaca 50ml", quantity: 150, unit: "pcs", category: "Kemasan" },
-  { id: "MAT010", name: "Botol Kaca 100ml", quantity: 80, unit: "pcs", category: "Kemasan" },
+  { id: "MAT001", name: "Rose Absolute", quantity: 500, unit: "ml", category: "bibit parfum", purchasePrice: 1500 },
+  { id: "MAT002", name: "Jasmine Sambac", quantity: 350, unit: "ml", category: "bibit parfum", purchasePrice: 1800 },
+  { id: "MAT003", name: "Bergamot Oil", quantity: 1200, unit: "ml", category: "bibit parfum", purchasePrice: 800 },
+  { id: "MAT004", name: "Sandalwood", quantity: 200, unit: "g", category: "bibit parfum", purchasePrice: 2500 },
+  { id: "MAT005", name: "Vanilla Extract", quantity: 800, unit: "ml", category: "bibit parfum", purchasePrice: 950 },
+  { id: "MAT006", name: "Ethanol (Perfumer's Alcohol)", quantity: 5000, unit: "ml", category: "pelarut", purchasePrice: 100 },
+  { id: "MAT007", name: "Iso E Super", quantity: 2500, unit: "ml", category: "bahan sintetis", purchasePrice: 400 },
+  { id: "MAT008", name: "Ambroxan", quantity: 150, unit: "g", category: "bahan sintetis", purchasePrice: 3000 },
+  { id: "MAT009", name: "Botol Kaca 50ml", quantity: 150, unit: "pcs", category: "kemasan", purchasePrice: 3500 },
+  { id: "MAT010", name: "Botol Kaca 100ml", quantity: 80, unit: "pcs", category: "kemasan", purchasePrice: 5000 },
 ];
 
 const initialCategories = [
@@ -49,6 +50,10 @@ const initialUnits = [
     { value: "pcs", label: "pcs" },
 ]
 
+const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
+};
+
 
 export default function InventoryPage() {
   const { toast } = useToast();
@@ -60,7 +65,7 @@ export default function InventoryPage() {
   const [categories, setCategories] = useState(initialCategories);
   const [units, setUnits] = useState(initialUnits);
 
-  const emptyMaterial: Material = { id: "", name: "", quantity: 0, unit: "", category: "" };
+  const emptyMaterial: Material = { id: "", name: "", quantity: 0, unit: "", category: "", purchasePrice: 0 };
 
   const handleOpenDialog = (material: Material | null = null) => {
     setEditingMaterial(material ? { ...material } : emptyMaterial);
@@ -103,21 +108,21 @@ export default function InventoryPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-headline text-3xl font-bold">Inventaris</h1>
+        <h1 className="font-headline text-3xl font-bold flex items-center gap-2"><PackageSearch className="h-8 w-8"/>Inventaris</h1>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-4">
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                     <div>
-                      <CardTitle>Inventaris Langsung</CardTitle>
+                      <CardTitle>Stok Bahan</CardTitle>
                       <CardDescription>Tingkat stok bahan baku saat ini dikelompokkan berdasarkan kategori.</CardDescription>
                     </div>
                     <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
                       <DialogTrigger asChild>
                         <Button size="sm" onClick={() => handleOpenDialog()}><PlusCircle className="mr-2" /> Tambah Bahan</Button>
                       </DialogTrigger>
-                       <DialogContent className="sm:max-w-[425px]">
+                       <DialogContent className="sm:max-w-md">
                         <DialogHeader>
                             <DialogTitle className="font-headline">{editingMaterial?.id ? 'Ubah Bahan' : 'Tambah Bahan Baru'}</DialogTitle>
                         </DialogHeader>
@@ -156,6 +161,10 @@ export default function InventoryPage() {
                                     />
                                 </div>
                             </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="purchasePrice" className="text-right">Harga Beli</Label>
+                                <Input id="purchasePrice" type="number" placeholder="Rp 0" className="col-span-3" value={editingMaterial?.purchasePrice || ''} onChange={(e) => setEditingMaterial(prev => prev ? {...prev, purchasePrice: parseFloat(e.target.value) || 0} : null)} />
+                            </div>
                         </div>
                         <DialogFooter>
                             <Button onClick={handleSaveMaterial} type="submit">Simpan</Button>
@@ -173,15 +182,19 @@ export default function InventoryPage() {
                               <TableHeader>
                                   <TableRow>
                                       <TableHead>Bahan</TableHead>
+                                      <TableHead>Harga Beli</TableHead>
                                       <TableHead className="text-right">Kuantitas</TableHead>
+                                      <TableHead className="text-right">Nilai Stok</TableHead>
                                       <TableHead className="w-[50px]"></TableHead>
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
                                   {items.map((material) => (
                                       <TableRow key={material.id}>
-                                          <TableCell>{material.name}</TableCell>
-                                          <TableCell className="text-right">{material.quantity} {material.unit}</TableCell>
+                                          <TableCell className="font-medium">{material.name}</TableCell>
+                                           <TableCell>{formatCurrency(material.purchasePrice)}</TableCell>
+                                          <TableCell className="text-right">{material.quantity.toLocaleString('id-ID')} {material.unit}</TableCell>
+                                          <TableCell className="text-right font-semibold">{formatCurrency(material.quantity * material.purchasePrice)}</TableCell>
                                           <TableCell>
                                             <DropdownMenu>
                                                   <DropdownMenuTrigger asChild>
@@ -207,7 +220,7 @@ export default function InventoryPage() {
                 </CardContent>
             </Card>
         </div>
-        <div className="lg:col-span-4">
+        <div className="lg:col-span-3">
           <InventoryTool availableMaterials={materials} />
         </div>
       </div>
