@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 
 type ApiKey = { id: string; label: string; key: string; created: string };
 type Outlet = { id: string; name: string; location: string };
+type Promotion = { id: string; name: string; type: string; value: string; };
 
 const initialApiKeys: ApiKey[] = [
     { id: "key_1", label: "Aplikasi POS Flutter", key: "sk_live_Abc123DeF4G5H6i7...", created: "29 Oktober 2023" },
@@ -27,17 +28,27 @@ const initialOutlets: Outlet[] = [
     { id: "out_2", name: "ScentPOS - Bandung", location: "Bandung" },
 ];
 
+const initialPromotions: Promotion[] = [
+    { id: "promo_1", name: "Diskon Akhir Pekan", type: "Persentase", value: "15%" },
+    { id: "promo_2", name: "Beli 1 Gratis 1 Parfum Mini", type: "BOGO", value: "Parfum Mini" },
+];
+
 export default function SettingsPage() {
     const { toast } = useToast();
 
     const [apiKeys, setApiKeys] = useState<ApiKey[]>(initialApiKeys);
     const [outlets, setOutlets] = useState<Outlet[]>(initialOutlets);
+    const [promotions, setPromotions] = useState<Promotion[]>(initialPromotions);
 
     const [isKeyDialogOpen, setKeyDialogOpen] = useState(false);
     const [newKeyLabel, setNewKeyLabel] = useState("");
 
     const [isOutletDialogOpen, setOutletDialogOpen] = useState(false);
     const [editingOutlet, setEditingOutlet] = useState<Outlet | null>(null);
+
+    const [isPromoDialogOpen, setPromoDialogOpen] = useState(false);
+    const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
+
 
     const handleCreateKey = () => {
         if (!newKeyLabel) {
@@ -87,6 +98,34 @@ export default function SettingsPage() {
         setOutlets(outlets.filter(o => o.id !== id));
         toast({ title: "Sukses", description: "Outlet berhasil dihapus." });
     };
+
+    const handleOpenPromoDialog = (promo: Promotion | null = null) => {
+        setEditingPromo(promo ? { ...promo } : { id: "", name: "", type: "Persentase", value: "" });
+        setPromoDialogOpen(true);
+    };
+
+    const handleSavePromo = () => {
+        if (!editingPromo || !editingPromo.name || !editingPromo.value) {
+            toast({ variant: "destructive", title: "Error", description: "Semua field promosi harus diisi." });
+            return;
+        }
+        if (editingPromo.id) {
+            setPromotions(promotions.map(p => p.id === editingPromo.id ? editingPromo : p));
+            toast({ title: "Sukses", description: "Promosi berhasil diperbarui." });
+        } else {
+            const newPromo = { ...editingPromo, id: `promo_${Date.now()}` };
+            setPromotions(prev => [...prev, newPromo]);
+            toast({ title: "Sukses", description: "Promosi baru berhasil ditambahkan." });
+        }
+        setPromoDialogOpen(false);
+        setEditingPromo(null);
+    };
+
+    const handleDeletePromo = (id: string) => {
+        setPromotions(promotions.filter(p => p.id !== id));
+        toast({ title: "Sukses", description: "Promosi berhasil dihapus." });
+    };
+
 
     return (
         <div className="flex flex-col gap-6">
@@ -201,7 +240,69 @@ export default function SettingsPage() {
                         <CardDescription>Kelola diskon dan penawaran khusus seperti 'Beli Satu Gratis Satu' atau harga grosir.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <Button>Buat Promosi Baru</Button>
+                        <div className="flex justify-end">
+                            <Dialog open={isPromoDialogOpen} onOpenChange={setPromoDialogOpen}>
+                                <DialogTrigger asChild><Button onClick={() => handleOpenPromoDialog()}><PlusCircle className="mr-2" /> Buat Promosi Baru</Button></DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader><DialogTitle className="font-headline">{editingPromo?.id ? 'Ubah Promosi' : 'Buat Promosi Baru'}</DialogTitle></DialogHeader>
+                                    <div className="grid gap-4 py-4">
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label htmlFor="promo-name" className="text-right">Nama</Label>
+                                            <Input id="promo-name" value={editingPromo?.name || ''} onChange={e => setEditingPromo(prev => prev ? {...prev, name: e.target.value} : null)} className="col-span-3" placeholder="e.g., Diskon Akhir Tahun" />
+                                        </div>
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label htmlFor="promo-type" className="text-right">Jenis</Label>
+                                            <Select value={editingPromo?.type} onValueChange={(value) => setEditingPromo(prev => prev ? {...prev, type: value} : null)}>
+                                                <SelectTrigger id="promo-type" className="col-span-3">
+                                                    <SelectValue placeholder="Pilih jenis promosi" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="Persentase">Persentase (%)</SelectItem>
+                                                    <SelectItem value="Nominal">Nominal (Rp)</SelectItem>
+                                                    <SelectItem value="BOGO">BOGO (Beli X Gratis Y)</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label htmlFor="promo-value" className="text-right">Nilai</Label>
+                                            <Input id="promo-value" value={editingPromo?.value || ''} onChange={e => setEditingPromo(prev => prev ? {...prev, value: e.target.value} : null)} className="col-span-3" placeholder="e.g., 15% atau 50000" />
+                                        </div>
+                                    </div>
+                                    <DialogFooter><Button onClick={handleSavePromo}>Simpan Promosi</Button></DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
+                        <Separator className="my-4" />
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Nama Promosi</TableHead>
+                                    <TableHead>Jenis</TableHead>
+                                    <TableHead>Nilai</TableHead>
+                                    <TableHead className="w-[100px] text-right">Aksi</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {promotions.map(promo => (
+                                    <TableRow key={promo.id}>
+                                        <TableCell className="font-medium">{promo.name}</TableCell>
+                                        <TableCell>{promo.type}</TableCell>
+                                        <TableCell>{promo.value}</TableCell>
+                                        <TableCell className="text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Buka menu</span><MoreHorizontal className="h-4 w-4" /></Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => handleOpenPromoDialog(promo)}>Ubah</DropdownMenuItem>
+                                                    <DropdownMenuItem className="text-destructive" onClick={() => handleDeletePromo(promo.id)}>Hapus</DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
                     </CardContent>
                 </Card>
 
@@ -242,5 +343,3 @@ export default function SettingsPage() {
         </div>
     )
 }
-
-    
