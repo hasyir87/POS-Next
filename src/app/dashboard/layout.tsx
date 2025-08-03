@@ -1,33 +1,62 @@
+
+"use client";
+
+import { useContext } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { BarChart2, Clock, FlaskConical, Home, LogOut, Menu, Settings, DollarSign, BookUser, Store, ChevronsUpDown } from "lucide-react";
 import Link from "next/link";
 import { ScentSationLogo } from "@/components/scent-sation-logo";
+import { AuthContext, UserRole } from '@/context/auth-context';
+import { useRouter } from 'next/navigation';
+
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  requiredRoles: UserRole[];
+};
+
+const allNavItems: NavItem[] = [
+  { href: "/dashboard", label: "Dasbor", icon: Home, requiredRoles: ["owner", "admin", "cashier"] },
+  { href: "/dashboard/shifts", label: "Shift", icon: Clock, requiredRoles: ["owner", "admin", "cashier"] },
+  { href: "/dashboard/inventory", label: "Inventaris", icon: FlaskConical, requiredRoles: ["owner", "admin"] },
+  { href: "/dashboard/expenses", label: "Beban", icon: DollarSign, requiredRoles: ["owner", "admin"] },
+  { href: "/dashboard/accounts", label: "Akun", icon: BookUser, requiredRoles: ["owner", "admin"] },
+  { href: "/dashboard/reports", label: "Laporan", icon: BarChart2, requiredRoles: ["owner", "admin"] },
+  { href: "/dashboard/settings", label: "Pengaturan", icon: Settings, requiredRoles: ["owner"] },
+];
+
+const outlets = [
+  { id: "all", name: "Semua Outlet" },
+  { id: "jkt", name: "ScentPOS - Jakarta Pusat" },
+  { id: "bdg", name: "ScentPOS - Bandung" },
+];
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const navItems = [
-    { href: "/dashboard", label: "Dasbor", icon: Home },
-    { href: "/dashboard/inventory", label: "Inventaris", icon: FlaskConical },
-    { href: "/dashboard/expenses", label: "Beban", icon: DollarSign },
-    { href: "/dashboard/accounts", label: "Akun", icon: BookUser },
-    { href: "/dashboard/reports", label: "Laporan", icon: BarChart2 },
-    { href: "/dashboard/shifts", label: "Shift", icon: Clock },
-    { href: "/dashboard/settings", label: "Pengaturan", icon: Settings },
-  ];
+  const router = useRouter();
+  const { user, logout } = useContext(AuthContext);
 
-  const outlets = [
-    { id: "all", name: "Semua Outlet" },
-    { id: "jkt", name: "ScentPOS - Jakarta Pusat" },
-    { id: "bdg", name: "ScentPOS - Bandung" },
-  ];
+  if (!user) {
+    // This can be a loading spinner or a redirect
+    if (typeof window !== 'undefined') {
+      router.push('/');
+    }
+    return null; 
+  }
 
+  const navItems = allNavItems.filter(item => item.requiredRoles.includes(user.role));
+
+  const handleLogout = () => {
+    logout();
+    router.push('/');
+  };
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
@@ -91,46 +120,46 @@ export default function DashboardLayout({
             </SheetContent>
           </Sheet>
           <div className="w-full flex-1">
-             <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="w-full max-w-xs">
-                        <Store className="mr-2 h-4 w-4" />
-                        <span className="flex-1 text-left">Semua Outlet</span>
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-full max-w-xs">
-                    <DropdownMenuLabel>Pilih Outlet</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {outlets.map((outlet) => (
-                        <DropdownMenuItem key={outlet.id}>
-                            {outlet.name}
-                        </DropdownMenuItem>
-                    ))}
-                </DropdownMenuContent>
-            </DropdownMenu>
+            {user.role === 'owner' && (
+              <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="w-full max-w-xs">
+                          <Store className="mr-2 h-4 w-4" />
+                          <span className="flex-1 text-left">Semua Outlet</span>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-full max-w-xs">
+                      <DropdownMenuLabel>Pilih Outlet</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {outlets.map((outlet) => (
+                          <DropdownMenuItem key={outlet.id}>
+                              {outlet.name}
+                          </DropdownMenuItem>
+                      ))}
+                  </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">
                 <Avatar>
-                  <AvatarImage src="https://placehold.co/40x40" alt="@shadcn" />
-                  <AvatarFallback>AD</AvatarFallback>
+                  <AvatarImage src="https://placehold.co/40x40" alt="Avatar" data-ai-hint="avatar" />
+                  <AvatarFallback>{user.name.substring(0, 2).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <span className="sr-only">Buka/tutup menu pengguna</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Admin</DropdownMenuLabel>
+              <DropdownMenuLabel>{user.name}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>Profil</DropdownMenuItem>
               <DropdownMenuItem>Dukungan</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Keluar</span>
-                </Link>
+              <DropdownMenuItem onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Keluar</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

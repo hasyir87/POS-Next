@@ -1,11 +1,15 @@
-import type {Metadata} from 'next';
-import './globals.css';
-import { Toaster } from "@/components/ui/toaster"
 
-export const metadata: Metadata = {
-  title: 'ScentPOS',
-  description: 'Point of Sale untuk parfum eksklusif.',
-};
+"use client";
+
+import './globals.css';
+import { Toaster } from "@/components/ui/toaster";
+import { AuthProvider } from '@/context/auth-context';
+
+// No metadata export from client component
+// export const metadata: Metadata = {
+//   title: 'ScentPOS',
+//   description: 'Point of Sale untuk parfum eksklusif.',
+// };
 
 export default function RootLayout({
   children,
@@ -15,13 +19,17 @@ export default function RootLayout({
   return (
     <html lang="id" suppressHydrationWarning>
       <head>
+        <title>ScentPOS</title>
+        <meta name="description" content="Point of Sale untuk parfum eksklusif." />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=PT+Sans:wght@400;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        {children}
-        <Toaster />
+        <AuthProvider>
+          {children}
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );

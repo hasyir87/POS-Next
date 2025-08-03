@@ -1,5 +1,7 @@
+
 "use client"
 
+import { useContext } from "react";
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -24,7 +26,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScentSationLogo } from "./scent-sation-logo"
-
+import { AuthContext } from "@/context/auth-context";
 
 const formSchema = z.object({
   email: z.string().email({
@@ -39,7 +41,9 @@ const formSchema = z.object({
 })
 
 export function LoginForm() {
-  const router = useRouter()
+  const router = useRouter();
+  const { login } = useContext(AuthContext);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -49,10 +53,11 @@ export function LoginForm() {
   })
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    // Di aplikasi nyata, Anda akan menangani otentikasi di sini.
-    // Untuk contoh ini, kita hanya akan mengarahkan ke dasbor.
-    console.log(values)
-    router.push("/dashboard")
+    // In a real app, you would handle real authentication here.
+    // For this example, we'll just log the user in with the selected role.
+    const userName = values.email.split('@')[0];
+    login({ name: userName, role: values.role });
+    router.push("/dashboard");
   }
 
   return (
