@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -42,21 +43,32 @@ export function ReportControls({ data, className }: ReportControlsProps) {
   const handleDownloadExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan Laba Rugi");
+    // Auto-size columns
+    const max_width = data.reduce((w, r) => Math.max(w, r.Laporan.length), 10);
+    worksheet["!cols"] = [ { wch: max_width }, { wch: 20 } ];
+
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
-    saveAs(blob, "laporan.xlsx");
+    saveAs(blob, "laporan_laba_rugi.xlsx");
   };
 
   const handleDownloadPdf = () => {
     const doc = new jsPDF();
-    doc.text("Laporan Laba & Rugi", 14, 16);
+    const period = date?.from && date?.to ? `${format(date.from, "d LLL y")} - ${format(date.to, "d LLL y")}` : "Semua Waktu";
+    
+    doc.setFontSize(16);
+    doc.text("Laporan Laba & Rugi", 14, 22);
+    doc.setFontSize(10);
+    doc.text(`Periode: ${period}`, 14, 28);
+    
     autoTable(doc, {
-        head: [['Periode', 'Pendapatan', 'HPP', 'Laba']],
-        body: data.map(row => [row.name, `Rp ${row.revenue}`, `Rp ${row.cogs}`, `Rp ${row.profit}`]),
-        startY: 20
+        head: [['Laporan', 'Jumlah']],
+        body: data.map(row => [row.Laporan, new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(row.Jumlah)]),
+        startY: 35,
+        theme: 'grid'
     });
-    doc.save('laporan.pdf');
+    doc.save('laporan_laba_rugi.pdf');
   };
 
 

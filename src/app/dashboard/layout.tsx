@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { BarChart2, Clock, Home, LogOut, Menu, Settings, DollarSign, BookUser, Store, ChevronsUpDown, Users, PackageSearch } from "lucide-react";
+import { BarChart3, Clock, Home, LogOut, Menu, Settings, DollarSign, BookUser, Store, ChevronsUpDown, Users, PackageSearch } from "lucide-react";
 import Link from "next/link";
 import { ScentSationLogo } from "@/components/scent-sation-logo";
 import { AuthContext, UserRole } from '@/context/auth-context';
@@ -26,7 +26,7 @@ const allNavItems: NavItem[] = [
   { href: "/dashboard/members", label: "Anggota", icon: Users, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/expenses", label: "Beban", icon: DollarSign, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/accounts", label: "Akun", icon: BookUser, requiredRoles: ["owner", "admin"] },
-  { href: "/dashboard/reports", label: "Laporan", icon: BarChart2, requiredRoles: ["owner", "admin"] },
+  { href: "/dashboard/reports", label: "Laporan", icon: BarChart3, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/settings", label: "Pengaturan", icon: Settings, requiredRoles: ["owner"] },
 ];
 

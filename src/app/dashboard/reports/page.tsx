@@ -1,72 +1,169 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, CircleDollarSign, Archive } from "lucide-react";
-import { ProfitLossChart } from "@/components/profit-loss-chart";
+import { useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ReportControls } from "@/components/report-controls";
+import { Separator } from "@/components/ui/separator";
 
-// In a real app, this data would be fetched and calculated dynamically
-const profitLossData = [
-  { name: 'Jan', revenue: 4000000, cogs: 2400000, profit: 1600000 },
-  { name: 'Feb', revenue: 3000000, cogs: 1398000, profit: 1602000 },
-  { name: 'Mar', revenue: 5000000, cogs: 3800000, profit: 1200000 },
-  { name: 'Apr', revenue: 4780000, cogs: 2908000, profit: 1872000 },
-  { name: 'Mei', revenue: 5890000, cogs: 3800000, profit: 2090000 },
-  { name: 'Jun', revenue: 4390000, cogs: 3100000, profit: 1290000 },
-  { name: 'Jul', revenue: 5490000, cogs: 3490000, profit: 2000000 },
+// --- SIMULASI DATA ---
+// Di aplikasi nyata, data ini akan datang dari database (Firestore)
+// dan dihitung berdasarkan rentang tanggal yang dipilih.
+
+// 1. Data Penjualan (Sales/Transactions)
+const salesData = [
+  { id: "TRX001", date: "2024-07-28", item: "Custom Blend (Floral)", revenue: 45000, cogs: 18000 },
+  { id: "TRX002", date: "2024-07-28", item: "Ocean Breeze 50ml", revenue: 79990, cogs: 32000 },
+  { id: "TRX005", date: "2024-07-29", item: "Custom Blend (Citrus)", revenue: 60250, cogs: 25000 },
+  { id: "TRX008", date: "2024-07-30", item: "Mystic Woods 100ml", revenue: 120000, cogs: 50000 },
 ];
 
+// 2. Data Beban (Expenses) - Ini akan kita ambil dari state, tapi untuk sekarang kita simulasikan
+const expenseData = [
+    { id: "EXP001", date: "2023-10-25", category: "Utilitas", description: "Tagihan listrik bulanan", amount: 120500 },
+    { id: "EXP002", date: "2023-10-20", category: "Sewa", description: "Sewa toko untuk November", amount: 1500000 },
+    { id: "EXP004", date: "2023-10-15", category: "Gaji", description: "Gaji untuk Alice", amount: 800000 },
+    { id: "EXP005", date: "2023-10-12", category: "Pemasaran", description: "Iklan media sosial", amount: 250000 },
+];
+
+// --- FUNGSI HELPER ---
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
 };
 
-// This would also be fetched in a real app
-const initialInventoryValue = 18382500; // Calculated from initial inventory data for demonstration
-
 export default function ReportsPage() {
-  // In a real app, you would fetch inventory and calculate this value
-  const [totalInventoryValue, setTotalInventoryValue] = useState(initialInventoryValue);
-  
-  const summaryData = [
-      { title: "Total Pendapatan", value: formatCurrency(250120890), icon: TrendingUp, color: "text-green-500" },
-      { title: "Harga Pokok Penjualan (HPP)", value: formatCurrency(142345120), icon: TrendingDown, color: "text-red-500" },
-      { title: "Laba Bersih", value: formatCurrency(107775770), icon: CircleDollarSign, color: "text-primary" },
-      { title: "Total Nilai Inventaris", value: formatCurrency(totalInventoryValue), icon: Archive, color: "text-blue-500" },
-  ];
+  // --- KALKULASI DINAMIS ---
+  const totalRevenue = salesData.reduce((sum, sale) => sum + sale.revenue, 0);
+  const totalCogs = salesData.reduce((sum, sale) => sum + sale.cogs, 0);
+  const grossProfit = totalRevenue - totalCogs;
+
+  const totalExpenses = expenseData.reduce((sum, expense) => sum + expense.amount, 0);
+  const netProfit = grossProfit - totalExpenses;
+
+  // Data untuk di-export
+  const exportData = [
+    { Laporan: "Pendapatan", Jumlah: totalRevenue },
+    { Laporan: "Harga Pokok Penjualan (HPP)", Jumlah: totalCogs },
+    { Laporan: "Laba Kotor", Jumlah: grossProfit },
+    { Laporan: "Total Beban Operasional", Jumlah: totalExpenses },
+    { Laporan: "Laba Bersih", Jumlah: netProfit },
+  ]
+
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="font-headline text-3xl font-bold">Laporan Laba & Rugi</h1>
-        <ReportControls data={profitLossData} />
-      </div>
-      
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {summaryData.map((item, index) => (
-            <Card key={index}>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
-                    <item.icon className={`h-4 w-4 text-muted-foreground ${item.color}`} />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">{item.value}</div>
-                    <p className="text-xs text-muted-foreground">Tahun berjalan</p>
-                </CardContent>
-            </Card>
-        ))}
+        <h1 className="font-headline text-3xl font-bold">Laporan Laba Rugi</h1>
+        <ReportControls data={exportData} />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Kinerja Bulanan</CardTitle>
-          <CardDescription>Pendapatan vs. Harga Pokok Penjualan (HPP) dari waktu ke waktu.</CardDescription>
+          <CardTitle>Ringkasan Laba Rugi</CardTitle>
+          <CardDescription>
+            Ringkasan keuangan terperinci untuk periode yang dipilih.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <ProfitLossChart data={profitLossData} />
+        <CardContent className="space-y-4">
+            {/* Laba Kotor */}
+            <div className="space-y-2">
+                <div className="flex justify-between items-baseline">
+                    <span className="font-medium">Pendapatan</span>
+                    <span>{formatCurrency(totalRevenue)}</span>
+                </div>
+                 <div className="flex justify-between items-baseline text-sm text-muted-foreground">
+                    <span>Harga Pokok Penjualan (HPP)</span>
+                    <span>- {formatCurrency(totalCogs)}</span>
+                </div>
+                 <Separator />
+                <div className="flex justify-between items-baseline font-semibold text-lg">
+                    <span>Laba Kotor</span>
+                    <span>{formatCurrency(grossProfit)}</span>
+                </div>
+            </div>
+
+            <Separator className="my-6"/>
+
+            {/* Laba Bersih */}
+            <div className="space-y-2">
+                <div className="flex justify-between items-baseline font-medium">
+                     <span>Beban Operasional</span>
+                </div>
+                {expenseData.map(expense => (
+                    <div key={expense.id} className="flex justify-between items-baseline text-sm text-muted-foreground">
+                        <span>{expense.description} ({expense.category})</span>
+                        <span>- {formatCurrency(expense.amount)}</span>
+                    </div>
+                ))}
+                 <Separator />
+                 <div className="flex justify-between items-baseline font-semibold">
+                    <span>Total Beban Operasional</span>
+                    <span>- {formatCurrency(totalExpenses)}</span>
+                </div>
+            </div>
         </CardContent>
+        <CardFooter className="bg-secondary/50">
+            <div className="flex justify-between items-baseline w-full font-bold text-xl">
+                 <span className={netProfit >= 0 ? 'text-green-600' : 'text-red-600'}>Laba Bersih</span>
+                 <span className={netProfit >= 0 ? 'text-green-600' : 'text-red-600'}>{formatCurrency(netProfit)}</span>
+            </div>
+        </CardFooter>
       </Card>
+      
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+            <CardHeader>
+                <CardTitle>Rincian Penjualan</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Item</TableHead>
+                            <TableHead className="text-right">Pendapatan</TableHead>
+                            <TableHead className="text-right">HPP</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {salesData.map(sale => (
+                            <TableRow key={sale.id}>
+                                <TableCell>{sale.item}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(sale.revenue)}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(sale.cogs)}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+         <Card>
+            <CardHeader>
+                <CardTitle>Rincian Beban</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Deskripsi</TableHead>
+                            <TableHead className="text-right">Jumlah</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {expenseData.map(expense => (
+                             <TableRow key={expense.id}>
+                                <TableCell>
+                                    <div className="font-medium">{expense.description}</div>
+                                    <div className="text-sm text-muted-foreground">{expense.category}</div>
+                                </TableCell>
+                                <TableCell className="text-right">{formatCurrency(expense.amount)}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
