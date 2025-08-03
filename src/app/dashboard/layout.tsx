@@ -8,7 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { BarChart3, Clock, Home, LogOut, Menu, Settings, DollarSign, BookUser, Store, ChevronsUpDown, Users, PackageSearch } from "lucide-react";
 import Link from "next/link";
-import { ScentSationLogo } from "@/components/scent-sation-logo";
+import { MPerfumeAmalLogo } from "@/components/m-perfume-amal-logo";
 import { AuthContext, UserRole } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 
@@ -33,8 +33,8 @@ const allNavItems: NavItem[] = [
 
 const outlets = [
   { id: "all", name: "Semua Outlet" },
-  { id: "jkt", name: "ScentPOS - Jakarta Pusat" },
-  { id: "bdg", name: "ScentPOS - Bandung" },
+  { id: "jkt", name: "M Perfume Amal - Jakarta Pusat" },
+  { id: "bdg", name: "M Perfume Amal - Bandung" },
 ];
 
 export default function DashboardLayout({
@@ -66,8 +66,8 @@ export default function DashboardLayout({
         <div className="flex h-full max-h-screen flex-col gap-2">
           <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
             <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-              <ScentSationLogo className="h-6 w-6 text-primary" />
-              <span className="font-headline text-xl">ScentPOS</span>
+              <MPerfumeAmalLogo className="h-6 w-6 text-primary" />
+              <span className="font-headline text-xl">M Perfume Amal</span>
             </Link>
           </div>
           <div className="flex-1">
@@ -105,8 +105,8 @@ export default function DashboardLayout({
                   href="#"
                   className="flex items-center gap-2 text-lg font-semibold mb-4"
                 >
-                  <ScentSationLogo className="h-6 w-6 text-primary" />
-                  <span className="font-headline text-xl">ScentPOS</span>
+                  <MPerfumeAmalLogo className="h-6 w-6 text-primary" />
+                  <span className="font-headline text-xl">M Perfume Amal</span>
                 </Link>
                 {navItems.map((item) => (
                   <Link

@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ScentSationLogo } from "./scent-sation-logo"
+import { MPerfumeAmalLogo } from "./m-perfume-amal-logo"
 import { AuthContext } from "@/context/auth-context";
 
 const formSchema = z.object({
@@ -63,8 +63,8 @@ export function LoginForm() {
   return (
     <Card className="w-full">
       <CardHeader className="items-center text-center">
-        <ScentSationLogo className="w-16 h-16 mb-2 text-primary" />
-        <CardTitle className="font-headline text-3xl">ScentPOS</CardTitle>
+        <MPerfumeAmalLogo className="w-16 h-16 mb-2 text-primary" />
+        <CardTitle className="font-headline text-3xl">M Perfume Amal</CardTitle>
       </CardHeader>
       <CardContent>
         <Form {...form}>

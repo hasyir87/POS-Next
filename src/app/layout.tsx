@@ -19,8 +19,8 @@ export default function RootLayout({
   return (
     <html lang="id" suppressHydrationWarning>
       <head>
-        <title>ScentPOS</title>
-        <meta name="description" content="Point of Sale untuk parfum eksklusif." />
+        <title>M Perfume Amal</title>
+        <meta name="description" content="Point of Sale untuk M Perfume Amal." />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=PT+Sans:wght@400;700&display=swap" rel="stylesheet" />
