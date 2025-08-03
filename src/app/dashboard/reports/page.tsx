@@ -19,12 +19,13 @@ const salesData = [
   { id: "TRX008", date: "2024-07-30", item: "Mystic Woods 100ml", revenue: 120000, cogs: 50000 },
 ];
 
-// 2. Data Beban (Expenses) - Ini akan kita ambil dari state, tapi untuk sekarang kita simulasikan
+// 2. Data Beban (Expenses) - Data ini harus konsisten dengan data awal di halaman Beban
 const expenseData = [
     { id: "EXP001", date: "2023-10-25", category: "Utilitas", description: "Tagihan listrik bulanan", amount: 120500 },
     { id: "EXP002", date: "2023-10-20", category: "Sewa", description: "Sewa toko untuk November", amount: 1500000 },
-    { id: "EXP004", date: "2023-10-15", category: "Gaji", description: "Gaji untuk Alice", amount: 800000 },
-    { id: "EXP005", date: "2023-10-12", category: "Pemasaran", description: "Iklan media sosial", amount: 250000 },
+    { id: "EXP003", date: "2023-10-18", category: "Perlengkapan", description: "Perlengkapan kebersihan", amount: 45200 },
+    { id: "EXP004", date: "2023-10-15", category: "Gaji", description: "Gaji untuk Alice (1-15 Okt)", amount: 800000 },
+    { id: "EXP005", date: "2023-10-12", category: "Pemasaran", description: "Kampanye iklan media sosial", amount: 250000 },
 ];
 
 // --- FUNGSI HELPER ---
@@ -167,3 +168,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    

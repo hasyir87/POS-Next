@@ -42,23 +42,30 @@ type Material = {
 };
 
 // --- SIMULASI DATA ---
-// Di aplikasi nyata, data ini akan datang dari database (Firestore) atau state management global.
+// Data ini disinkronkan dengan data awal di halaman Inventaris untuk konsistensi notifikasi.
 const initialAvailableMaterials: Material[] = [
   { id: "MAT001", name: "Rose Absolute", quantity: 50, unit: "ml" },
   { id: "MAT002", name: "Jasmine Sambac", quantity: 350, unit: "ml" },
+  { id: "MAT003", name: "Bergamot Oil", quantity: 1200, unit: "ml" },
   { id: "MAT004", name: "Sandalwood", quantity: 0, unit: "g" },
+  { id: "MAT005", name: "Vanilla Extract", quantity: 800, unit: "ml" },
+  { id: "MAT006", name: "Ethanol (Perfumer's Alcohol)", quantity: 5000, unit: "ml" },
   { id: "MAT007", name: "Iso E Super", quantity: 180, unit: "ml" },
+  { id: "MAT008", name: "Ambroxan", quantity: 150, unit: "g" },
+  { id: "MAT009", name: "Botol Kaca 50ml", quantity: 150, unit: "pcs" },
+  { id: "MAT010", name: "Botol Kaca 100ml", quantity: 80, unit: "pcs" },
 ];
 
 
 export default function DashboardPage() {
     // In a real app, this would be fetched or come from a global state
     const [materials, setMaterials] = useState<Material[]>(initialAvailableMaterials);
+    // Nilai ini harus cocok dengan nilai default di halaman Pengaturan
     const [lowStockThreshold, setLowStockThreshold] = useState(200);
 
     const lowStockItems = materials.filter(m => m.quantity > 0 && m.quantity < lowStockThreshold);
     const outOfStockItems = materials.filter(m => m.quantity === 0);
-    const notifications = [...lowStockItems, ...outOfStockItems];
+    const notifications = [...outOfStockItems, ...lowStockItems];
 
 
   return (
@@ -161,3 +168,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

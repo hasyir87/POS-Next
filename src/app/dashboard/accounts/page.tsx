@@ -56,7 +56,7 @@ export default function AccountsPage() {
             dueDate: newPayable.dueDate,
             status: "Tertunda",
         };
-        setPayables(prev => [...prev, newEntry]);
+        setPayables(prev => [newEntry, ...prev]);
         toast({ title: "Sukses", description: "Utang baru berhasil ditambahkan." });
         setNewPayable({ vendor: '', amount: '', dueDate: '' });
         setPayableDialogOpen(false);
@@ -74,7 +74,7 @@ export default function AccountsPage() {
             dueDate: newReceivable.dueDate,
             status: "Tertunda",
         };
-        setReceivables(prev => [...prev, newEntry]);
+        setReceivables(prev => [newEntry, ...prev]);
         toast({ title: "Sukses", description: "Piutang baru berhasil ditambahkan." });
         setNewReceivable({ customer: '', amount: '', dueDate: '' });
         setReceivableDialogOpen(false);
@@ -265,4 +265,5 @@ export default function AccountsPage() {
         </div>
     );
 }
+
     
