@@ -20,10 +20,11 @@ type NavItem = {
 };
 
 const allNavItems: NavItem[] = [
-  { href: "/dashboard", label: "Dasbor", icon: Home, requiredRoles: ["owner", "admin", "cashier"] },
+  { href: "/dashboard", label: "Dasbor", icon: Home, requiredRoles: ["owner", "admin"] },
+  { href: "/dashboard/pos", label: "Point of Sale", icon: Store, requiredRoles: ["owner", "admin", "cashier"] },
   { href: "/dashboard/shifts", label: "Shift", icon: Clock, requiredRoles: ["owner", "admin", "cashier"] },
   { href: "/dashboard/inventory", label: "Inventaris", icon: PackageSearch, requiredRoles: ["owner", "admin"] },
-  { href: "/dashboard/members", label: "Anggota", icon: Users, requiredRoles: ["owner", "admin"] },
+  { href: "/dashboard/members", label: "Anggota", icon: Users, requiredRoles: ["owner", "admin", "cashier"] },
   { href: "/dashboard/expenses", label: "Beban", icon: DollarSign, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/accounts", label: "Akun", icon: BookUser, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/reports", label: "Laporan", icon: BarChart3, requiredRoles: ["owner", "admin"] },
