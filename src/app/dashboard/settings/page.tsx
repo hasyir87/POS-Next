@@ -1,3 +1,7 @@
+
+"use client";
+
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -5,12 +9,85 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tag, User, Languages, Key, Store, MoreHorizontal } from "lucide-react";
+import { Tag, User, Languages, Key, Store, MoreHorizontal, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
+type ApiKey = { id: string; label: string; key: string; created: string };
+type Outlet = { id: string; name: string; location: string };
+
+const initialApiKeys: ApiKey[] = [
+    { id: "key_1", label: "Aplikasi POS Flutter", key: "sk_live_Abc123DeF4G5H6i7...", created: "29 Oktober 2023" },
+];
+
+const initialOutlets: Outlet[] = [
+    { id: "out_1", name: "ScentPOS - Jakarta Pusat", location: "Jakarta" },
+    { id: "out_2", name: "ScentPOS - Bandung", location: "Bandung" },
+];
 
 export default function SettingsPage() {
+    const { toast } = useToast();
+
+    const [apiKeys, setApiKeys] = useState<ApiKey[]>(initialApiKeys);
+    const [outlets, setOutlets] = useState<Outlet[]>(initialOutlets);
+
+    const [isKeyDialogOpen, setKeyDialogOpen] = useState(false);
+    const [newKeyLabel, setNewKeyLabel] = useState("");
+
+    const [isOutletDialogOpen, setOutletDialogOpen] = useState(false);
+    const [editingOutlet, setEditingOutlet] = useState<Outlet | null>(null);
+
+    const handleCreateKey = () => {
+        if (!newKeyLabel) {
+            toast({ variant: "destructive", title: "Error", description: "Label kunci API harus diisi." });
+            return;
+        }
+        const newKey: ApiKey = {
+            id: `key_${Date.now()}`,
+            label: newKeyLabel,
+            key: `sk_live_${btoa(Math.random().toString()).substring(10, 26)}...`,
+            created: new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }),
+        };
+        setApiKeys(prev => [...prev, newKey]);
+        toast({ title: "Sukses", description: `Kunci API "${newKeyLabel}" berhasil dibuat.` });
+        setNewKeyLabel("");
+        setKeyDialogOpen(false);
+    };
+
+    const handleRevokeKey = (id: string) => {
+        setApiKeys(apiKeys.filter(k => k.id !== id));
+        toast({ title: "Sukses", description: "Kunci API telah dicabut." });
+    };
+
+    const handleOpenOutletDialog = (outlet: Outlet | null = null) => {
+        setEditingOutlet(outlet ? { ...outlet } : { id: "", name: "", location: "" });
+        setOutletDialogOpen(true);
+    };
+
+    const handleSaveOutlet = () => {
+        if (!editingOutlet || !editingOutlet.name || !editingOutlet.location) {
+            toast({ variant: "destructive", title: "Error", description: "Nama dan lokasi outlet harus diisi." });
+            return;
+        }
+        if (editingOutlet.id) {
+            setOutlets(outlets.map(o => o.id === editingOutlet.id ? editingOutlet : o));
+            toast({ title: "Sukses", description: "Outlet berhasil diperbarui." });
+        } else {
+            const newOutlet = { ...editingOutlet, id: `out_${Date.now()}` };
+            setOutlets(prev => [...prev, newOutlet]);
+            toast({ title: "Sukses", description: "Outlet baru berhasil ditambahkan." });
+        }
+        setOutletDialogOpen(false);
+        setEditingOutlet(null);
+    };
+
+    const handleDeleteOutlet = (id: string) => {
+        setOutlets(outlets.filter(o => o.id !== id));
+        toast({ title: "Sukses", description: "Outlet berhasil dihapus." });
+    };
+
     return (
         <div className="flex flex-col gap-6">
             <h1 className="font-headline text-3xl font-bold">Pengaturan</h1>
@@ -22,27 +99,40 @@ export default function SettingsPage() {
                     </CardHeader>
                     <CardContent>
                          <div className="flex justify-end">
-                             <Button>Buat Kunci Baru</Button>
+                            <Dialog open={isKeyDialogOpen} onOpenChange={setKeyDialogOpen}>
+                                <DialogTrigger asChild><Button>Buat Kunci Baru</Button></DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader><DialogTitle className="font-headline">Buat Kunci API Baru</DialogTitle></DialogHeader>
+                                    <div className="grid gap-4 py-4">
+                                        <Label htmlFor="key-label">Label</Label>
+                                        <Input id="key-label" value={newKeyLabel} onChange={e => setNewKeyLabel(e.target.value)} placeholder="e.g., Aplikasi POS Flutter" />
+                                        <DialogDescription>Beri nama kunci ini agar Anda dapat mengingatnya nanti.</DialogDescription>
+                                    </div>
+                                    <DialogFooter><Button onClick={handleCreateKey}>Buat & Salin Kunci</Button></DialogFooter>
+                                </DialogContent>
+                            </Dialog>
                          </div>
                          <Separator className="my-4" />
                          <Table>
                              <TableHeader>
                                  <TableRow>
                                      <TableHead>Label</TableHead>
-                                     <TableHead>Kunci (8 Karakter Pertama)</TableHead>
+                                     <TableHead>Kunci (Potongan)</TableHead>
                                      <TableHead>Dibuat</TableHead>
                                      <TableHead className="w-[100px] text-right">Aksi</TableHead>
                                  </TableRow>
                              </TableHeader>
                              <TableBody>
-                                 <TableRow>
-                                     <TableCell className="font-medium">Aplikasi POS Flutter</TableCell>
-                                     <TableCell className="font-mono">sk_live_Abc123De...</TableCell>
-                                     <TableCell>29 Oktober 2023</TableCell>
-                                     <TableCell className="text-right">
-                                         <Button variant="destructive" size="sm">Cabut</Button>
-                                     </TableCell>
-                                 </TableRow>
+                                 {apiKeys.map(key => (
+                                     <TableRow key={key.id}>
+                                         <TableCell className="font-medium">{key.label}</TableCell>
+                                         <TableCell className="font-mono">{key.key}</TableCell>
+                                         <TableCell>{key.created}</TableCell>
+                                         <TableCell className="text-right">
+                                             <Button variant="destructive" size="sm" onClick={() => handleRevokeKey(key.id)}>Cabut</Button>
+                                         </TableCell>
+                                     </TableRow>
+                                 ))}
                              </TableBody>
                          </Table>
                     </CardContent>
@@ -55,7 +145,23 @@ export default function SettingsPage() {
                     </CardHeader>
                     <CardContent>
                          <div className="flex justify-end">
-                             <Button>Tambah Outlet Baru</Button>
+                             <Dialog open={isOutletDialogOpen} onOpenChange={setOutletDialogOpen}>
+                                <DialogTrigger asChild><Button onClick={() => handleOpenOutletDialog()}><PlusCircle className="mr-2" /> Tambah Outlet Baru</Button></DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader><DialogTitle className="font-headline">{editingOutlet?.id ? 'Ubah Outlet' : 'Tambah Outlet Baru'}</DialogTitle></DialogHeader>
+                                    <div className="grid gap-4 py-4">
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label htmlFor="outlet-name" className="text-right">Nama</Label>
+                                            <Input id="outlet-name" value={editingOutlet?.name || ''} onChange={e => setEditingOutlet(prev => prev ? {...prev, name: e.target.value} : null)} className="col-span-3" />
+                                        </div>
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label htmlFor="outlet-location" className="text-right">Lokasi</Label>
+                                            <Input id="outlet-location" value={editingOutlet?.location || ''} onChange={e => setEditingOutlet(prev => prev ? {...prev, location: e.target.value} : null)} className="col-span-3" />
+                                        </div>
+                                    </div>
+                                    <DialogFooter><Button onClick={handleSaveOutlet}>Simpan</Button></DialogFooter>
+                                </DialogContent>
+                             </Dialog>
                          </div>
                          <Separator className="my-4" />
                          <Table>
@@ -67,42 +173,23 @@ export default function SettingsPage() {
                                  </TableRow>
                              </TableHeader>
                              <TableBody>
-                                 <TableRow>
-                                     <TableCell className="font-medium">ScentPOS - Jakarta Pusat</TableCell>
-                                     <TableCell>Jakarta</TableCell>
-                                     <TableCell className="text-right">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                                    <span className="sr-only">Buka menu</span>
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem>Ubah</DropdownMenuItem>
-                                                <DropdownMenuItem className="text-destructive">Hapus</DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                     </TableCell>
-                                 </TableRow>
-                                  <TableRow>
-                                     <TableCell className="font-medium">ScentPOS - Bandung</TableCell>
-                                     <TableCell>Bandung</TableCell>
-                                     <TableCell className="text-right">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                                    <span className="sr-only">Buka menu</span>
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem>Ubah</DropdownMenuItem>
-                                                <DropdownMenuItem className="text-destructive">Hapus</DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                     </TableCell>
-                                 </TableRow>
+                                 {outlets.map(outlet => (
+                                     <TableRow key={outlet.id}>
+                                         <TableCell className="font-medium">{outlet.name}</TableCell>
+                                         <TableCell>{outlet.location}</TableCell>
+                                         <TableCell className="text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Buka menu</span><MoreHorizontal className="h-4 w-4" /></Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => handleOpenOutletDialog(outlet)}>Ubah</DropdownMenuItem>
+                                                    <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteOutlet(outlet.id)}>Hapus</DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                         </TableCell>
+                                     </TableRow>
+                                 ))}
                              </TableBody>
                          </Table>
                     </CardContent>
@@ -155,3 +242,5 @@ export default function SettingsPage() {
         </div>
     )
 }
+
+    
