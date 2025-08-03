@@ -5,8 +5,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tag, User, Languages, Key } from "lucide-react";
+import { Tag, User, Languages, Key, Store, MoreHorizontal } from "lucide-react";
 import Link from "next/link";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+
 
 export default function SettingsPage() {
     return (
@@ -45,6 +47,67 @@ export default function SettingsPage() {
                          </Table>
                     </CardContent>
                 </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Store className="h-5 w-5" /> Manajemen Outlet</CardTitle>
+                        <CardDescription>Kelola semua lokasi atau cabang bisnis Anda.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                         <div className="flex justify-end">
+                             <Button>Tambah Outlet Baru</Button>
+                         </div>
+                         <Separator className="my-4" />
+                         <Table>
+                             <TableHeader>
+                                 <TableRow>
+                                     <TableHead>Nama Outlet</TableHead>
+                                     <TableHead>Lokasi</TableHead>
+                                     <TableHead className="w-[100px] text-right">Aksi</TableHead>
+                                 </TableRow>
+                             </TableHeader>
+                             <TableBody>
+                                 <TableRow>
+                                     <TableCell className="font-medium">ScentPOS - Jakarta Pusat</TableCell>
+                                     <TableCell>Jakarta</TableCell>
+                                     <TableCell className="text-right">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                                    <span className="sr-only">Buka menu</span>
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem>Ubah</DropdownMenuItem>
+                                                <DropdownMenuItem className="text-destructive">Hapus</DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                     </TableCell>
+                                 </TableRow>
+                                  <TableRow>
+                                     <TableCell className="font-medium">ScentPOS - Bandung</TableCell>
+                                     <TableCell>Bandung</TableCell>
+                                     <TableCell className="text-right">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                                    <span className="sr-only">Buka menu</span>
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem>Ubah</DropdownMenuItem>
+                                                <DropdownMenuItem className="text-destructive">Hapus</DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                     </TableCell>
+                                 </TableRow>
+                             </TableBody>
+                         </Table>
+                    </CardContent>
+                </Card>
+
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Tag className="h-5 w-5" /> Promosi</CardTitle>
