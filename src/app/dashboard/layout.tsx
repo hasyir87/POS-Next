@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { BarChart2, Clock, FlaskConical, Home, LogOut, Menu, Settings, DollarSign, BookUser } from "lucide-react";
+import { BarChart2, Clock, FlaskConical, Home, LogOut, Menu, Settings, DollarSign, BookUser, Store, ChevronsUpDown } from "lucide-react";
 import Link from "next/link";
 import { ScentSationLogo } from "@/components/scent-sation-logo";
 
@@ -21,6 +21,13 @@ export default function DashboardLayout({
     { href: "/dashboard/shifts", label: "Shift", icon: Clock },
     { href: "/dashboard/settings", label: "Pengaturan", icon: Settings },
   ];
+
+  const outlets = [
+    { id: "all", name: "Semua Outlet" },
+    { id: "jkt", name: "ScentPOS - Jakarta Pusat" },
+    { id: "bdg", name: "ScentPOS - Bandung" },
+  ];
+
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
@@ -84,7 +91,24 @@ export default function DashboardLayout({
             </SheetContent>
           </Sheet>
           <div className="w-full flex-1">
-             {/* Can be used for search bar if needed */}
+             <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-full max-w-xs">
+                        <Store className="mr-2 h-4 w-4" />
+                        <span className="flex-1 text-left">Semua Outlet</span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-full max-w-xs">
+                    <DropdownMenuLabel>Pilih Outlet</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {outlets.map((outlet) => (
+                        <DropdownMenuItem key={outlet.id}>
+                            {outlet.name}
+                        </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
