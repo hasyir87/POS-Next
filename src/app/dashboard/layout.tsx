@@ -16,7 +16,7 @@ export default function DashboardLayout({
     { href: "/dashboard", label: "Dashboard", icon: Home },
     { href: "/dashboard/inventory", label: "Inventory", icon: FlaskConical },
     { href: "/dashboard/expenses", label: "Expenses", icon: DollarSign },
-    { href: "/dashboard/accounts", label: "Utang & Piutang", icon: BookUser },
+    { href: "/dashboard/accounts", label: "Accounts", icon: BookUser },
     { href: "/dashboard/reports", label: "Reports", icon: BarChart2 },
     { href: "/dashboard/shifts", label: "Shifts", icon: Clock },
     { href: "/dashboard/settings", label: "Settings", icon: Settings },
