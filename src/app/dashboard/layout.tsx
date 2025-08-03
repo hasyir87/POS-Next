@@ -52,7 +52,7 @@ export default function DashboardLayout({
     return null; 
   }
 
-  const navItems = allNavItems.filter(item => item.requiredRoles.includes(user.role));
+  const navItems = allNavItems.filter(item => user && item.requiredRoles.includes(user.role));
 
   const handleLogout = () => {
     logout();
