@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Tag, User, Languages } from "lucide-react";
+import { Tag, User, Languages, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 
 export default function SettingsPage() {
     return (
@@ -26,8 +27,11 @@ export default function SettingsPage() {
                         <CardTitle className="flex items-center gap-2"><User className="h-5 w-5" /> User Management</CardTitle>
                         <CardDescription>Manage staff accounts and their roles (Cashier, Admin, Owner).</CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="flex gap-2">
                          <Button>Add New User</Button>
+                         <Button variant="outline" asChild>
+                            <Link href="/dashboard/settings/roles">Manage Roles</Link>
+                         </Button>
                     </CardContent>
                 </Card>
 
