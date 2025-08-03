@@ -1,9 +1,20 @@
+
 "use client";
 
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from "recharts";
 
 interface ProfitLossChartProps {
   data: { name: string; revenue: number; cogs: number; profit: number; }[];
+}
+
+const formatCurrencyForChart = (value: number) => {
+    if (value >= 1000000) {
+        return `Rp${(value / 1000000).toFixed(1)}jt`;
+    }
+    if (value >= 1000) {
+        return `Rp${(value / 1000).toFixed(0)}rb`;
+    }
+    return `Rp${value}`;
 }
 
 export function ProfitLossChart({ data }: ProfitLossChartProps) {
@@ -21,9 +32,10 @@ export function ProfitLossChart({ data }: ProfitLossChartProps) {
           </linearGradient>
         </defs>
         <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `$${value/1000}k`} />
+        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={formatCurrencyForChart} />
         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
         <Tooltip 
+          formatter={(value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(value)}
           contentStyle={{ 
               backgroundColor: 'hsl(var(--background))', 
               border: '1px solid hsl(var(--border))',
@@ -31,9 +43,11 @@ export function ProfitLossChart({ data }: ProfitLossChartProps) {
           }}
         />
         <Legend />
-        <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorRevenue)" />
-        <Area type="monotone" dataKey="cogs" name="COGS" stroke="hsl(var(--destructive))" fillOpacity={1} fill="url(#colorCogs)" />
+        <Area type="monotone" dataKey="revenue" name="Pendapatan" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorRevenue)" />
+        <Area type="monotone" dataKey="cogs" name="HPP" stroke="hsl(var(--destructive))" fillOpacity={1} fill="url(#colorCogs)" />
       </AreaChart>
     </ResponsiveContainer>
   );
 }
+
+    

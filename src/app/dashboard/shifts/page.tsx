@@ -1,3 +1,7 @@
+
+"use client";
+
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -5,24 +9,84 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Clock, CheckCircle, PlayCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
-const shiftHistory = [
-    { id: "SFT001", date: "2023-10-26", cashier: "Alice", start: "Rp 150.000", end: "Rp 1.632.500", status: "Ditutup" },
-    { id: "SFT002", date: "2023-10-26", cashier: "Bob", start: "Rp 150.000", end: "Rp 1.450.750", status: "Ditutup" },
-    { id: "SFT003", date: "2023-10-27", cashier: "Alice", start: "Rp 150.000", end: "Rp 1.780.000", status: "Ditutup" },
-    { id: "SFT004", date: "2023-10-27", cashier: "Charlie", start: "Rp 150.000", end: "Rp 980.250", status: "Ditutup" },
-    { id: "SFT005", date: "2023-10-28", cashier: "Bob", start: "Rp 150.000", end: "---", status: "Aktif" },
+type Shift = {
+    id: string;
+    date: string;
+    cashier: string;
+    start: number;
+    end: number | null;
+    status: "Aktif" | "Ditutup";
+};
+
+const initialShiftHistory: Shift[] = [
+    { id: "SFT001", date: "2023-10-26", cashier: "Alice", start: 150000, end: 1632500, status: "Ditutup" },
+    { id: "SFT002", date: "2023-10-26", cashier: "Bob", start: 150000, end: 1450750, status: "Ditutup" },
+    { id: "SFT003", date: "2023-10-27", cashier: "Alice", start: 150000, end: 1780000, status: "Ditutup" },
+    { id: "SFT004", date: "2023-10-27", cashier: "Charlie", start: 150000, end: 980250, status: "Ditutup" },
+    { id: "SFT005", date: "2023-10-28", cashier: "Bob", start: 150000, end: null, status: "Aktif" },
 ];
 
+const formatCurrency = (amount: number | null) => {
+    if (amount === null) return "---";
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
+};
+
+
 export default function ShiftsPage() {
+    const { toast } = useToast();
+    const [shifts, setShifts] = useState<Shift[]>(initialShiftHistory);
+    const [isStartShiftOpen, setStartShiftOpen] = useState(false);
+    const [isEndShiftOpen, setEndShiftOpen] = useState(false);
+    const [startingCash, setStartingCash] = useState(150000);
+    const [endingCash, setEndingCash] = useState(0);
+
+    const activeShift = shifts.find(s => s.status === "Aktif");
+    const cashSales = activeShift ? endingCash - activeShift.start : 0;
+
+    const handleStartShift = () => {
+        if (activeShift) {
+            toast({ variant: "destructive", title: "Error", description: "Sudah ada shift yang aktif." });
+            return;
+        }
+        const newShift: Shift = {
+            id: `SFT${(shifts.length + 1).toString().padStart(3, '0')}`,
+            date: new Date().toISOString().substring(0, 10),
+            cashier: "Admin", // In a real app, this would be the logged in user
+            start: startingCash,
+            end: null,
+            status: "Aktif",
+        };
+        setShifts(prev => [newShift, ...prev]);
+        toast({ title: "Sukses", description: "Shift baru berhasil dimulai." });
+        setStartShiftOpen(false);
+    };
+    
+    const handleEndShift = () => {
+        if (!activeShift) {
+            toast({ variant: "destructive", title: "Error", description: "Tidak ada shift yang aktif untuk diakhiri." });
+            return;
+        }
+        if (endingCash < activeShift.start) {
+            toast({ variant: "destructive", title: "Error", description: "Kas akhir tidak boleh kurang dari kas awal." });
+            return;
+        }
+        setShifts(shifts.map(s => s.id === activeShift.id ? { ...s, end: endingCash, status: "Ditutup" } : s));
+        toast({ title: "Sukses", description: "Shift berhasil diakhiri." });
+        setEndShiftOpen(false);
+        setEndingCash(0);
+    };
+
+
     return (
         <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
                 <h1 className="font-headline text-3xl font-bold">Manajemen Shift</h1>
                 <div className="flex gap-2">
-                    <Dialog>
+                    <Dialog open={isEndShiftOpen} onOpenChange={setEndShiftOpen}>
                         <DialogTrigger asChild>
-                            <Button variant="outline">
+                            <Button variant="outline" disabled={!activeShift}>
                                 <CheckCircle className="mr-2 h-4 w-4" /> Akhiri Shift
                             </Button>
                         </DialogTrigger>
@@ -36,26 +100,28 @@ export default function ShiftsPage() {
                             <div className="grid gap-4 py-4">
                                 <div className="grid grid-cols-4 items-center gap-4">
                                     <Label htmlFor="ending-cash" className="text-right">Kas Akhir</Label>
-                                    <Input id="ending-cash" defaultValue="Rp 0" className="col-span-3" />
+                                    <Input id="ending-cash" type="number" value={endingCash} onChange={(e) => setEndingCash(parseFloat(e.target.value) || 0)} className="col-span-3" />
                                 </div>
-                                <Card>
+                                {activeShift && <Card>
                                     <CardHeader className="pb-2">
                                         <CardDescription>Ringkasan Shift</CardDescription>
-                                        <CardTitle className="text-2xl">Rp 1.300.750</CardTitle>
+                                        <CardTitle className="text-2xl">{formatCurrency(endingCash)}</CardTitle>
                                     </CardHeader>
                                     <CardContent>
-                                        <div className="text-xs text-muted-foreground">+ Rp 1.150.750 dari penjualan tunai</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {cashSales >= 0 ? `+ ${formatCurrency(cashSales)} dari penjualan tunai` : `- ${formatCurrency(Math.abs(cashSales))} selisih`}
+                                        </div>
                                     </CardContent>
-                                </Card>
+                                </Card>}
                             </div>
                             <DialogFooter>
-                                <Button type="submit">Konfirmasi & Akhiri Shift</Button>
+                                <Button onClick={handleEndShift} type="submit">Konfirmasi & Akhiri Shift</Button>
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>
-                    <Dialog>
+                    <Dialog open={isStartShiftOpen} onOpenChange={setStartShiftOpen}>
                         <DialogTrigger asChild>
-                            <Button>
+                            <Button disabled={!!activeShift}>
                                 <PlayCircle className="mr-2 h-4 w-4" /> Mulai Shift
                             </Button>
                         </DialogTrigger>
@@ -69,11 +135,11 @@ export default function ShiftsPage() {
                             <div className="grid gap-4 py-4">
                                 <div className="grid grid-cols-4 items-center gap-4">
                                     <Label htmlFor="starting-cash" className="text-right">Kas Awal</Label>
-                                    <Input id="starting-cash" defaultValue="Rp 150.000" className="col-span-3" />
+                                    <Input id="starting-cash" type="number" value={startingCash} onChange={(e) => setStartingCash(parseFloat(e.target.value) || 0)} className="col-span-3" />
                                 </div>
                             </div>
                             <DialogFooter>
-                                <Button type="submit">Mulai Shift</Button>
+                                <Button onClick={handleStartShift} type="submit">Mulai Shift</Button>
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>
@@ -97,7 +163,7 @@ export default function ShiftsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {shiftHistory.map((shift) => (
+                            {shifts.map((shift) => (
                                 <TableRow key={shift.id}>
                                     <TableCell>
                                         <div className="font-medium">{shift.date}</div>
@@ -109,8 +175,8 @@ export default function ShiftsPage() {
                                             {shift.status}
                                         </span>
                                     </TableCell>
-                                    <TableCell className="text-right">{shift.start}</TableCell>
-                                    <TableCell className="text-right">{shift.end}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(shift.start)}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(shift.end)}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -120,3 +186,5 @@ export default function ShiftsPage() {
         </div>
     );
 }
+
+    

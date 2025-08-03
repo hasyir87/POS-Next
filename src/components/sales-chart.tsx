@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
@@ -6,13 +7,21 @@ interface SalesChartProps {
     data: { name: string; sales: number }[];
 }
 
+const formatCurrencyForChart = (value: number) => {
+    if (value >= 1000) {
+        return `Rp${(value / 1000).toFixed(0)}k`;
+    }
+    return `Rp${value}`;
+}
+
 export function SalesChart({ data }: SalesChartProps) {
     return (
         <ResponsiveContainer width="100%" height={350}>
             <BarChart data={data}>
                 <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
+                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatCurrencyForChart} />
                 <Tooltip
+                    formatter={(value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(value)}
                     contentStyle={{
                         backgroundColor: 'hsl(var(--background))',
                         border: '1px solid hsl(var(--border))',
@@ -20,8 +29,10 @@ export function SalesChart({ data }: SalesChartProps) {
                     }}
                     cursor={{ fill: 'hsl(var(--accent))', opacity: 0.2 }}
                 />
-                <Bar dataKey="sales" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="sales" name="Penjualan" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
             </BarChart>
         </ResponsiveContainer>
     );
 }
+
+    
