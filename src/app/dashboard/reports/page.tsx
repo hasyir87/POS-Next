@@ -13,9 +13,9 @@ import { Separator } from "@/components/ui/separator";
 // 1. Data Penjualan (Sales/Transactions) - Mensimulasikan beberapa transaksi dari POS
 const salesData = [
   { id: "TRX001", date: "2024-07-28", item: "Ocean Breeze", revenue: 79990, cogs: 32000 },
-  { id: "TRX002", date: "2024-07-28", item: "Isi Ulang: YSL Black Opium (50ml)", revenue: 85000, cogs: 40000 },
+  { id: "TRX002", date: "2024-07-28", item: "Isi Ulang: YSL Black Opium (50ml)", revenue: 90000, cogs: 40000 },
   { id: "TRX003", date: "2024-07-29", item: "Mystic Woods", revenue: 85000, cogs: 35000 },
-  { id: "TRX004", date: "2024-07-30", item: "Isi Ulang: Sandalwood Supreme (30ml)", revenue: 45000, cogs: 21000 },
+  { id: "TRX004", date: "2024-07-30", item: "Isi Ulang: Sandalwood Supreme (30ml)", revenue: 50000, cogs: 21000 },
 ];
 
 // 2. Data Beban (Expenses) - Data ini harus konsisten dengan data awal di halaman Beban
@@ -167,3 +167,4 @@ export default function ReportsPage() {
     </div>
   );
 }
+

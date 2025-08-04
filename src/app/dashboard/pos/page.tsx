@@ -309,10 +309,10 @@ export default function PosPage() {
                         </div>
                    </CardHeader>
                 </Card>
-                <Tabs defaultValue="products" className="flex-grow flex flex-col">
+                <Tabs defaultValue="refills" className="flex-grow flex flex-col">
                     <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="products"><SprayCan className="mr-2"/> Produk Jadi</TabsTrigger>
                         <TabsTrigger value="refills"><Droplets className="mr-2"/> Isi Ulang</TabsTrigger>
+                        <TabsTrigger value="products"><SprayCan className="mr-2"/> Produk Jadi</TabsTrigger>
                     </TabsList>
                     <TabsContent value="products" className="flex-grow mt-4">
                         <ScrollArea className="h-full">
@@ -424,4 +424,3 @@ export default function PosPage() {
     );
 }
 
-    
