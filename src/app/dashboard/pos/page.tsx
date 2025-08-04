@@ -43,6 +43,8 @@ const recipeBook = [
     { aromaId: "ARO003", bottleSize: 50, essenceMl: 22, solventMl: 28, basePrice: 85000 },
     { aromaId: "ARO003", bottleSize: 100, essenceMl: 40, solventMl: 60, basePrice: 150000 },
     { aromaId: "ARO001", bottleSize: 30, essenceMl: 15, solventMl: 15, basePrice: 45000 },
+    { aromaId: "ARO001", bottleSize: 50, essenceMl: 25, solventMl: 25, basePrice: 70000 },
+    { aromaId: "ARO001", bottleSize: 100, essenceMl: 45, solventMl: 55, basePrice: 125000 },
 ];
 
 type CartItem = {
@@ -154,7 +156,7 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
                 {/* Step 2: Bottle Size */}
                 <div className="space-y-2">
                     <Label>Langkah 2: Pilih Ukuran Botol</Label>
-                    <Select value={selectedBottleSize.toString()} onValueChange={(val) => setSelectedBottleSize(parseInt(val, 10))} disabled={!selectedAroma}>
+                    <Select value={selectedBottleSize ? selectedBottleSize.toString() : ""} onValueChange={(val) => setSelectedBottleSize(parseInt(val, 10))} disabled={!selectedAroma}>
                         <SelectTrigger><SelectValue placeholder="Pilih Ukuran..." /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="30">30 ml</SelectItem>
@@ -320,7 +322,7 @@ export default function PosPage() {
                                                          </Button>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="text-right p-2 align-top">{formatCurrency(item.price * item.quantity)}</TableCell>
+                                                <TableCell className="text-right p-2 align-top font-medium">{formatCurrency(item.price * item.quantity)}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -361,4 +363,3 @@ export default function PosPage() {
         </div>
     );
 }
-    

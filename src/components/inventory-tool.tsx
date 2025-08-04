@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -82,6 +83,19 @@ export function InventoryTool({ availableMaterials }: { availableMaterials: Mate
     }
   }
 
+  const handleAddToOrder = () => {
+    // In a real app, this would likely trigger a state update in the parent
+    // component or a navigation to the POS page with the items pre-filled.
+    // For now, we'll just show a confirmation toast.
+    if (suggestion) {
+      toast({
+        title: "Saran Ditambahkan",
+        description: "Campuran optimal telah ditambahkan ke pesanan.",
+      });
+    }
+  };
+
+
   return (
     <Card className="sticky top-20">
       <CardHeader>
@@ -163,7 +177,7 @@ export function InventoryTool({ availableMaterials }: { availableMaterials: Mate
                 {suggestion.reasoning}
               </p>
             </div>
-            <Button className="w-full" variant="outline">Tambah ke Pesanan</Button>
+            <Button className="w-full" variant="outline" onClick={handleAddToOrder}>Tambah ke Pesanan</Button>
           </div>
         )}
       </CardContent>
