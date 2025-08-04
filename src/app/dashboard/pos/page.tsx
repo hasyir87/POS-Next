@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { Combobox } from "@/components/ui/combobox";
 
 // --- SIMULASI DATA ---
 // Produk Jadi
@@ -86,7 +87,9 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
     useEffect(() => {
         if(recipe) {
             const aromaDetails = availableAromas.find(a => a.id === selectedAroma);
-            const extraEssence = Math.max(0, essenceMl - recipe.essenceMl);
+            // Ensure essenceMl is at least the base recipe amount for calculation
+            const currentEssence = Math.max(essenceMl, recipe.essenceMl);
+            const extraEssence = Math.max(0, currentEssence - recipe.essenceMl);
             const extraCost = extraEssence * (aromaDetails?.pricePerMlExtra || 0);
             setTotalPrice(recipe.basePrice + extraCost);
         } else {
@@ -125,6 +128,8 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
         setSelectedBottleSize(0);
         toast({ title: "Sukses", description: `${aroma.name} ditambahkan ke keranjang.` });
     };
+    
+    const aromaOptions = filteredAromas.map(a => ({ value: a.id, label: a.name }));
 
     return (
         <Card>
@@ -134,7 +139,7 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
                 <div className="space-y-2">
                     <Label>Langkah 1: Pilih Aroma</Label>
                     <div className="grid grid-cols-2 gap-2">
-                        <Select value={selectedGrade} onValueChange={setSelectedGrade}>
+                        <Select value={selectedGrade} onValueChange={val => { setSelectedGrade(val); setSelectedAroma(''); setSelectedBottleSize(0);}}>
                             <SelectTrigger><SelectValue placeholder="Pilih Grade..." /></SelectTrigger>
                             <SelectContent>
                                 {perfumeGrades.map(grade => (
@@ -142,14 +147,15 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
                                 ))}
                             </SelectContent>
                         </Select>
-                         <Select value={selectedAroma} onValueChange={setSelectedAroma} disabled={!selectedGrade}>
-                            <SelectTrigger><SelectValue placeholder="Pilih Aroma..." /></SelectTrigger>
-                            <SelectContent>
-                                {filteredAromas.map(aroma => (
-                                    <SelectItem key={aroma.id} value={aroma.id}>{aroma.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                         <Combobox
+                            options={aromaOptions}
+                            value={selectedAroma}
+                            onChange={val => { setSelectedAroma(val); setSelectedBottleSize(0); }}
+                            placeholder="Pilih Aroma..."
+                            searchPlaceholder="Cari aroma..."
+                            emptyPlaceholder="Aroma tidak ditemukan."
+                            disabled={!selectedGrade}
+                         />
                     </div>
                 </div>
 
@@ -363,3 +369,4 @@ export default function PosPage() {
         </div>
     );
 }
+
