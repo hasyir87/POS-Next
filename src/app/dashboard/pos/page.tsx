@@ -49,8 +49,8 @@ const bottleSizes = [
 // Simulasi Resep & Harga
 // [aroma_value]: { [bottle_size]: { essence: ml, solvent: ml, price: Rp } }
 const recipes: Record<string, Record<number, { essence: number; solvent: number; price: number }>> = {
-    sandalwood: { 30: { essence: 12, solvent: 18, price: 50000 }, 50: { essence: 20, solvent: 30, price: 80000 } },
-    vanilla: { 30: { essence: 12, solvent: 18, price: 50000 }, 50: { essence: 20, solvent: 30, price: 80000 } },
+    sandalwood: { 30: { essence: 12, solvent: 18, price: 50000 }, 50: { essence: 20, solvent: 30, price: 80000 }, 100: { essence: 38, solvent: 62, price: 160000 } },
+    vanilla: { 30: { essence: 12, solvent: 18, price: 50000 }, 50: { essence: 20, solvent: 30, price: 80000 }, 100: { essence: 38, solvent: 62, price: 160000 } },
     ysl_black: { 30: { essence: 13, solvent: 17, price: 55000 }, 50: { essence: 22, solvent: 28, price: 90000 }, 100: { essence: 40, solvent: 60, price: 170000 } },
     baccarat: { 30: { essence: 13, solvent: 17, price: 55000 }, 50: { essence: 22, solvent: 28, price: 90000 }, 100: { essence: 40, solvent: 60, price: 170000 } },
     aqua_digio: { 30: { essence: 12, solvent: 18, price: 50000 }, 50: { essence: 20, solvent: 30, price: 80000 }, 100: { essence: 38, solvent: 62, price: 160000 } },
@@ -129,6 +129,8 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
             const extraCost = extraMl * EXTRA_ESSENCE_PRICE_PER_ML;
             setExtraEssenceCost(extraCost);
             setTotalPrice(basePrice + extraCost);
+        } else {
+            setTotalPrice(0)
         }
     }, [essenceMl, selectedBottleSize, basePrice, standardEssence]);
 
@@ -186,7 +188,7 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
 
                 {selectedAroma && (<div className="space-y-2">
                     <Label>3. Pilih Ukuran Botol</Label>
-                    <Select value={selectedBottleSize.toString()} onValueChange={(v) => setSelectedBottleSize(Number(v))}>
+                    <Select value={selectedBottleSize.toString()} onValueChange={(v) => setSelectedBottleSize(Number(v) || 0)}>
                         <SelectTrigger><SelectValue placeholder="Pilih ukuran botol..." /></SelectTrigger>
                         <SelectContent>
                             {bottleSizes.map(b => (<SelectItem key={b.value} value={b.value.toString()}>{b.label}</SelectItem>))}
@@ -203,7 +205,13 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
                         <div className="grid grid-cols-2 gap-4">
                            <div className="space-y-2">
                                <Label htmlFor="essence-ml">Bibit (ml)</Label>
-                               <Input id="essence-ml" type="number" value={essenceMl} onChange={(e) => setEssenceMl(Number(e.target.value))} />
+                               <Input 
+                                id="essence-ml" 
+                                type="number" 
+                                value={essenceMl} 
+                                onChange={(e) => setEssenceMl(Number(e.target.value))} 
+                                min="1"
+                               />
                                <p className="text-xs text-muted-foreground">Resep: {standardEssence}ml</p>
                            </div>
                            <div className="space-y-2">
@@ -241,6 +249,7 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
 }
 
 export default function PosPage() {
+    const { toast } = useToast();
     const [cart, setCart] = useState<CartItem[]>([]);
 
     const addProductToCart = (product: typeof productCatalog[0]) => {
@@ -267,6 +276,21 @@ export default function PosPage() {
                 item.id === itemId ? { ...item, quantity: newQuantity } : item
             ));
         }
+    };
+
+    const handleSaveOrder = () => {
+        toast({
+            title: "Pesanan Disimpan",
+            description: "Pesanan saat ini telah disimpan.",
+        });
+    };
+
+    const handleCheckout = () => {
+        toast({
+            title: "Pembayaran Berhasil",
+            description: "Pesanan telah dibayar dan transaksi selesai.",
+        });
+        setCart([]); // Clear cart after checkout
     };
 
     const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -389,8 +413,8 @@ export default function PosPage() {
                                 </div>
                             </CardContent>
                             <CardFooter className="grid grid-cols-2 gap-2 p-4">
-                                <Button size="lg" variant="outline">Simpan</Button>
-                                <Button size="lg">Bayar</Button>
+                                <Button size="lg" variant="outline" onClick={handleSaveOrder}>Simpan</Button>
+                                <Button size="lg" onClick={handleCheckout}>Bayar</Button>
                             </CardFooter>
                         </>
                     )}
@@ -399,3 +423,5 @@ export default function PosPage() {
         </div>
     );
 }
+
+    
