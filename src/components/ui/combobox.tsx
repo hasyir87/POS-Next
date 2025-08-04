@@ -56,9 +56,9 @@ export function Combobox({ options, value, onChange, placeholder, searchPlacehol
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.label}
-                  onSelect={() => {
-                    onChange(option.value === value ? "" : option.value)
+                  value={option.value}
+                  onSelect={(currentValue) => {
+                    onChange(currentValue === value ? "" : currentValue)
                     setOpen(false)
                   }}
                 >
