@@ -28,8 +28,8 @@ const initialApiKeys: ApiKey[] = [
 ];
 
 const initialOutlets: Outlet[] = [
-    { id: "out_1", name: "ScentPOS - Jakarta Pusat", location: "Jakarta" },
-    { id: "out_2", name: "ScentPOS - Bandung", location: "Bandung" },
+    { id: "out_1", name: "M Perfume Amal - Jakarta Pusat", location: "Jakarta" },
+    { id: "out_2", name: "M Perfume Amal - Bandung", location: "Bandung" },
 ];
 
 const initialPromotions: Promotion[] = [
@@ -119,12 +119,11 @@ export default function SettingsPage() {
         }
         if (editingOutlet.id) {
             setOutlets(outlets.map(o => o.id === editingOutlet.id ? editingOutlet : o));
-            toast({ title: "Sukses", description: "Outlet berhasil diperbarui." });
         } else {
             const newOutlet = { ...editingOutlet, id: `out_${Date.now()}` };
             setOutlets(prev => [...prev, newOutlet]);
-            toast({ title: "Sukses", description: "Outlet baru berhasil ditambahkan." });
         }
+        toast({ title: "Sukses", description: "Outlet berhasil disimpan." });
         setOutletDialogOpen(false);
         setEditingOutlet(null);
     };

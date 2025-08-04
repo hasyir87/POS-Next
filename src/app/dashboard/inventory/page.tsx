@@ -13,7 +13,7 @@ import { MoreHorizontal, PlusCircle, PackageSearch } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Combobox } from "@/components/ui/combobox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 type Material = {
@@ -72,9 +72,9 @@ export default function InventoryPage() {
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
 
   // In a real app, these would come from a database or a global state management solution
-  const [categories, setCategories] = useState(initialCategories);
-  const [units, setUnits] = useState(initialUnits);
-  const [brands, setBrands] = useState(initialBrands);
+  const [categories, setCategories] = useState(initialCategories.map(c => c.value));
+  const [units, setUnits] = useState(initialUnits.map(u => u.value));
+  const [brands, setBrands] = useState(initialBrands.map(b => b.value));
   const [lowStockThreshold, setLowStockThreshold] = useState(200);
 
   const emptyMaterial: Material = { id: "", name: "", brand: "", quantity: 0, unit: "", category: "", purchasePrice: 0 };
@@ -108,7 +108,7 @@ export default function InventoryPage() {
   };
   
   const groupedMaterials = materials.reduce((acc, material) => {
-    const categoryLabel = categories.find(c => c.value === material.category)?.label || material.category;
+    const categoryLabel = initialCategories.find(c => c.value === material.category)?.label || material.category;
     if (!acc[categoryLabel]) {
       acc[categoryLabel] = [];
     }
@@ -145,29 +145,25 @@ export default function InventoryPage() {
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="brand" className="text-right">Brand</Label>
-                                <div className="col-span-3">
-                                  <Combobox
-                                    options={brands}
-                                    value={editingMaterial?.brand}
-                                    onChange={(value) => setEditingMaterial(prev => prev ? {...prev, brand: value} : null)}
-                                    placeholder="Pilih brand..."
-                                    searchPlaceholder="Cari brand..."
-                                    emptyPlaceholder="Brand tidak ditemukan."
-                                  />
-                                </div>
+                                <Select value={editingMaterial?.brand} onValueChange={(value) => setEditingMaterial(prev => prev ? {...prev, brand: value} : null)}>
+                                    <SelectTrigger id="brand" className="col-span-3">
+                                        <SelectValue placeholder="Pilih brand" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {brands.map(brand => (<SelectItem key={brand} value={brand}>{brand}</SelectItem>))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="category" className="text-right">Kategori</Label>
-                                <div className="col-span-3">
-                                  <Combobox
-                                    options={categories}
-                                    value={editingMaterial?.category}
-                                    onChange={(value) => setEditingMaterial(prev => prev ? {...prev, category: value} : null)}
-                                    placeholder="Pilih kategori..."
-                                    searchPlaceholder="Cari kategori..."
-                                    emptyPlaceholder="Kategori tidak ditemukan."
-                                  />
-                                </div>
+                                 <Select value={editingMaterial?.category} onValueChange={(value) => setEditingMaterial(prev => prev ? {...prev, category: value} : null)}>
+                                    <SelectTrigger id="category" className="col-span-3">
+                                        <SelectValue placeholder="Pilih kategori" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {initialCategories.map(cat => (<SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="quantity" className="text-right">Kuantitas</Label>
@@ -175,16 +171,14 @@ export default function InventoryPage() {
                             </div>
                              <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="unit" className="text-right">Unit</Label>
-                                <div className="col-span-3">
-                                    <Combobox
-                                        options={units}
-                                        value={editingMaterial?.unit}
-                                        onChange={(value) => setEditingMaterial(prev => prev ? {...prev, unit: value} : null)}
-                                        placeholder="Pilih unit..."
-                                        searchPlaceholder="Cari unit..."
-                                        emptyPlaceholder="Unit tidak ditemukan."
-                                    />
-                                </div>
+                                <Select value={editingMaterial?.unit} onValueChange={(value) => setEditingMaterial(prev => prev ? {...prev, unit: value} : null)}>
+                                    <SelectTrigger id="unit" className="col-span-3">
+                                        <SelectValue placeholder="Pilih unit" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {initialUnits.map(unit => (<SelectItem key={unit.value} value={unit.value}>{unit.label}</SelectItem>))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="purchasePrice" className="text-right">Harga Beli</Label>

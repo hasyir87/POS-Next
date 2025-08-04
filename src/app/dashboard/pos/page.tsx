@@ -15,7 +15,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { Combobox } from "@/components/ui/combobox";
 
 // --- SIMULASI DATA ---
 // Produk Jadi
@@ -26,26 +25,12 @@ const productCatalog = [
   { id: "PROD004", name: "Floral Fantasy", price: 92000, image: "https://placehold.co/100x100.png", stock: 8, "data-ai-hint": "perfume bottle" },
 ];
 
-// Resep & Bibit Parfum untuk Isi Ulang
-const perfumeGrades = [
-    { value: "standard", label: "Standar" },
-    { value: "premium", label: "Premium" },
-];
-
+// Bibit Parfum untuk Isi Ulang
 const availableAromas = [
-    { id: "ARO001", name: "Sandalwood Supreme", grade: "standard", pricePerMlExtra: 3000 },
-    { id: "ARO002", name: "Vanilla Orchid", grade: "standard", pricePerMlExtra: 2500 },
-    { id: "ARO003", name: "YSL Black Opium", grade: "premium", pricePerMlExtra: 3500 },
-    { id: "ARO004", name: "Baccarat Rouge", grade: "premium", pricePerMlExtra: 4500 },
-];
-
-const recipeBook = [
-    { aromaId: "ARO003", bottleSize: 30, essenceMl: 13, solventMl: 17, basePrice: 55000 },
-    { aromaId: "ARO003", bottleSize: 50, essenceMl: 22, solventMl: 28, basePrice: 85000 },
-    { aromaId: "ARO003", bottleSize: 100, essenceMl: 40, solventMl: 60, basePrice: 150000 },
-    { aromaId: "ARO001", bottleSize: 30, essenceMl: 15, solventMl: 15, basePrice: 45000 },
-    { aromaId: "ARO001", bottleSize: 50, essenceMl: 25, solventMl: 25, basePrice: 70000 },
-    { aromaId: "ARO001", bottleSize: 100, essenceMl: 45, solventMl: 55, basePrice: 125000 },
+    { value: "sandalwood", label: "Sandalwood Supreme" },
+    { value: "vanilla", label: "Vanilla Orchid" },
+    { value: "ysl_black", label: "YSL Black Opium" },
+    { value: "baccarat", label: "Baccarat Rouge" },
 ];
 
 type CartItem = {
@@ -64,145 +49,89 @@ const formatCurrency = (amount: number) => {
 // Komponen Form Isi Ulang
 const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) => {
     const { toast } = useToast();
-    const [selectedGrade, setSelectedGrade] = useState<string>('');
-    const [selectedAroma, setSelectedAroma] = useState<string>('');
-    const [selectedBottleSize, setSelectedBottleSize] = useState<number>(0);
-    const [essenceMl, setEssenceMl] = useState<number>(0);
-    const [solventMl, setSolventMl] = useState<number>(0);
-    const [totalPrice, setTotalPrice] = useState<number>(0);
+    const [selectedAroma, setSelectedAroma] = useState('');
+    const [selectedBottle, setSelectedBottle] = useState('');
+    const [refillAmount, setRefillAmount] = useState(30); // Default 30ml
+    const [totalPrice, setTotalPrice] = useState(0);
 
-    const filteredAromas = availableAromas.filter(a => a.grade === selectedGrade);
-    const recipe = recipeBook.find(r => r.aromaId === selectedAroma && r.bottleSize === selectedBottleSize);
-
+    // Simulasi kalkulasi harga
     useEffect(() => {
-        if (recipe) {
-            setEssenceMl(recipe.essenceMl);
-            setSolventMl(recipe.solventMl);
-        } else {
-            setEssenceMl(0);
-            setSolventMl(0);
-        }
-    }, [recipe]);
-    
-    useEffect(() => {
-        if(recipe) {
-            const aromaDetails = availableAromas.find(a => a.id === selectedAroma);
-            // Ensure essenceMl is at least the base recipe amount for calculation
-            const currentEssence = Math.max(essenceMl, recipe.essenceMl);
-            const extraEssence = Math.max(0, currentEssence - recipe.essenceMl);
-            const extraCost = extraEssence * (aromaDetails?.pricePerMlExtra || 0);
-            setTotalPrice(recipe.basePrice + extraCost);
-        } else {
-            setTotalPrice(0);
-        }
-    }, [essenceMl, recipe, selectedAroma]);
+        const basePricePerMl = 1500; // Harga dasar per ml
+        let price = refillAmount * basePricePerMl;
 
-    const handleEssenceChange = (newEssenceMl: number) => {
-        if (newEssenceMl < 0) newEssenceMl = 0;
-        if (newEssenceMl > selectedBottleSize) newEssenceMl = selectedBottleSize;
+        // Tambahan harga untuk aroma premium
+        if (selectedAroma === 'ysl_black' || selectedAroma === 'baccarat') {
+            price += 15000;
+        }
+        // Tambahan harga untuk botol baru
+        if (selectedBottle === '30ml') price += 5000;
+        if (selectedBottle === '50ml') price += 7500;
+        if (selectedBottle === '100ml') price += 10000;
+        
+        setTotalPrice(price);
 
-        setEssenceMl(newEssenceMl);
-        setSolventMl(selectedBottleSize - newEssenceMl);
-    };
-    
+    }, [selectedAroma, selectedBottle, refillAmount]);
+
+
     const handleAddToCart = () => {
-        const aroma = availableAromas.find(a => a.id === selectedAroma);
-        if (!aroma || !recipe) {
-             toast({ variant: "destructive", title: "Error", description: "Harap lengkapi semua pilihan resep." });
+        if (!selectedAroma) {
+            toast({ variant: "destructive", title: "Error", description: "Harap pilih aroma." });
             return;
         }
 
+        const aromaLabel = availableAromas.find(a => a.value === selectedAroma)?.label || 'Aroma';
+        const bottleLabel = selectedBottle ? `${selectedBottle} Botol Baru` : 'Botol Pelanggan';
+
         const cartItem: CartItem = {
             id: `refill-${Date.now()}`,
-            name: `Isi Ulang: ${aroma.name}`,
+            name: `Isi Ulang: ${aromaLabel}`,
             price: totalPrice,
             quantity: 1,
             type: 'refill',
-            details: `${selectedBottleSize}ml (${essenceMl}ml bibit / ${solventMl}ml pelarut)`
+            details: `${refillAmount}ml, ${bottleLabel}`
         };
-
         onAddToCart(cartItem);
-        // Reset form
-        setSelectedGrade('');
-        setSelectedAroma('');
-        setSelectedBottleSize(0);
-        toast({ title: "Sukses", description: `${aroma.name} ditambahkan ke keranjang.` });
+        toast({ title: "Sukses", description: `${aromaLabel} ditambahkan ke keranjang.` });
     };
-    
-    const aromaOptions = filteredAromas.map(a => ({ value: a.id, label: a.name }));
 
     return (
         <Card>
-            <CardHeader><CardTitle>Formulir Isi Ulang Kustom</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Formulir Isi Ulang</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-                 {/* Step 1: Grade & Aroma */}
-                <div className="space-y-2">
-                    <Label>Langkah 1: Pilih Aroma</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                        <Select value={selectedGrade} onValueChange={val => { setSelectedGrade(val); setSelectedAroma(''); setSelectedBottleSize(0);}}>
-                            <SelectTrigger><SelectValue placeholder="Pilih Grade..." /></SelectTrigger>
-                            <SelectContent>
-                                {perfumeGrades.map(grade => (
-                                    <SelectItem key={grade.value} value={grade.value}>{grade.label}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                         <Combobox
-                            options={aromaOptions}
-                            value={selectedAroma}
-                            onChange={val => { setSelectedAroma(val); setSelectedBottleSize(0); }}
-                            placeholder="Pilih Aroma..."
-                            searchPlaceholder="Cari aroma..."
-                            emptyPlaceholder="Aroma tidak ditemukan."
-                            disabled={!selectedGrade}
-                         />
-                    </div>
-                </div>
-
-                {/* Step 2: Bottle Size */}
-                <div className="space-y-2">
-                    <Label>Langkah 2: Pilih Ukuran Botol</Label>
-                    <Select value={selectedBottleSize ? selectedBottleSize.toString() : ""} onValueChange={(val) => setSelectedBottleSize(parseInt(val, 10))} disabled={!selectedAroma}>
-                        <SelectTrigger><SelectValue placeholder="Pilih Ukuran..." /></SelectTrigger>
+                 <div className="space-y-2">
+                    <Label>Pilih Aroma</Label>
+                    <Select value={selectedAroma} onValueChange={setSelectedAroma}>
+                        <SelectTrigger><SelectValue placeholder="Pilih bibit parfum..." /></SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="30">30 ml</SelectItem>
-                            <SelectItem value="50">50 ml</SelectItem>
-                            <SelectItem value="100">100 ml</SelectItem>
+                            {availableAromas.map(aroma => (
+                                <SelectItem key={aroma.value} value={aroma.value}>{aroma.label}</SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
                 </div>
-                
-                {/* Step 3: Customization */}
-                {recipe && (
-                     <Card className="bg-secondary/50">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-lg">Langkah 3: Atur Komposisi</CardTitle>
-                            <CardDescription>Resep dasar: {recipe.essenceMl}ml Bibit & {recipe.solventMl}ml Pelarut</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <Label htmlFor="essence-ml">Bibit (ml)</Label>
-                                    <Input id="essence-ml" type="number" value={essenceMl} onChange={e => handleEssenceChange(parseInt(e.target.value) || 0)} />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="solvent-ml">Pelarut (ml)</Label>
-                                    <Input id="solvent-ml" type="number" value={solventMl} readOnly disabled />
-                                </div>
-                            </div>
-                             <div className="text-right">
-                                <p className="text-sm text-muted-foreground">Harga Dasar: {formatCurrency(recipe.basePrice)}</p>
-                                {totalPrice > recipe.basePrice && (
-                                    <p className="text-sm text-green-600 font-medium">Biaya Tambahan: +{formatCurrency(totalPrice - recipe.basePrice)}</p>
-                                )}
-                                <p className="text-xl font-bold">Total: {formatCurrency(totalPrice)}</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
+                <div className="space-y-2">
+                    <Label htmlFor="refill-amount">Jumlah Isi Ulang (ml)</Label>
+                    <Input id="refill-amount" type="number" value={refillAmount} onChange={(e) => setRefillAmount(parseInt(e.target.value, 10) || 0)} placeholder="e.g. 30"/>
+                </div>
+                 <div className="space-y-2">
+                    <Label>Pilih Botol (Opsional)</Label>
+                    <Select value={selectedBottle} onValueChange={setSelectedBottle}>
+                        <SelectTrigger><SelectValue placeholder="Pilih jenis botol..." /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="customer-bottle">Botol milik pelanggan</SelectItem>
+                            <SelectItem value="30ml">Botol Baru 30ml</SelectItem>
+                            <SelectItem value="50ml">Botol Baru 50ml</SelectItem>
+                             <SelectItem value="100ml">Botol Baru 100ml</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                 <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Estimasi Harga</p>
+                    <p className="text-2xl font-bold">{formatCurrency(totalPrice)}</p>
+                </div>
             </CardContent>
             <CardFooter>
-                <Button className="w-full" onClick={handleAddToCart} disabled={!recipe}>
+                <Button className="w-full" onClick={handleAddToCart}>
                     <PlusCircle className="mr-2"/> Tambah ke Keranjang
                 </Button>
             </CardFooter>
