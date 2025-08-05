@@ -27,23 +27,23 @@ type Material = {
 };
 
 const initialAvailableMaterials: Material[] = [
-  { id: "MAT001", name: "Rose Absolute", brand: "Luxe Fragrance Co.", quantity: 50, unit: "ml", category: "bibit parfum", purchasePrice: 1500 },
-  { id: "MAT002", name: "Jasmine Sambac", brand: "Aroma Natural", quantity: 350, unit: "ml", category: "bibit parfum", purchasePrice: 1800 },
-  { id: "MAT003", name: "Bergamot Oil", brand: "Aroma Natural", quantity: 1200, unit: "ml", category: "bibit parfum", purchasePrice: 800 },
-  { id: "MAT004", name: "Sandalwood", brand: "Luxe Fragrance Co.", quantity: 0, unit: "g", category: "bibit parfum", purchasePrice: 2500 },
-  { id: "MAT005", name: "Vanilla Extract", brand: "Aroma Natural", quantity: 800, unit: "ml", category: "bibit parfum", purchasePrice: 950 },
-  { id: "MAT006", name: "Ethanol (Perfumer's Alcohol)", brand: "Generic Chemical", quantity: 5000, unit: "ml", category: "pelarut", purchasePrice: 100 },
-  { id: "MAT007", name: "Iso E Super", brand: "SynthScents", quantity: 180, unit: "ml", category: "bahan sintetis", purchasePrice: 400 },
-  { id: "MAT008", name: "Ambroxan", brand: "SynthScents", quantity: 150, unit: "g", category: "bahan sintetis", purchasePrice: 3000 },
-  { id: "MAT009", name: "Botol Kaca 50ml", brand: "GlassPack", quantity: 150, unit: "pcs", category: "kemasan", purchasePrice: 3500 },
-  { id: "MAT010", name: "Botol Kaca 100ml", brand: "GlassPack", quantity: 80, unit: "pcs", category: "kemasan", purchasePrice: 5000 },
+  { id: "MAT001", name: "Rose Absolute", brand: "Luxe Fragrance Co.", quantity: 50, unit: "ml", category: "Bibit Parfum", purchasePrice: 1500 },
+  { id: "MAT002", name: "Jasmine Sambac", brand: "Aroma Natural", quantity: 350, unit: "ml", category: "Bibit Parfum", purchasePrice: 1800 },
+  { id: "MAT003", name: "Bergamot Oil", brand: "Aroma Natural", quantity: 1200, unit: "ml", category: "Bibit Parfum", purchasePrice: 800 },
+  { id: "MAT004", name: "Sandalwood", brand: "Luxe Fragrance Co.", quantity: 0, unit: "g", category: "Bibit Parfum", purchasePrice: 2500 },
+  { id: "MAT005", name: "Vanilla Extract", brand: "Aroma Natural", quantity: 800, unit: "ml", category: "Bibit Parfum", purchasePrice: 950 },
+  { id: "MAT006", name: "Ethanol (Perfumer's Alcohol)", brand: "Generic Chemical", quantity: 5000, unit: "ml", category: "Pelarut", purchasePrice: 100 },
+  { id: "MAT007", name: "Iso E Super", brand: "SynthScents", quantity: 180, unit: "ml", category: "Bahan Sintetis", purchasePrice: 400 },
+  { id: "MAT008", name: "Ambroxan", brand: "SynthScents", quantity: 150, unit: "g", category: "Bahan Sintetis", purchasePrice: 3000 },
+  { id: "MAT009", name: "Botol Kaca 50ml", brand: "GlassPack", quantity: 150, unit: "pcs", category: "Kemasan", purchasePrice: 3500 },
+  { id: "MAT010", name: "Botol Kaca 100ml", brand: "GlassPack", quantity: 80, unit: "pcs", category: "Kemasan", purchasePrice: 5000 },
 ];
 
 const initialCategories = [
-    { value: "bibit parfum", label: "Bibit Parfum" },
-    { value: "pelarut", label: "Pelarut" },
-    { value: "bahan sintetis", label: "Bahan Sintetis" },
-    { value: "kemasan", label: "Kemasan" },
+    { value: "Bibit Parfum", label: "Bibit Parfum" },
+    { value: "Pelarut", label: "Pelarut" },
+    { value: "Bahan Sintetis", label: "Bahan Sintetis" },
+    { value: "Kemasan", label: "Kemasan" },
 ]
 
 const initialUnits = [
@@ -71,10 +71,10 @@ export default function InventoryPage() {
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
 
-  // In a real app, these would come from a database or a global state management solution
-  const [categories, setCategories] = useState(initialCategories.map(c => c.value));
-  const [units, setUnits] = useState(initialUnits.map(u => u.value));
-  const [brands, setBrands] = useState(initialBrands.map(b => b.value));
+  // In a real app, these would come from the settings page or a global state management solution
+  const [categories, setCategories] = useState(initialCategories);
+  const [units, setUnits] = useState(initialUnits);
+  const [brands, setBrands] = useState(initialBrands);
   const [lowStockThreshold, setLowStockThreshold] = useState(200);
 
   const emptyMaterial: Material = { id: "", name: "", brand: "", quantity: 0, unit: "", category: "", purchasePrice: 0 };
@@ -91,11 +91,11 @@ export default function InventoryPage() {
     }
 
     if (editingMaterial.id) {
-      setMaterials(materials.map(mat => mat.id === editingMaterial.id ? editingMaterial : mat));
+      setMaterials(prev => prev.map(mat => mat.id === editingMaterial.id ? editingMaterial : mat));
       toast({ title: "Sukses", description: "Bahan berhasil diperbarui." });
     } else {
       const newMaterial = { ...editingMaterial, id: `MAT${(materials.length + 1).toString().padStart(3, '0')}` };
-      setMaterials(prev => [...prev, newMaterial]);
+      setMaterials(prev => [newMaterial, ...prev]);
       toast({ title: "Sukses", description: "Bahan baru berhasil ditambahkan." });
     }
     setDialogOpen(false);
@@ -103,12 +103,12 @@ export default function InventoryPage() {
   };
 
   const handleDeleteMaterial = (id: string) => {
-    setMaterials(materials.filter(mat => mat.id !== id));
+    setMaterials(prev => prev.filter(mat => mat.id !== id));
     toast({ title: "Sukses", description: "Bahan berhasil dihapus." });
   };
   
   const groupedMaterials = materials.reduce((acc, material) => {
-    const categoryLabel = initialCategories.find(c => c.value === material.category)?.label || material.category;
+    const categoryLabel = categories.find(c => c.value === material.category)?.label || material.category;
     if (!acc[categoryLabel]) {
       acc[categoryLabel] = [];
     }
@@ -150,7 +150,7 @@ export default function InventoryPage() {
                                         <SelectValue placeholder="Pilih brand" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {brands.map(brand => (<SelectItem key={brand} value={brand}>{brand}</SelectItem>))}
+                                        {brands.map(brand => (<SelectItem key={brand.value} value={brand.value}>{brand.label}</SelectItem>))}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -161,7 +161,7 @@ export default function InventoryPage() {
                                         <SelectValue placeholder="Pilih kategori" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {initialCategories.map(cat => (<SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>))}
+                                        {categories.map(cat => (<SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>))}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -176,7 +176,7 @@ export default function InventoryPage() {
                                         <SelectValue placeholder="Pilih unit" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {initialUnits.map(unit => (<SelectItem key={unit.value} value={unit.value}>{unit.label}</SelectItem>))}
+                                        {units.map(unit => (<SelectItem key={unit.value} value={unit.value}>{unit.label}</SelectItem>))}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -261,4 +261,5 @@ export default function InventoryPage() {
     </div>
   );
 }
+
     

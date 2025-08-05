@@ -118,7 +118,7 @@ export default function SettingsPage() {
             return;
         }
         if (editingOutlet.id) {
-            setOutlets(outlets.map(o => o.id === editingOutlet.id ? editingOutlet : o));
+            setOutlets(prev => prev.map(o => o.id === editingOutlet.id ? editingOutlet : o));
         } else {
             const newOutlet = { ...editingOutlet, id: `out_${Date.now()}` };
             setOutlets(prev => [...prev, newOutlet]);
@@ -129,7 +129,7 @@ export default function SettingsPage() {
     };
 
     const handleDeleteOutlet = (id: string) => {
-        setOutlets(outlets.filter(o => o.id !== id));
+        setOutlets(prev => prev.filter(o => o.id !== id));
         toast({ title: "Sukses", description: "Outlet berhasil dihapus." });
     };
 
@@ -171,12 +171,16 @@ export default function SettingsPage() {
             return;
         }
         
-        const list = editingAttr.type === 'Kategori' ? categories : editingAttr.type === 'Unit' ? units : brands;
-        const setList = editingAttr.type === 'Kategori' ? setCategories : editingAttr.type === 'Unit' ? setUnits : setBrands;
-        const prefix = editingAttr.type === 'Kategori' ? 'cat' : editingAttr.type === 'Unit' ? 'unit' : 'brand';
+        let list, setList, prefix;
+        switch(editingAttr.type) {
+            case 'Kategori': list = categories; setList = setCategories; prefix = 'cat'; break;
+            case 'Unit': list = units; setList = setUnits; prefix = 'unit'; break;
+            case 'Brand': list = brands; setList = setBrands; prefix = 'brand'; break;
+            default: return;
+        }
 
         if (editingAttr.id) {
-            setList(list.map(item => item.id === editingAttr.id ? {id: item.id, name: editingAttr.name} : item));
+            setList(prev => prev.map(item => item.id === editingAttr!.id ? {id: item.id, name: editingAttr!.name} : item));
         } else {
             const newItem = { id: `${prefix}_${Date.now()}`, name: editingAttr.name };
             setList(prev => [...prev, newItem]);
@@ -244,10 +248,11 @@ export default function SettingsPage() {
                                     <DialogFooter><Button onClick={handleSaveAttr}>Simpan</Button></DialogFooter>
                                 </DialogContent>
                             </Dialog>
-                            <TabsContent value="categories">
+                            <TabsContent value="categories" className="pt-4">
                                 <div className="flex justify-end mb-4">
                                     <Button onClick={() => handleOpenAttrDialog(null, 'Kategori')}><PlusCircle className="mr-2" /> Tambah Kategori</Button>
                                 </div>
+                                <div className="border rounded-md">
                                 <Table>
                                     <TableHeader><TableRow><TableHead>Nama Kategori</TableHead><TableHead className="w-[100px] text-right">Aksi</TableHead></TableRow></TableHeader>
                                     <TableBody>
@@ -267,11 +272,13 @@ export default function SettingsPage() {
                                         ))}
                                     </TableBody>
                                 </Table>
+                                </div>
                             </TabsContent>
-                            <TabsContent value="units">
+                            <TabsContent value="units" className="pt-4">
                                 <div className="flex justify-end mb-4">
                                      <Button onClick={() => handleOpenAttrDialog(null, 'Unit')}><PlusCircle className="mr-2" /> Tambah Unit</Button>
                                 </div>
+                                <div className="border rounded-md">
                                 <Table>
                                     <TableHeader><TableRow><TableHead>Nama Unit</TableHead><TableHead className="w-[100px] text-right">Aksi</TableHead></TableRow></TableHeader>
                                     <TableBody>
@@ -291,11 +298,13 @@ export default function SettingsPage() {
                                         ))}
                                     </TableBody>
                                 </Table>
+                                </div>
                             </TabsContent>
-                             <TabsContent value="brands">
+                             <TabsContent value="brands" className="pt-4">
                                 <div className="flex justify-end mb-4">
                                      <Button onClick={() => handleOpenAttrDialog(null, 'Brand')}><PlusCircle className="mr-2" /> Tambah Brand</Button>
                                 </div>
+                                <div className="border rounded-md">
                                 <Table>
                                     <TableHeader><TableRow><TableHead>Nama Brand</TableHead><TableHead className="w-[100px] text-right">Aksi</TableHead></TableRow></TableHeader>
                                     <TableBody>
@@ -315,6 +324,7 @@ export default function SettingsPage() {
                                         ))}
                                     </TableBody>
                                 </Table>
+                                </div>
                             </TabsContent>
                         </Tabs>
                     </CardContent>
@@ -532,4 +542,5 @@ export default function SettingsPage() {
         </div>
     )
 }
+
     
