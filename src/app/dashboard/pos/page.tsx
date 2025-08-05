@@ -323,6 +323,9 @@ export default function PosPage() {
                         <TabsTrigger value="refills"><Droplets className="mr-2"/> Isi Ulang</TabsTrigger>
                         <TabsTrigger value="products"><SprayCan className="mr-2"/> Produk Jadi</TabsTrigger>
                     </TabsList>
+                    <TabsContent value="refills" className="flex-grow mt-4">
+                        <RefillForm onAddToCart={addRefillToCart} />
+                    </TabsContent>
                     <TabsContent value="products" className="flex-grow mt-4">
                         <ScrollArea className="h-full">
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pr-4">
@@ -339,9 +342,6 @@ export default function PosPage() {
                                 ))}
                             </div>
                         </ScrollArea>
-                    </TabsContent>
-                    <TabsContent value="refills" className="flex-grow mt-4">
-                        <RefillForm onAddToCart={addRefillToCart} />
                     </TabsContent>
                 </Tabs>
             </div>
@@ -432,3 +432,5 @@ export default function PosPage() {
         </div>
     );
 }
+
+    

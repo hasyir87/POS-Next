@@ -16,6 +16,7 @@ import Image from "next/image";
 type Product = {
     id: string;
     name: string;
+    cogs: number; // Cost of Goods Sold / Harga Pokok Penjualan (HPP)
     price: number;
     stock: number;
     image: string;
@@ -23,10 +24,10 @@ type Product = {
 };
 
 const initialProductCatalog: Product[] = [
-  { id: "PROD001", name: "Ocean Breeze", price: 79990, image: "https://placehold.co/150x150.png", stock: 15, "data-ai-hint": "perfume bottle" },
-  { id: "PROD002", name: "Mystic Woods", price: 85000, image: "https://placehold.co/150x150.png", stock: 10, "data-ai-hint": "perfume bottle" },
-  { id: "PROD003", name: "Citrus Grove", price: 75500, image: "https://placehold.co/150x150.png", stock: 20, "data-ai-hint": "perfume bottle" },
-  { id: "PROD004", name: "Floral Fantasy", price: 92000, image: "https://placehold.co/150x150.png", stock: 8, "data-ai-hint": "perfume bottle" },
+  { id: "PROD001", name: "Ocean Breeze", cogs: 32000, price: 79990, image: "https://placehold.co/150x150.png", stock: 15, "data-ai-hint": "perfume bottle" },
+  { id: "PROD002", name: "Mystic Woods", cogs: 35000, price: 85000, image: "https://placehold.co/150x150.png", stock: 10, "data-ai-hint": "perfume bottle" },
+  { id: "PROD003", name: "Citrus Grove", cogs: 30000, price: 75500, image: "https://placehold.co/150x150.png", stock: 20, "data-ai-hint": "perfume bottle" },
+  { id: "PROD004", name: "Floral Fantasy", cogs: 40000, price: 92000, image: "https://placehold.co/150x150.png", stock: 8, "data-ai-hint": "perfume bottle" },
 ];
 
 const formatCurrency = (amount: number) => {
@@ -40,7 +41,7 @@ export default function ProductsPage() {
     const [isDialogOpen, setDialogOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-    const emptyProduct: Product = { id: "", name: "", price: 0, stock: 0, image: "https://placehold.co/150x150.png", "data-ai-hint": "perfume bottle" };
+    const emptyProduct: Product = { id: "", name: "", price: 0, cogs: 0, stock: 0, image: "https://placehold.co/150x150.png", "data-ai-hint": "perfume bottle" };
 
     const handleOpenDialog = (product: Product | null = null) => {
         setEditingProduct(product ? { ...product } : emptyProduct);
@@ -73,7 +74,7 @@ export default function ProductsPage() {
     return (
         <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
-                <h1 className="font-headline text-3xl font-bold flex items-center gap-2"><SprayCan className="h-8 w-8" /> Manajemen Produk</h1>
+                <h1 className="font-headline text-3xl font-bold flex items-center gap-2"><SprayCan className="h-8 w-8" /> Manajemen Produk Jadi</h1>
                 <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
                     <DialogTrigger asChild>
                         <Button onClick={() => handleOpenDialog()}>
@@ -89,8 +90,12 @@ export default function ProductsPage() {
                                 <Label htmlFor="name" className="text-right">Nama</Label>
                                 <Input id="name" placeholder="Nama produk" className="col-span-3" value={editingProduct?.name || ''} onChange={(e) => setEditingProduct(prev => prev ? {...prev, name: e.target.value} : null)} />
                             </div>
+                             <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="cogs" className="text-right">HPP</Label>
+                                <Input id="cogs" type="number" placeholder="Rp 0" className="col-span-3" value={editingProduct?.cogs || ''} onChange={(e) => setEditingProduct(prev => prev ? {...prev, cogs: parseFloat(e.target.value) || 0} : null)} />
+                            </div>
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="price" className="text-right">Harga</Label>
+                                <Label htmlFor="price" className="text-right">Harga Jual</Label>
                                 <Input id="price" type="number" placeholder="Rp 0" className="col-span-3" value={editingProduct?.price || ''} onChange={(e) => setEditingProduct(prev => prev ? {...prev, price: parseFloat(e.target.value) || 0} : null)} />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
@@ -108,7 +113,7 @@ export default function ProductsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Daftar Produk Jadi</CardTitle>
-                    <CardDescription>Kelola produk parfum yang siap dijual.</CardDescription>
+                    <CardDescription>Kelola produk parfum yang siap dijual. Harga untuk layanan isi ulang diatur di halaman POS.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -117,7 +122,8 @@ export default function ProductsPage() {
                                 <TableHead className="w-[80px]">Gambar</TableHead>
                                 <TableHead>Nama Produk</TableHead>
                                 <TableHead>Stok</TableHead>
-                                <TableHead className="text-right">Harga</TableHead>
+                                <TableHead className="text-right">HPP</TableHead>
+                                <TableHead className="text-right">Harga Jual</TableHead>
                                 <TableHead className="w-[50px]"></TableHead>
                             </TableRow>
                         </TableHeader>
@@ -132,6 +138,7 @@ export default function ProductsPage() {
                                         <div className="text-sm text-muted-foreground">{product.id}</div>
                                     </TableCell>
                                     <TableCell>{product.stock} pcs</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(product.cogs)}</TableCell>
                                     <TableCell className="text-right">{formatCurrency(product.price)}</TableCell>
                                     <TableCell>
                                        <DropdownMenu>
@@ -156,3 +163,5 @@ export default function ProductsPage() {
         </div>
     );
 }
+
+    
