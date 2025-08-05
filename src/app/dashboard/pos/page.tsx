@@ -17,7 +17,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Combobox } from "@/components/ui/combobox";
 
 // --- SIMULASI DATA ---
-// Produk Jadi
+// NOTE: In a real app, this data would be fetched from your database/backend,
+// likely using a server action or an API route. The `ProductsPage` would be where you manage it.
 const productCatalog = [
   { id: "PROD001", name: "Ocean Breeze", price: 79990, image: "https://placehold.co/100x100.png", stock: 15, "data-ai-hint": "perfume bottle" },
   { id: "PROD002", name: "Mystic Woods", price: 85000, image: "https://placehold.co/100x100.png", stock: 10, "data-ai-hint": "perfume bottle" },
@@ -286,6 +287,14 @@ export default function PosPage() {
     };
 
     const handleCheckout = () => {
+        if (cart.length === 0) {
+            toast({
+                variant: "destructive",
+                title: "Keranjang Kosong",
+                description: "Tidak dapat melakukan pembayaran dengan keranjang kosong.",
+            });
+            return;
+        }
         toast({
             title: "Pembayaran Berhasil",
             description: "Pesanan telah dibayar dan transaksi selesai.",
@@ -423,4 +432,3 @@ export default function PosPage() {
         </div>
     );
 }
-

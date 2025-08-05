@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { BarChart3, Clock, Home, LogOut, Menu, Settings, DollarSign, BookUser, Store, ChevronsUpDown, Users, PackageSearch } from "lucide-react";
+import { BarChart3, Clock, Home, LogOut, Menu, Settings, DollarSign, BookUser, Store, ChevronsUpDown, Users, PackageSearch, SprayCan } from "lucide-react";
 import Link from "next/link";
 import { MPerfumeAmalLogo } from "@/components/m-perfume-amal-logo";
 import { AuthContext, UserRole } from '@/context/auth-context';
@@ -22,6 +22,7 @@ type NavItem = {
 const allNavItems: NavItem[] = [
   { href: "/dashboard", label: "Dasbor", icon: Home, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/pos", label: "Point of Sale", icon: Store, requiredRoles: ["owner", "admin", "cashier"] },
+  { href: "/dashboard/products", label: "Produk", icon: SprayCan, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/shifts", label: "Shift", icon: Clock, requiredRoles: ["owner", "admin", "cashier"] },
   { href: "/dashboard/inventory", label: "Inventaris", icon: PackageSearch, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/members", label: "Anggota", icon: Users, requiredRoles: ["owner", "admin", "cashier"] },
