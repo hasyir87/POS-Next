@@ -184,3 +184,5 @@ export function InventoryTool({ availableMaterials }: { availableMaterials: Mate
     </Card>
   );
 }
+
+    

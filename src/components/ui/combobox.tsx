@@ -58,7 +58,7 @@ export function Combobox({ options, value, onChange, placeholder, searchPlacehol
                   key={option.value}
                   value={option.value}
                   onSelect={(currentValue) => {
-                    onChange(currentValue)
+                    onChange(currentValue === value ? "" : currentValue)
                     setOpen(false)
                   }}
                 >
@@ -78,3 +78,5 @@ export function Combobox({ options, value, onChange, placeholder, searchPlacehol
     </Popover>
   )
 }
+
+    

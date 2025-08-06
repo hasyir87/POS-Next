@@ -210,7 +210,7 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
                                 id="essence-ml" 
                                 type="number" 
                                 value={essenceMl} 
-                                onChange={(e) => setEssenceMl(Number(e.target.value))} 
+                                onChange={(e) => setEssenceMl(Math.max(1, Number(e.target.value)))} 
                                 min="1"
                                />
                                <p className="text-xs text-muted-foreground">Resep: {standardEssence}ml</p>
@@ -282,7 +282,7 @@ export default function PosPage() {
     const handleSaveOrder = () => {
         toast({
             title: "Pesanan Disimpan",
-            description: "Pesanan saat ini telah disimpan.",
+            description: "Pesanan saat ini telah disimpan untuk dilanjutkan nanti.",
         });
     };
 
