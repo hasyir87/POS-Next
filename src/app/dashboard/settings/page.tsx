@@ -33,8 +33,9 @@ const initialOutlets: Outlet[] = [
 ];
 
 const initialPromotions: Promotion[] = [
-    { id: "promo_1", name: "Diskon Akhir Pekan", type: "Persentase", value: "15%" },
-    { id: "promo_2", name: "Beli 1 Gratis 1 Parfum Mini", type: "BOGO", value: "Parfum Mini" },
+    { id: "promo_1", name: "Diskon Akhir Pekan", type: "Persentase", value: "15" },
+    { id: "promo_2", name: "Potongan Langsung", type: "Nominal", value: "20000" },
+    { id: "promo_3", name: "Beli 1 Gratis 1 (TIDAK AKTIF)", type: "BOGO", value: "Parfum Mini" },
 ];
 
 const initialCategories: Attribute[] = [
@@ -464,7 +465,7 @@ export default function SettingsPage() {
                                         </div>
                                         <div className="grid grid-cols-4 items-center gap-4">
                                             <Label htmlFor="promo-value" className="text-right">Nilai</Label>
-                                            <Input id="promo-value" value={editingPromo?.value || ''} onChange={e => setEditingPromo(prev => prev ? {...prev, value: e.target.value} : null)} className="col-span-3" placeholder="e.g., 15% atau 50000" />
+                                            <Input id="promo-value" value={editingPromo?.value || ''} onChange={e => setEditingPromo(prev => prev ? {...prev, value: e.target.value} : null)} className="col-span-3" placeholder="e.g., 15 atau 20000" />
                                         </div>
                                     </div>
                                     <DialogFooter><Button onClick={handleSavePromo}>Simpan Promosi</Button></DialogFooter>

@@ -35,7 +35,12 @@ const initialMembers = [
 const initialPromotions = [
     { id: "promo_1", name: "Diskon Akhir Pekan", type: "Persentase", value: "15" },
     { id: "promo_2", name: "Potongan Langsung", type: "Nominal", value: "20000" },
+    { id: "promo_3", name: "Beli 1 Gratis 1 (TIDAK AKTIF)", type: "BOGO", value: "Parfum Mini" },
 ];
+
+const availablePromotions = initialPromotions.filter(
+    (promo) => promo.type === "Persentase" || promo.type === "Nominal"
+);
 
 const grades = [
     { value: "standard", label: "Standar" },
@@ -409,7 +414,7 @@ export default function PosPage() {
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="none">Tanpa Promosi</SelectItem>
-                                            {initialPromotions.map(promo => (
+                                            {availablePromotions.map(promo => (
                                                 <SelectItem key={promo.id} value={promo.id}>{promo.name}</SelectItem>
                                             ))}
                                         </SelectContent>
@@ -432,3 +437,5 @@ export default function PosPage() {
         </div>
     );
 }
+
+    
