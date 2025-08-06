@@ -208,7 +208,7 @@ export default function PosPage() {
     const { toast } = useToast();
     const [cart, setCart] = useState<CartItem[]>([]);
     const [activeCustomer, setActiveCustomer] = useState<{value: string, label: string} | null>(null);
-    const [appliedPromo, setAppliedPromo] = useState<typeof initialPromotions[0] | null>(null);
+    const [appliedPromo, setAppliedPromo] = useState<(typeof initialPromotions[0]) | null>(null);
 
     const addProductToCart = (product: typeof productCatalog[0]) => {
         setCart(prevCart => {
@@ -332,7 +332,10 @@ export default function PosPage() {
                                 <Combobox
                                     options={initialMembers}
                                     value={activeCustomer?.value || ''}
-                                    onChange={(val) => setActiveCustomer(initialMembers.find(m => m.value === val) || null)}
+                                    onChange={(val) => {
+                                        const member = initialMembers.find(m => m.value === val);
+                                        setActiveCustomer(member || null);
+                                    }}
                                     placeholder="Cari Pelanggan..."
                                     searchPlaceholder="Cari nama anggota..."
                                     notFoundText="Anggota tidak ditemukan."
@@ -392,16 +395,20 @@ export default function PosPage() {
                                 <div className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
                                 
                                 {appliedPromo ? (
-                                     <div className="flex justify-between text-destructive">
+                                     <div className="flex justify-between items-center text-destructive">
                                         <span>Diskon ({appliedPromo.name})</span>
-                                        <span>- {formatCurrency(discount)}</span>
+                                        <div className="flex items-center gap-2">
+                                          <span>- {formatCurrency(discount)}</span>
+                                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setAppliedPromo(null)}><XCircle className="h-4 w-4" /></Button>
+                                        </div>
                                      </div>
                                 ) : (
                                     <Select onValueChange={(promoId) => setAppliedPromo(initialPromotions.find(p => p.id === promoId) || null)}>
-                                        <SelectTrigger className="h-auto py-1 text-xs">
+                                        <SelectTrigger className="h-auto py-1.5 text-xs">
                                             <SelectValue placeholder="Gunakan Promosi/Voucher" />
                                         </SelectTrigger>
                                         <SelectContent>
+                                            <SelectItem value="none">Tanpa Promosi</SelectItem>
                                             {initialPromotions.map(promo => (
                                                 <SelectItem key={promo.id} value={promo.id}>{promo.name}</SelectItem>
                                             ))}
@@ -425,4 +432,3 @@ export default function PosPage() {
         </div>
     );
 }
-
