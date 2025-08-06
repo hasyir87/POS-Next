@@ -16,6 +16,7 @@ const salesData = [
   { id: "TRX002", date: "2024-07-28", item: "Isi Ulang: YSL Black Opium (50ml)", revenue: 90000, cogs: 40000 },
   { id: "TRX003", date: "2024-07-29", item: "Mystic Woods", revenue: 85000, cogs: 35000 },
   { id: "TRX004", date: "2024-07-30", item: "Isi Ulang: Sandalwood Supreme (30ml)", revenue: 50000, cogs: 21000 },
+  { id: "TRX005", date: "2024-07-30", item: "Parfum Mini", revenue: 25000, cogs: 10000 },
 ];
 
 // 2. Data Beban (Expenses) - Data ini harus konsisten dengan data awal di halaman Beban
@@ -167,6 +168,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-
-    

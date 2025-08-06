@@ -318,12 +318,12 @@ export default function PosPage() {
                 isPromo: true
             };
             setCart(prev => [...prev, newCartItem]);
+            toast({title: "Hadiah Diterapkan", description: `Produk gratis ${freebie.name} telah ditambahkan.`});
         } else { // Discount
             // This would be more complex in a real app, for now just show a toast
             toast({title: "Hadiah Diterapkan", description: `Diskon ${loyaltySettings.rewardValue}% telah diterapkan.`});
         }
         setShowLoyaltyReward(false); // Hide notification after applying
-        toast({title: "Hadiah Diterapkan", description: "Hadiah loyalitas telah ditambahkan ke pesanan."});
     }
 
     // Effect to handle BOGO logic
@@ -556,5 +556,3 @@ export default function PosPage() {
         </div>
     );
 }
-
-    
