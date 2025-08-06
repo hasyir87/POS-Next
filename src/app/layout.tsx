@@ -1,8 +1,6 @@
 
 "use client";
 
-import './globals.css';
-import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/auth-context';
 
 // No metadata export from client component
@@ -11,6 +9,8 @@ import { AuthProvider } from '@/context/auth-context';
 //   description: 'Point of Sale untuk parfum eksklusif.',
 // };
 
+import './globals.css';
+import { Toaster } from "@/components/ui/toaster";
 export default function RootLayout({
   children,
 }: Readonly<{
