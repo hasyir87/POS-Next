@@ -24,6 +24,7 @@ const productCatalog = [
   { id: "PROD002", name: "Mystic Woods", price: 85000, image: "https://placehold.co/100x100.png", stock: 10, "data-ai-hint": "perfume bottle" },
   { id: "PROD003", name: "Citrus Grove", price: 75500, image: "https://placehold.co/100x100.png", stock: 20, "data-ai-hint": "perfume bottle" },
   { id: "PROD004", name: "Floral Fantasy", price: 92000, image: "https://placehold.co/100x100.png", stock: 8, "data-ai-hint": "perfume bottle" },
+  { id: "PROD005", name: "Parfum Mini", price: 25000, image: "https://placehold.co/100x100.png", stock: 50, "data-ai-hint": "small perfume" },
 ];
 
 const initialMembers = [
@@ -36,13 +37,11 @@ const initialMembers = [
 const initialPromotions = [
     { id: "promo_1", name: "Diskon Akhir Pekan", type: "Persentase", value: "15" },
     { id: "promo_2", name: "Potongan Langsung", type: "Nominal", value: "20000" },
-    { id: "promo_3", name: "Beli 1 Gratis 1 (TIDAK AKTIF)", type: "BOGO", value: "Parfum Mini" },
+    { id: "promo_3", name: "Beli 1 Gratis 1 Parfum Mini", type: "BOGO", value: "PROD005" }, // Value is now a product ID
 ];
 
-// Hanya tampilkan promosi yang didukung oleh logika POS saat ini (Persentase/Nominal)
-const availablePromotions = initialPromotions.filter(
-    (promo) => promo.type === "Persentase" || promo.type === "Nominal"
-);
+
+const availablePromotions = initialPromotions;
 
 const grades = [
     { value: "standard", label: "Standar" },
@@ -81,6 +80,7 @@ type CartItem = {
   quantity: number;
   type: 'product' | 'refill';
   details?: string;
+  isPromo?: boolean;
 };
 
 const formatCurrency = (amount: number) => {
@@ -234,13 +234,18 @@ export default function PosPage() {
     }
 
     const updateQuantity = (itemId: string, newQuantity: number) => {
-        if (newQuantity <= 0) {
-            setCart(prevCart => prevCart.filter(item => item.id !== itemId));
-        } else {
-            setCart(prevCart => prevCart.map(item => 
+        setCart(prevCart => {
+            // Prevent changing quantity of promo items
+            const itemToUpdate = prevCart.find(item => item.id === itemId);
+            if (itemToUpdate?.isPromo) return prevCart;
+
+            if (newQuantity <= 0) {
+                return prevCart.filter(item => item.id !== itemId);
+            }
+            return prevCart.map(item =>
                 item.id === itemId ? { ...item, quantity: newQuantity } : item
-            ));
-        }
+            );
+        });
     };
 
     const handleSaveOrder = () => {
@@ -264,6 +269,36 @@ export default function PosPage() {
         setActiveCustomer(null);
         setAppliedPromo(null);
     };
+
+    const handleSetPromo = (promoId: string) => {
+        const promo = initialPromotions.find(p => p.id === promoId);
+        setAppliedPromo(promo || null);
+    };
+
+    // Effect to handle BOGO logic
+    useEffect(() => {
+        if (appliedPromo?.type === 'BOGO') {
+            const freeProduct = productCatalog.find(p => p.id === appliedPromo.value);
+            if (freeProduct) {
+                const promoItemInCart = cart.find(item => item.id === freeProduct.id && item.isPromo);
+                if (!promoItemInCart) {
+                    const newCartItem: CartItem = {
+                        id: freeProduct.id,
+                        name: `GRATIS: ${freeProduct.name}`,
+                        price: 0,
+                        quantity: 1,
+                        type: 'product',
+                        isPromo: true
+                    };
+                    setCart(prev => [...prev, newCartItem]);
+                }
+            }
+        } else {
+            // Remove any BOGO items if the promo is changed or removed
+            setCart(prev => prev.filter(item => !item.isPromo));
+        }
+    }, [appliedPromo, cart]);
+
 
     const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
 
@@ -365,10 +400,10 @@ export default function PosPage() {
                                     </TableHeader>
                                     <TableBody>
                                         {cart.map(item => (
-                                            <TableRow key={item.id}>
+                                            <TableRow key={item.id} className={item.isPromo ? "bg-muted/50" : ""}>
                                                 <TableCell className="font-medium p-2 align-top">
                                                     <div className="flex gap-2 items-start">
-                                                        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 mt-1" onClick={() => updateQuantity(item.id, 0)}><X className="h-4 w-4 text-destructive" /></Button>
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 mt-1" onClick={() => updateQuantity(item.id, 0)} disabled={item.isPromo}><X className="h-4 w-4 text-destructive" /></Button>
                                                         <div>
                                                             <p className="leading-tight font-semibold">{item.name}</p>
                                                             <p className="text-xs text-muted-foreground">{item.details ? item.details : formatCurrency(item.price)}</p>
@@ -377,9 +412,9 @@ export default function PosPage() {
                                                 </TableCell>
                                                 <TableCell className="p-2 align-top">
                                                     <div className="flex items-center justify-center gap-1 mt-1">
-                                                         <Button variant="outline" size="icon" className="h-6 w-6" disabled={item.type === 'refill'} onClick={() => updateQuantity(item.id, item.quantity - 1)}><MinusCircle className="h-4 w-4" /></Button>
+                                                         <Button variant="outline" size="icon" className="h-6 w-6" disabled={item.type === 'refill' || item.isPromo} onClick={() => updateQuantity(item.id, item.quantity - 1)}><MinusCircle className="h-4 w-4" /></Button>
                                                          <span className="w-6 text-center">{item.quantity}</span>
-                                                         <Button variant="outline" size="icon" className="h-6 w-6" disabled={item.type === 'refill'} onClick={() => updateQuantity(item.id, item.quantity + 1)}><PlusCircle className="h-4 w-4" /></Button>
+                                                         <Button variant="outline" size="icon" className="h-6 w-6" disabled={item.type === 'refill' || item.isPromo} onClick={() => updateQuantity(item.id, item.quantity + 1)}><PlusCircle className="h-4 w-4" /></Button>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-right p-2 align-top font-medium">{formatCurrency(item.price * item.quantity)}</TableCell>
@@ -401,21 +436,21 @@ export default function PosPage() {
                             <CardContent className="p-4 space-y-2 text-sm">
                                 <div className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
                                 
-                                {appliedPromo ? (
+                                {appliedPromo && appliedPromo.type !== 'BOGO' ? (
                                      <div className="flex justify-between items-center text-destructive">
                                         <span>Diskon ({appliedPromo.name})</span>
                                         <div className="flex items-center gap-2">
                                           <span>- {formatCurrency(discount)}</span>
-                                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setAppliedPromo(null)}><XCircle className="h-4 w-4" /></Button>
+                                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleSetPromo('')}><XCircle className="h-4 w-4" /></Button>
                                         </div>
                                      </div>
                                 ) : (
-                                    <Select onValueChange={(promoId) => setAppliedPromo(initialPromotions.find(p => p.id === promoId) || null)}>
+                                    <Select onValueChange={handleSetPromo} value={appliedPromo?.id || ''}>
                                         <SelectTrigger className="h-auto py-1.5 text-xs">
                                             <SelectValue placeholder="Gunakan Promosi/Voucher" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="none">Tanpa Promosi</SelectItem>
+                                            <SelectItem value="">Tanpa Promosi</SelectItem>
                                             {availablePromotions.map(promo => (
                                                 <SelectItem key={promo.id} value={promo.id}>{promo.name}</SelectItem>
                                             ))}

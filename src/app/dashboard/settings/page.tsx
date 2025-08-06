@@ -16,6 +16,15 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+// SIMULASI DATA - Di aplikasi nyata, ini akan berasal dari database
+const productCatalogForSettings = [
+  { id: "PROD001", name: "Ocean Breeze" },
+  { id: "PROD002", name: "Mystic Woods" },
+  { id: "PROD003", name: "Citrus Grove" },
+  { id: "PROD004", name: "Floral Fantasy" },
+  { id: "PROD005", name: "Parfum Mini" },
+];
+
 
 type ApiKey = { id: string; label: string; key: string; created: string };
 type Outlet = { id: string; name: string; location: string };
@@ -35,7 +44,7 @@ const initialOutlets: Outlet[] = [
 const initialPromotions: Promotion[] = [
     { id: "promo_1", name: "Diskon Akhir Pekan", type: "Persentase", value: "15" },
     { id: "promo_2", name: "Potongan Langsung", type: "Nominal", value: "20000" },
-    { id: "promo_3", name: "Beli 1 Gratis 1 (TIDAK AKTIF)", type: "BOGO", value: "Parfum Mini" },
+    { id: "promo_3", name: "Beli 1 Gratis 1 Parfum Mini", type: "BOGO", value: "PROD005" },
 ];
 
 const initialCategories: Attribute[] = [
@@ -92,7 +101,7 @@ export default function SettingsPage() {
             return;
         }
         const newKey: ApiKey = {
-            id: `key_${'|'.repeat(Date.now())}`,
+            id: `key_${Date.now()}`,
             label: newKeyLabel,
             key: `sk_live_${btoa(Math.random().toString()).substring(10, 26)}...`,
             created: new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }),
@@ -121,7 +130,7 @@ export default function SettingsPage() {
         if (editingOutlet.id) {
             setOutlets(prev => prev.map(o => o.id === editingOutlet.id ? editingOutlet : o));
         } else {
-            const newOutlet = { ...editingOutlet, id: `out_${'|'.repeat(Date.now())}` };
+            const newOutlet = { ...editingOutlet, id: `out_${Date.now()}` };
             setOutlets(prev => [...prev, newOutlet]);
         }
         toast({ title: "Sukses", description: "Outlet berhasil disimpan." });
@@ -148,7 +157,7 @@ export default function SettingsPage() {
             setPromotions(promotions.map(p => p.id === editingPromo.id ? editingPromo : p));
             toast({ title: "Sukses", description: "Promosi berhasil diperbarui." });
         } else {
-            const newPromo = { ...editingPromo, id: `promo_${'|'.repeat(Date.now())}` };
+            const newPromo = { ...editingPromo, id: `promo_${Date.now()}` };
             setPromotions(prev => [...prev, newPromo]);
             toast({ title: "Sukses", description: "Promosi baru berhasil ditambahkan." });
         }
@@ -183,7 +192,7 @@ export default function SettingsPage() {
         if (editingAttr.id) {
             setList(prev => prev.map(item => item.id === editingAttr!.id ? {id: item.id, name: editingAttr!.name} : item));
         } else {
-            const newItem = { id: `${prefix}_${'|'.repeat(Date.now())}`, name: editingAttr.name };
+            const newItem = { id: `${prefix}_${Date.now()}`, name: editingAttr.name };
             setList(prev => [...prev, newItem]);
         }
         toast({ title: "Sukses", description: `${editingAttr.type} berhasil disimpan.` });
@@ -452,7 +461,7 @@ export default function SettingsPage() {
                                         </div>
                                         <div className="grid grid-cols-4 items-center gap-4">
                                             <Label htmlFor="promo-type" className="text-right">Jenis</Label>
-                                            <Select value={editingPromo?.type} onValueChange={(value) => setEditingPromo(prev => prev ? {...prev, type: value} : null)}>
+                                            <Select value={editingPromo?.type} onValueChange={(value) => setEditingPromo(prev => prev ? {...prev, type: value, value: ""} : null)}>
                                                 <SelectTrigger id="promo-type" className="col-span-3">
                                                     <SelectValue placeholder="Pilih jenis promosi" />
                                                 </SelectTrigger>
@@ -465,7 +474,20 @@ export default function SettingsPage() {
                                         </div>
                                         <div className="grid grid-cols-4 items-center gap-4">
                                             <Label htmlFor="promo-value" className="text-right">Nilai</Label>
-                                            <Input id="promo-value" value={editingPromo?.value || ''} onChange={e => setEditingPromo(prev => prev ? {...prev, value: e.target.value} : null)} className="col-span-3" placeholder="e.g., 15 atau 20000" />
+                                            {editingPromo?.type === 'BOGO' ? (
+                                                <Select value={editingPromo.value} onValueChange={(value) => setEditingPromo(prev => prev ? {...prev, value: value} : null)}>
+                                                     <SelectTrigger id="promo-value" className="col-span-3">
+                                                        <SelectValue placeholder="Pilih produk gratis" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {productCatalogForSettings.map(product => (
+                                                            <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            ) : (
+                                                <Input id="promo-value" value={editingPromo?.value || ''} onChange={e => setEditingPromo(prev => prev ? {...prev, value: e.target.value} : null)} className="col-span-3" placeholder="e.g., 15 atau 20000" />
+                                            )}
                                         </div>
                                     </div>
                                     <DialogFooter><Button onClick={handleSavePromo}>Simpan Promosi</Button></DialogFooter>
@@ -487,7 +509,12 @@ export default function SettingsPage() {
                                     <TableRow key={promo.id}>
                                         <TableCell className="font-medium">{promo.name}</TableCell>
                                         <TableCell>{promo.type}</TableCell>
-                                        <TableCell>{promo.value}</TableCell>
+                                        <TableCell>
+                                            {promo.type === 'BOGO' 
+                                                ? productCatalogForSettings.find(p => p.id === promo.value)?.name || promo.value
+                                                : promo.value
+                                            }
+                                        </TableCell>
                                         <TableCell className="text-right">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
