@@ -8,17 +8,17 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, MinusCircle, X, Search, UserPlus, Droplets, SprayCan } from "lucide-react";
+import { PlusCircle, MinusCircle, X, Search, UserPlus, Droplets, SprayCan, Tag, User, XCircle } from "lucide-react";
 import Image from "next/image";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Combobox } from "@/components/ui/combobox";
+import { Badge } from "@/components/ui/badge";
 
 // --- SIMULASI DATA ---
-// NOTE: In a real app, this data would be fetched from your database/backend,
-// likely using a server action or an API route. The `ProductsPage` would be where you manage it.
+// NOTE: In a real app, this data would be fetched from your database/backend.
 const productCatalog = [
   { id: "PROD001", name: "Ocean Breeze", price: 79990, image: "https://placehold.co/100x100.png", stock: 15, "data-ai-hint": "perfume bottle" },
   { id: "PROD002", name: "Mystic Woods", price: 85000, image: "https://placehold.co/100x100.png", stock: 10, "data-ai-hint": "perfume bottle" },
@@ -26,7 +26,17 @@ const productCatalog = [
   { id: "PROD004", name: "Floral Fantasy", price: 92000, image: "https://placehold.co/100x100.png", stock: 8, "data-ai-hint": "perfume bottle" },
 ];
 
-// Data untuk Form Isi Ulang
+const initialMembers = [
+    { value: "MEM001", label: "Andi Wijaya" },
+    { value: "MEM002", label: "Bunga Citra" },
+    { value: "MEM003", label: "Charlie Dharmawan" },
+];
+
+const initialPromotions = [
+    { id: "promo_1", name: "Diskon Akhir Pekan", type: "Persentase", value: "15" },
+    { id: "promo_2", name: "Potongan Langsung", type: "Nominal", value: "20000" },
+];
+
 const grades = [
     { value: "standard", label: "Standar" },
     { value: "premium", label: "Premium" },
@@ -47,8 +57,6 @@ const bottleSizes = [
     { value: 100, label: "Botol 100ml" },
 ]
 
-// Simulasi Resep & Harga
-// [aroma_value]: { [bottle_size]: { essence: ml, solvent: ml, price: Rp } }
 const recipes: Record<string, Record<number, { essence: number; solvent: number; price: number }>> = {
     sandalwood: { 30: { essence: 12, solvent: 18, price: 50000 }, 50: { essence: 20, solvent: 30, price: 80000 }, 100: { essence: 38, solvent: 62, price: 160000 } },
     vanilla: { 30: { essence: 12, solvent: 18, price: 50000 }, 50: { essence: 20, solvent: 30, price: 80000 }, 100: { essence: 38, solvent: 62, price: 160000 } },
@@ -72,16 +80,11 @@ const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
 };
 
-// Komponen Form Isi Ulang
 const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) => {
     const { toast } = useToast();
-    
-    // Form State
     const [selectedGrade, setSelectedGrade] = useState('');
     const [selectedAroma, setSelectedAroma] = useState('');
     const [selectedBottleSize, setSelectedBottleSize] = useState(0);
-
-    // Recipe State
     const [essenceMl, setEssenceMl] = useState(0);
     const [solventMl, setSolventMl] = useState(0);
     const [basePrice, setBasePrice] = useState(0);
@@ -94,13 +97,11 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
         return aromas.filter(a => a.grade === selectedGrade);
     }, [selectedGrade]);
     
-    // Effect untuk me-reset pilihan jika grade berubah
     useEffect(() => {
         setSelectedAroma('');
         setSelectedBottleSize(0);
     }, [selectedGrade]);
 
-    // Effect untuk memuat resep saat aroma dan botol dipilih
     useEffect(() => {
         if (selectedAroma && selectedBottleSize > 0) {
             const recipe = recipes[selectedAroma]?.[selectedBottleSize];
@@ -110,22 +111,15 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
                 setBasePrice(recipe.price);
                 setStandardEssence(recipe.essence);
             } else {
-                // Reset jika tidak ada resep
-                setEssenceMl(0);
-                setSolventMl(0);
-                setBasePrice(0);
-                setStandardEssence(0);
+                setEssenceMl(0); setSolventMl(0); setBasePrice(0); setStandardEssence(0);
             }
         }
     }, [selectedAroma, selectedBottleSize]);
 
-    // Effect untuk mengkalkulasi ulang harga saat komposisi berubah
     useEffect(() => {
         if (selectedBottleSize > 0) {
-            // Pastikan essence tidak melebihi ukuran botol
             const cappedEssence = Math.min(essenceMl, selectedBottleSize);
             setSolventMl(selectedBottleSize - cappedEssence);
-
             const extraMl = Math.max(0, cappedEssence - standardEssence);
             const extraCost = extraMl * EXTRA_ESSENCE_PRICE_PER_ML;
             setExtraEssenceCost(extraCost);
@@ -140,9 +134,7 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
             toast({ variant: "destructive", title: "Error", description: "Harap pilih grade, aroma, dan ukuran botol." });
             return;
         }
-
         const aromaLabel = aromas.find(a => a.value === selectedAroma)?.label || 'Aroma';
-
         const cartItem: CartItem = {
             id: `refill-${Date.now()}`,
             name: `Isi Ulang: ${aromaLabel}`,
@@ -153,12 +145,7 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
         };
         onAddToCart(cartItem);
         toast({ title: "Sukses", description: `${aromaLabel} ditambahkan ke keranjang.` });
-        
-        // Reset form
-        setSelectedGrade('');
-        setSelectedAroma('');
-        setSelectedBottleSize(0);
-        setEssenceMl(0);
+        setSelectedGrade(''); setSelectedAroma(''); setSelectedBottleSize(0); setEssenceMl(0);
     };
 
     return (
@@ -174,45 +161,25 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
                         </SelectContent>
                     </Select>
                 </div>
-
                 {selectedGrade && (<div className="space-y-2">
                     <Label>2. Pilih Aroma</Label>
-                    <Combobox
-                        options={availableAromas}
-                        value={selectedAroma}
-                        onChange={setSelectedAroma}
-                        placeholder="Cari & pilih aroma..."
-                        searchPlaceholder="Ketik untuk mencari..."
-                        notFoundText="Aroma tidak ditemukan."
-                    />
+                    <Combobox options={availableAromas} value={selectedAroma} onChange={setSelectedAroma} placeholder="Cari & pilih aroma..." searchPlaceholder="Ketik untuk mencari..." notFoundText="Aroma tidak ditemukan." />
                 </div>)}
-
                 {selectedAroma && (<div className="space-y-2">
                     <Label>3. Pilih Ukuran Botol</Label>
                     <Select value={selectedBottleSize.toString()} onValueChange={(v) => setSelectedBottleSize(Number(v) || 0)}>
                         <SelectTrigger><SelectValue placeholder="Pilih ukuran botol..." /></SelectTrigger>
-                        <SelectContent>
-                            {bottleSizes.map(b => (<SelectItem key={b.value} value={b.value.toString()}>{b.label}</SelectItem>))}
-                        </SelectContent>
+                        <SelectContent>{bottleSizes.map(b => (<SelectItem key={b.value} value={b.value.toString()}>{b.label}</SelectItem>))}</SelectContent>
                     </Select>
                 </div>)}
-
                 {selectedBottleSize > 0 && basePrice > 0 && (
                 <Card className="bg-muted/50">
-                    <CardHeader className="pb-4">
-                        <CardTitle className="text-base">4. Atur Komposisi</CardTitle>
-                    </CardHeader>
+                    <CardHeader className="pb-4"><CardTitle className="text-base">4. Atur Komposisi</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                            <div className="space-y-2">
                                <Label htmlFor="essence-ml">Bibit (ml)</Label>
-                               <Input 
-                                id="essence-ml" 
-                                type="number" 
-                                value={essenceMl} 
-                                onChange={(e) => setEssenceMl(Math.max(1, Number(e.target.value)))} 
-                                min="1"
-                               />
+                               <Input id="essence-ml" type="number" value={essenceMl} onChange={(e) => setEssenceMl(Math.max(1, Number(e.target.value)))} min="1"/>
                                <p className="text-xs text-muted-foreground">Resep: {standardEssence}ml</p>
                            </div>
                            <div className="space-y-2">
@@ -222,28 +189,16 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
                         </div>
                         <Separator />
                         <div className="space-y-1 text-sm">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Harga Resep Dasar</span>
-                                <span>{formatCurrency(basePrice)}</span>
-                            </div>
-                             <div className="flex justify-between">
-                                <span className="text-muted-foreground">Biaya Tambahan Bibit</span>
-                                <span>{formatCurrency(extraEssenceCost)}</span>
-                            </div>
-                             <div className="flex justify-between text-base font-bold">
-                                <span>Total Harga</span>
-                                <span>{formatCurrency(totalPrice)}</span>
-                            </div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Harga Resep Dasar</span><span>{formatCurrency(basePrice)}</span></div>
+                             <div className="flex justify-between"><span className="text-muted-foreground">Biaya Tambahan Bibit</span><span>{formatCurrency(extraEssenceCost)}</span></div>
+                             <div className="flex justify-between text-base font-bold"><span>Total Harga</span><span>{formatCurrency(totalPrice)}</span></div>
                         </div>
                     </CardContent>
                 </Card>
                 )}
-
             </CardContent>
             <CardFooter>
-                <Button className="w-full" onClick={handleAddToCart} disabled={!totalPrice || totalPrice <= 0}>
-                    <PlusCircle className="mr-2"/> Tambah ke Keranjang
-                </Button>
+                <Button className="w-full" onClick={handleAddToCart} disabled={!totalPrice || totalPrice <= 0}><PlusCircle className="mr-2"/> Tambah ke Keranjang</Button>
             </CardFooter>
         </Card>
     )
@@ -252,6 +207,8 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
 export default function PosPage() {
     const { toast } = useToast();
     const [cart, setCart] = useState<CartItem[]>([]);
+    const [activeCustomer, setActiveCustomer] = useState<{value: string, label: string} | null>(null);
+    const [appliedPromo, setAppliedPromo] = useState<typeof initialPromotions[0] | null>(null);
 
     const addProductToCart = (product: typeof productCatalog[0]) => {
         setCart(prevCart => {
@@ -280,35 +237,45 @@ export default function PosPage() {
     };
 
     const handleSaveOrder = () => {
-        toast({
-            title: "Pesanan Disimpan",
-            description: "Pesanan saat ini telah disimpan untuk dilanjutkan nanti.",
-        });
+        toast({ title: "Pesanan Disimpan", description: "Pesanan saat ini telah disimpan untuk dilanjutkan nanti." });
     };
+
+    const handleClearOrder = () => {
+        setCart([]);
+        setActiveCustomer(null);
+        setAppliedPromo(null);
+        toast({ title: "Pesanan Dibatalkan", description: "Keranjang dan pelanggan telah dibersihkan."});
+    }
 
     const handleCheckout = () => {
         if (cart.length === 0) {
-            toast({
-                variant: "destructive",
-                title: "Keranjang Kosong",
-                description: "Tidak dapat melakukan pembayaran dengan keranjang kosong.",
-            });
+            toast({ variant: "destructive", title: "Keranjang Kosong", description: "Tidak dapat melakukan pembayaran dengan keranjang kosong." });
             return;
         }
-        toast({
-            title: "Pembayaran Berhasil",
-            description: "Pesanan telah dibayar dan transaksi selesai.",
-        });
-        setCart([]); // Clear cart after checkout
+        toast({ title: "Pembayaran Berhasil", description: "Pesanan telah dibayar dan transaksi selesai." });
+        setCart([]);
+        setActiveCustomer(null);
+        setAppliedPromo(null);
     };
 
-    const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const tax = subtotal * 0.11; // PPN 11%
-    const total = subtotal + tax;
+    const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
+
+    const discount = useMemo(() => {
+        if (!appliedPromo || subtotal === 0) return 0;
+        if (appliedPromo.type === 'Persentase') {
+            return subtotal * (parseFloat(appliedPromo.value) / 100);
+        }
+        if (appliedPromo.type === 'Nominal') {
+            return Math.min(subtotal, parseFloat(appliedPromo.value));
+        }
+        return 0;
+    }, [appliedPromo, subtotal]);
+
+    const tax = useMemo(() => (subtotal - discount) * 0.11, [subtotal, discount]);
+    const total = useMemo(() => subtotal - discount + tax, [subtotal, discount, tax]);
 
     return (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 h-[calc(100vh-100px)]">
-            {/* Kolom Produk & Isi Ulang */}
             <div className="lg:col-span-2 flex flex-col gap-4">
                 <Card className="flex-shrink-0">
                    <CardHeader>
@@ -346,15 +313,33 @@ export default function PosPage() {
                 </Tabs>
             </div>
             
-            {/* Kolom Keranjang */}
             <div className="lg:col-span-1 flex flex-col gap-4">
                  <Card className="flex flex-col h-full">
                     <CardHeader>
                         <CardTitle>Pesanan Saat Ini</CardTitle>
-                        <div className="flex gap-2 pt-2">
-                            <Button variant="outline" size="sm" className="w-full"><Search className="mr-2" /> Cari Pelanggan</Button>
-                            <Button variant="outline" size="sm"><UserPlus /></Button>
-                        </div>
+                        {activeCustomer ? (
+                            <div className="pt-2">
+                                <Badge variant="secondary" className="text-base font-medium p-2 w-full justify-between">
+                                    <div className="flex items-center gap-2">
+                                       <User className="h-4 w-4" />
+                                       {activeCustomer.label}
+                                    </div>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setActiveCustomer(null)}><XCircle className="h-4 w-4 text-muted-foreground" /></Button>
+                                </Badge>
+                            </div>
+                        ) : (
+                            <div className="flex gap-2 pt-2">
+                                <Combobox
+                                    options={initialMembers}
+                                    value={activeCustomer?.value || ''}
+                                    onChange={(val) => setActiveCustomer(initialMembers.find(m => m.value === val) || null)}
+                                    placeholder="Cari Pelanggan..."
+                                    searchPlaceholder="Cari nama anggota..."
+                                    notFoundText="Anggota tidak ditemukan."
+                                />
+                                <Button variant="outline" size="icon"><UserPlus /></Button>
+                            </div>
+                        )}
                     </CardHeader>
                     <Separator />
                     <ScrollArea className="flex-grow">
@@ -382,13 +367,9 @@ export default function PosPage() {
                                                 </TableCell>
                                                 <TableCell className="p-2 align-top">
                                                     <div className="flex items-center justify-center gap-1 mt-1">
-                                                         <Button variant="outline" size="icon" className="h-6 w-6" disabled={item.type === 'refill'} onClick={() => updateQuantity(item.id, item.quantity - 1)}>
-                                                            <MinusCircle className="h-4 w-4" />
-                                                         </Button>
+                                                         <Button variant="outline" size="icon" className="h-6 w-6" disabled={item.type === 'refill'} onClick={() => updateQuantity(item.id, item.quantity - 1)}><MinusCircle className="h-4 w-4" /></Button>
                                                          <span className="w-6 text-center">{item.quantity}</span>
-                                                         <Button variant="outline" size="icon" className="h-6 w-6" disabled={item.type === 'refill'} onClick={() => updateQuantity(item.id, item.quantity + 1)}>
-                                                            <PlusCircle className="h-4 w-4" />
-                                                         </Button>
+                                                         <Button variant="outline" size="icon" className="h-6 w-6" disabled={item.type === 'refill'} onClick={() => updateQuantity(item.id, item.quantity + 1)}><PlusCircle className="h-4 w-4" /></Button>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-right p-2 align-top font-medium">{formatCurrency(item.price * item.quantity)}</TableCell>
@@ -399,6 +380,7 @@ export default function PosPage() {
                             ) : (
                                 <div className="p-6 text-center text-muted-foreground">
                                     <p>Keranjang kosong</p>
+                                    <p className="text-xs">Pilih produk atau isi ulang untuk memulai.</p>
                                 </div>
                             )}
                         </CardContent>
@@ -407,23 +389,34 @@ export default function PosPage() {
                         <>
                             <Separator />
                             <CardContent className="p-4 space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                    <span>Subtotal</span>
-                                    <span>{formatCurrency(subtotal)}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Pajak (11%)</span>
-                                    <span>{formatCurrency(tax)}</span>
-                                </div>
+                                <div className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
+                                
+                                {appliedPromo ? (
+                                     <div className="flex justify-between text-destructive">
+                                        <span>Diskon ({appliedPromo.name})</span>
+                                        <span>- {formatCurrency(discount)}</span>
+                                     </div>
+                                ) : (
+                                    <Select onValueChange={(promoId) => setAppliedPromo(initialPromotions.find(p => p.id === promoId) || null)}>
+                                        <SelectTrigger className="h-auto py-1 text-xs">
+                                            <SelectValue placeholder="Gunakan Promosi/Voucher" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {initialPromotions.map(promo => (
+                                                <SelectItem key={promo.id} value={promo.id}>{promo.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                                
+                                <div className="flex justify-between"><span>Pajak (11%)</span><span>{formatCurrency(tax)}</span></div>
                                 <Separator />
-                                <div className="flex justify-between font-bold text-base">
-                                    <span>Total</span>
-                                    <span>{formatCurrency(total)}</span>
-                                </div>
+                                <div className="flex justify-between font-bold text-base"><span>Total</span><span>{formatCurrency(total)}</span></div>
                             </CardContent>
-                            <CardFooter className="grid grid-cols-2 gap-2 p-4">
-                                <Button size="lg" variant="outline" onClick={handleSaveOrder}>Simpan</Button>
-                                <Button size="lg" onClick={handleCheckout}>Bayar</Button>
+                            <CardFooter className="grid grid-cols-3 gap-2 p-4">
+                                <Button size="lg" variant="destructive" className="col-span-1" onClick={handleClearOrder}>Batal</Button>
+                                <Button size="lg" variant="outline" className="col-span-1" onClick={handleSaveOrder}>Simpan</Button>
+                                <Button size="lg" className="col-span-1" onClick={handleCheckout}>Bayar</Button>
                             </CardFooter>
                         </>
                     )}
@@ -433,4 +426,3 @@ export default function PosPage() {
     );
 }
 
-    

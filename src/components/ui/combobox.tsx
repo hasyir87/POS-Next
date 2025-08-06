@@ -39,19 +39,19 @@ export function Combobox({ options, value, onChange, placeholder, searchPlacehol
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between"
+          className="w-full justify-between font-normal"
         >
           {value
             ? options.find((option) => option.value === value)?.label
-            : placeholder || "Select option..."}
+            : placeholder || "Pilih..."}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" style={{width: 'var(--radix-popover-trigger-width)'}}>
         <Command>
-          <CommandInput placeholder={searchPlaceholder || "Search..."} />
+          <CommandInput placeholder={searchPlaceholder || "Cari..."} />
           <CommandList>
-            <CommandEmpty>{notFoundText || "No option found."}</CommandEmpty>
+            <CommandEmpty>{notFoundText || "Tidak ditemukan."}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
@@ -78,5 +78,3 @@ export function Combobox({ options, value, onChange, placeholder, searchPlacehol
     </Popover>
   )
 }
-
-    
