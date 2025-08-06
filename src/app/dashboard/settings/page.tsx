@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tag, User, Languages, Key, Store, MoreHorizontal, PlusCircle, Package, Bell } from "lucide-react";
+import { Tag, User, Languages, Key, Store, MoreHorizontal, PlusCircle, Package, Bell, Star } from "lucide-react";
 import Link from "next/link";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -93,6 +93,11 @@ export default function SettingsPage() {
     
     // In a real app, this would be saved to a database and probably managed via context/global state
     const [lowStockThreshold, setLowStockThreshold] = useState(200);
+    const [loyaltyThreshold, setLoyaltyThreshold] = useState(10);
+    const [loyaltyRewardType, setLoyaltyRewardType] = useState('Discount');
+    const [loyaltyRewardValue, setLoyaltyRewardValue] = useState('50');
+    const [loyaltyFreeProductId, setLoyaltyFreeProductId] = useState('PROD005');
+
 
 
     const handleCreateKey = () => {
@@ -228,6 +233,51 @@ export default function SettingsPage() {
                             <p className="text-sm text-muted-foreground">
                                 Dapatkan notifikasi di dasbor ketika kuantitas bahan berada di bawah angka ini.
                             </p>
+                        </div>
+                    </CardContent>
+                </Card>
+                
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Star className="h-5 w-5" /> Pengaturan Loyalitas Anggota</CardTitle>
+                        <CardDescription>Konfigurasikan program hadiah untuk pelanggan setia Anda.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="loyalty-threshold">Ambang Batas Transaksi</Label>
+                                <Input id="loyalty-threshold" type="number" value={loyaltyThreshold} onChange={e => setLoyaltyThreshold(parseInt(e.target.value) || 0)} />
+                                <p className="text-sm text-muted-foreground">Jumlah transaksi sebelum anggota mendapat hadiah.</p>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="loyalty-reward-type">Jenis Hadiah</Label>
+                                 <Select value={loyaltyRewardType} onValueChange={setLoyaltyRewardType}>
+                                    <SelectTrigger id="loyalty-reward-type"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Discount">Diskon Persentase</SelectItem>
+                                        <SelectItem value="FreeProduct">Produk Gratis</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-sm text-muted-foreground">Pilih jenis hadiah yang akan diberikan.</p>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             {loyaltyRewardType === 'Discount' ? (
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="loyalty-reward-value">Nilai Diskon (%)</Label>
+                                    <Input id="loyalty-reward-value" type="number" value={loyaltyRewardValue} onChange={e => setLoyaltyRewardValue(e.target.value)} />
+                                </div>
+                            ) : (
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="loyalty-free-product">Produk Gratis</Label>
+                                    <Select value={loyaltyFreeProductId} onValueChange={setLoyaltyFreeProductId}>
+                                        <SelectTrigger id="loyalty-free-product"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            {productCatalogForSettings.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, MinusCircle, X, Search, UserPlus, Droplets, SprayCan, Tag, User, XCircle } from "lucide-react";
+import { PlusCircle, MinusCircle, X, Search, UserPlus, Droplets, SprayCan, Tag, User, XCircle, Star } from "lucide-react";
 import Image from "next/image";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // --- SIMULASI DATA ---
 // NOTE: In a real app, this data would be fetched from your database/backend.
@@ -28,9 +29,9 @@ const productCatalog = [
 ];
 
 const initialMembers = [
-    { value: "MEM001", label: "Andi Wijaya" },
-    { value: "MEM002", label: "Bunga Citra" },
-    { value: "MEM003", label: "Charlie Dharmawan" },
+    { value: "MEM001", label: "Andi Wijaya", transactionCount: 25 },
+    { value: "MEM002", label: "Bunga Citra", transactionCount: 9 },
+    { value: "MEM003", label: "Charlie Dharmawan", transactionCount: 4 },
 ];
 
 // Data ini diselaraskan dengan data dari halaman Pengaturan
@@ -40,6 +41,13 @@ const initialPromotions = [
     { id: "promo_3", name: "Beli 1 Gratis 1 Parfum Mini", type: "BOGO", value: "PROD005" }, // Value is now a product ID
 ];
 
+// Data ini diselaraskan dengan data dari halaman Pengaturan
+const loyaltySettings = {
+    threshold: 10, // Beli 10...
+    rewardType: 'Discount', // 'Discount' atau 'FreeProduct'
+    rewardValue: "50", // 50%
+    freeProductId: "PROD005"
+}
 
 const availablePromotions = initialPromotions;
 
@@ -218,8 +226,10 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
 export default function PosPage() {
     const { toast } = useToast();
     const [cart, setCart] = useState<CartItem[]>([]);
-    const [activeCustomer, setActiveCustomer] = useState<{value: string, label: string} | null>(null);
+    const [activeCustomer, setActiveCustomer] = useState<(typeof initialMembers[0]) | null>(null);
     const [appliedPromo, setAppliedPromo] = useState<(typeof initialPromotions[0]) | null>(null);
+    const [showLoyaltyReward, setShowLoyaltyReward] = useState(false);
+
 
     const addProductToCart = (product: typeof productCatalog[0]) => {
         setCart(prevCart => {
@@ -264,6 +274,7 @@ export default function PosPage() {
         setCart([]);
         setActiveCustomer(null);
         setAppliedPromo(null);
+        setShowLoyaltyReward(false);
         toast({ title: "Pesanan Dibatalkan", description: "Keranjang dan pelanggan telah dibersihkan."});
     }
 
@@ -272,10 +283,12 @@ export default function PosPage() {
             toast({ variant: "destructive", title: "Keranjang Kosong", description: "Tidak dapat melakukan pembayaran dengan keranjang kosong." });
             return;
         }
+        // In a real app, here you would update the member's transactionCount
         toast({ title: "Pembayaran Berhasil", description: "Pesanan telah dibayar dan transaksi selesai." });
         setCart([]);
         setActiveCustomer(null);
         setAppliedPromo(null);
+        setShowLoyaltyReward(false);
     };
 
     const handleSetPromo = (promoId: string) => {
@@ -283,22 +296,51 @@ export default function PosPage() {
         setAppliedPromo(promo || null);
     };
 
+    const handleSetCustomer = (customerId: string) => {
+        const customer = initialMembers.find(m => m.value === customerId);
+        setActiveCustomer(customer || null);
+        if (customer && customer.transactionCount >= loyaltySettings.threshold) {
+            setShowLoyaltyReward(true);
+        } else {
+            setShowLoyaltyReward(false);
+        }
+    };
+    
+    const handleApplyLoyaltyReward = () => {
+        const freebie = productCatalog.find(p => p.id === loyaltySettings.freeProductId);
+        if (loyaltySettings.rewardType === 'FreeProduct' && freebie) {
+             const newCartItem: CartItem = {
+                id: `promo-${freebie.id}`,
+                name: `Hadiah: ${freebie.name}`,
+                price: 0,
+                quantity: 1,
+                type: 'product',
+                isPromo: true
+            };
+            setCart(prev => [...prev, newCartItem]);
+        } else { // Discount
+            // This would be more complex in a real app, for now just show a toast
+            toast({title: "Hadiah Diterapkan", description: `Diskon ${loyaltySettings.rewardValue}% telah diterapkan.`});
+        }
+        setShowLoyaltyReward(false); // Hide notification after applying
+        toast({title: "Hadiah Diterapkan", description: "Hadiah loyalitas telah ditambahkan ke pesanan."});
+    }
+
     // Effect to handle BOGO logic
     useEffect(() => {
-        // First, remove any existing promo items to avoid duplicates
-        const newCart = cart.filter(item => !item.isPromo);
+        // First, remove any existing BOGO promo items to avoid duplicates
+        const newCart = cart.filter(item => !item.isPromo || !item.id.startsWith('promo-bogo-'));
 
-        let promoApplied = false;
         if (appliedPromo?.type === 'BOGO') {
             const freeProduct = productCatalog.find(p => p.id === appliedPromo.value);
             // Check if cart has at least one non-promo item
             const hasRegularItem = cart.some(item => !item.isPromo);
 
             if (freeProduct && hasRegularItem) {
-                const promoItemInCart = cart.find(item => item.id === freeProduct.id && item.isPromo);
+                const promoItemInCart = newCart.find(item => item.id === `promo-bogo-${freeProduct.id}`);
                 if (!promoItemInCart) {
                      const newCartItem: CartItem = {
-                        id: freeProduct.id,
+                        id: `promo-bogo-${freeProduct.id}`,
                         name: `GRATIS: ${freeProduct.name}`,
                         price: 0,
                         quantity: 1,
@@ -306,7 +348,6 @@ export default function PosPage() {
                         isPromo: true
                     };
                     newCart.push(newCartItem);
-                    promoApplied = true;
                 }
             }
         }
@@ -381,32 +422,41 @@ export default function PosPage() {
                  <Card className="flex flex-col h-full">
                     <CardHeader>
                         <CardTitle>Pesanan Saat Ini</CardTitle>
-                        {activeCustomer ? (
-                            <div className="pt-2">
-                                <Badge variant="secondary" className="text-base font-medium p-2 w-full justify-between">
-                                    <div className="flex items-center gap-2">
-                                       <User className="h-4 w-4" />
-                                       {activeCustomer.label}
-                                    </div>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setActiveCustomer(null)}><XCircle className="h-4 w-4 text-muted-foreground" /></Button>
-                                </Badge>
-                            </div>
-                        ) : (
-                            <div className="flex gap-2 pt-2">
-                                <Combobox
-                                    options={initialMembers}
-                                    value={activeCustomer?.value || ''}
-                                    onChange={(val) => {
-                                        const member = initialMembers.find(m => m.value === val);
-                                        setActiveCustomer(member || null);
-                                    }}
-                                    placeholder="Cari Pelanggan..."
-                                    searchPlaceholder="Cari nama anggota..."
-                                    notFoundText="Anggota tidak ditemukan."
-                                />
-                                <Button variant="outline" size="icon"><UserPlus /></Button>
-                            </div>
-                        )}
+                        <div className="pt-2 space-y-2">
+                            {activeCustomer ? (
+                                <div>
+                                    <Badge variant="secondary" className="text-base font-medium p-2 w-full justify-between">
+                                        <div className="flex items-center gap-2">
+                                           <User className="h-4 w-4" />
+                                           {activeCustomer.label}
+                                        </div>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleSetCustomer('')}><XCircle className="h-4 w-4 text-muted-foreground" /></Button>
+                                    </Badge>
+                                </div>
+                            ) : (
+                                <div className="flex gap-2">
+                                    <Combobox
+                                        options={initialMembers}
+                                        value={activeCustomer?.value || ''}
+                                        onChange={(val) => handleSetCustomer(val)}
+                                        placeholder="Cari Pelanggan..."
+                                        searchPlaceholder="Cari nama anggota..."
+                                        notFoundText="Anggota tidak ditemukan."
+                                    />
+                                    <Button variant="outline" size="icon"><UserPlus /></Button>
+                                </div>
+                            )}
+                             {showLoyaltyReward && (
+                                <Alert variant="default" className="border-primary bg-primary/10">
+                                    <Star className="h-5 w-5 text-primary" />
+                                    <AlertTitle className="font-bold text-primary">Hadiah Loyalitas!</AlertTitle>
+                                    <AlertDescription className="flex justify-between items-center">
+                                        Pelanggan ini berhak mendapat hadiah.
+                                        <Button size="sm" onClick={handleApplyLoyaltyReward}>Gunakan</Button>
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+                        </div>
                     </CardHeader>
                     <Separator />
                     <ScrollArea className="flex-grow">
