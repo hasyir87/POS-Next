@@ -32,12 +32,14 @@ const initialMembers = [
     { value: "MEM003", label: "Charlie Dharmawan" },
 ];
 
+// Data ini diselaraskan dengan data dari halaman Pengaturan
 const initialPromotions = [
     { id: "promo_1", name: "Diskon Akhir Pekan", type: "Persentase", value: "15" },
     { id: "promo_2", name: "Potongan Langsung", type: "Nominal", value: "20000" },
     { id: "promo_3", name: "Beli 1 Gratis 1 (TIDAK AKTIF)", type: "BOGO", value: "Parfum Mini" },
 ];
 
+// Hanya tampilkan promosi yang didukung oleh logika POS saat ini (Persentase/Nominal)
 const availablePromotions = initialPromotions.filter(
     (promo) => promo.type === "Persentase" || promo.type === "Nominal"
 );
