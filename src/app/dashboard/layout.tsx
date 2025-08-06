@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useContext } from 'react';
+import { useContext, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -46,12 +46,19 @@ export default function DashboardLayout({
   const router = useRouter();
   const { user, logout } = useContext(AuthContext);
 
-  if (!user) {
-    // This can be a loading spinner or a redirect
-    if (typeof window !== 'undefined') {
+  useEffect(() => {
+    // If the user is not available (still loading or logged out), redirect to the login page.
+    // This check runs after the component has mounted, avoiding state updates during render.
+    if (!user) {
       router.push('/');
     }
-    return null; 
+  }, [user, router]);
+
+
+  // While the auth state is loading or redirecting, it's best to show a loader or nothing at all.
+  // Returning null prevents the dashboard from flashing before the redirect happens.
+  if (!user) {
+    return null;
   }
 
   const navItems = allNavItems.filter(item => user && item.requiredRoles.includes(user.role));
