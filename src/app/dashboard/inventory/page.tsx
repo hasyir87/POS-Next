@@ -39,6 +39,8 @@ const initialAvailableMaterials: Material[] = [
   { id: "MAT010", name: "Botol Kaca 100ml", brand: "GlassPack", quantity: 80, unit: "pcs", category: "Kemasan", purchasePrice: 5000 },
 ];
 
+// In a real app, this data would come from a global state or be fetched from the settings.
+// For now, we keep it in sync with the settings page's initial data.
 const initialCategories = [
     { value: "Bibit Parfum", label: "Bibit Parfum" },
     { value: "Pelarut", label: "Pelarut" },

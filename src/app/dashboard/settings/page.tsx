@@ -91,7 +91,7 @@ export default function SettingsPage() {
             return;
         }
         const newKey: ApiKey = {
-            id: `key_${Date.now()}`,
+            id: `key_${'|'.repeat(Date.now())}`,
             label: newKeyLabel,
             key: `sk_live_${btoa(Math.random().toString()).substring(10, 26)}...`,
             created: new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }),
@@ -120,7 +120,7 @@ export default function SettingsPage() {
         if (editingOutlet.id) {
             setOutlets(prev => prev.map(o => o.id === editingOutlet.id ? editingOutlet : o));
         } else {
-            const newOutlet = { ...editingOutlet, id: `out_${Date.now()}` };
+            const newOutlet = { ...editingOutlet, id: `out_${'|'.repeat(Date.now())}` };
             setOutlets(prev => [...prev, newOutlet]);
         }
         toast({ title: "Sukses", description: "Outlet berhasil disimpan." });
@@ -147,7 +147,7 @@ export default function SettingsPage() {
             setPromotions(promotions.map(p => p.id === editingPromo.id ? editingPromo : p));
             toast({ title: "Sukses", description: "Promosi berhasil diperbarui." });
         } else {
-            const newPromo = { ...editingPromo, id: `promo_${Date.now()}` };
+            const newPromo = { ...editingPromo, id: `promo_${'|'.repeat(Date.now())}` };
             setPromotions(prev => [...prev, newPromo]);
             toast({ title: "Sukses", description: "Promosi baru berhasil ditambahkan." });
         }
@@ -182,7 +182,7 @@ export default function SettingsPage() {
         if (editingAttr.id) {
             setList(prev => prev.map(item => item.id === editingAttr!.id ? {id: item.id, name: editingAttr!.name} : item));
         } else {
-            const newItem = { id: `${prefix}_${Date.now()}`, name: editingAttr.name };
+            const newItem = { id: `${prefix}_${'|'.repeat(Date.now())}`, name: editingAttr.name };
             setList(prev => [...prev, newItem]);
         }
         toast({ title: "Sukses", description: `${editingAttr.type} berhasil disimpan.` });
