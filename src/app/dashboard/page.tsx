@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DollarSign, Package, Users, Activity, AlertCircle, ArchiveX } from "lucide-react";
+import { DollarSign, Package, Users, Activity, AlertCircle, ArchiveX, Trophy, Droplets } from "lucide-react";
 import { SalesChart } from "@/components/sales-chart";
 import { useState } from "react";
 import Link from "next/link";
@@ -33,6 +33,23 @@ const recentTransactions = [
   { id: "TRX004", customer: "Emma Brown", amount: "Rp 150.000", item: "Bulk Order", status: "Pending" },
   { id: "TRX005", customer: "Ava Jones", amount: "Rp 60.250", item: "Custom Blend (Citrus)", status: "Paid" },
 ];
+
+const topProducts = [
+    { rank: 1, name: "Ocean Breeze", sales: 124 },
+    { rank: 2, name: "Mystic Woods", sales: 98 },
+    { rank: 3, name: "Citrus Grove", sales: 76 },
+    { rank: 4, name: "Floral Fantasy", sales: 55 },
+    { rank: 5, name: "Parfum Mini", sales: 210 },
+];
+
+const topRefillAromas = [
+    { rank: 1, aroma: "YSL Black Opium", sales: 88 },
+    { rank: 2, aroma: "Baccarat Rouge", sales: 81 },
+    { rank: 3, aroma: "Creed Aventus", sales: 65 },
+    { rank: 4, aroma: "Sandalwood Supreme", sales: 52 },
+    { rank: 5, aroma: "Aqua di Gio", sales: 48 },
+];
+
 
 type Material = {
   id: string;
@@ -165,8 +182,64 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Trophy className="text-yellow-500" /> Produk Jadi Terlaris</CardTitle>
+                    <CardDescription>5 produk jadi dengan penjualan unit terbanyak sepanjang masa.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-[50px]">Peringkat</TableHead>
+                                <TableHead>Nama Produk</TableHead>
+                                <TableHead className="text-right">Total Penjualan</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {topProducts.map(product => (
+                                <TableRow key={product.rank}>
+                                    <TableCell className="font-bold text-center">{product.rank}</TableCell>
+                                    <TableCell>{product.name}</TableCell>
+                                    <TableCell className="text-right">{product.sales.toLocaleString('id-ID')} unit</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Droplets className="text-blue-500" /> Aroma Isi Ulang Terpopuler</CardTitle>
+                    <CardDescription>5 aroma isi ulang yang paling banyak diminati pelanggan.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                     <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-[50px]">Peringkat</TableHead>
+                                <TableHead>Nama Aroma</TableHead>
+                                <TableHead className="text-right">Total Penjualan</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {topRefillAromas.map(aroma => (
+                                <TableRow key={aroma.rank}>
+                                    <TableCell className="font-bold text-center">{aroma.rank}</TableCell>
+                                    <TableCell>{aroma.aroma}</TableCell>
+                                    <TableCell className="text-right">{aroma.sales.toLocaleString('id-ID')} kali</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+        </div>
     </div>
   );
 }
+
+    
 
     
