@@ -114,25 +114,29 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
             const recipe = recipes[selectedAroma]?.[selectedBottleSize];
             if (recipe) {
                 setEssenceMl(recipe.essence);
-                setSolventMl(recipe.solvent);
-                setBasePrice(recipe.price);
                 setStandardEssence(recipe.essence);
-            } else {
-                setEssenceMl(0); setSolventMl(0); setBasePrice(0); setStandardEssence(0);
+                setBasePrice(recipe.price);
             }
+        } else {
+             setEssenceMl(0);
+             setStandardEssence(0);
+             setBasePrice(0);
         }
     }, [selectedAroma, selectedBottleSize]);
 
     useEffect(() => {
-        if (selectedBottleSize > 0) {
-            const cappedEssence = Math.min(essenceMl, selectedBottleSize);
-            setSolventMl(selectedBottleSize - cappedEssence);
+        if (selectedBottleSize > 0 && basePrice > 0) {
+            const cappedEssence = Math.max(0, Math.min(essenceMl, selectedBottleSize));
+            const newSolventMl = selectedBottleSize - cappedEssence;
             const extraMl = Math.max(0, cappedEssence - standardEssence);
             const extraCost = extraMl * EXTRA_ESSENCE_PRICE_PER_ML;
+            setSolventMl(newSolventMl);
             setExtraEssenceCost(extraCost);
             setTotalPrice(basePrice + extraCost);
         } else {
-            setTotalPrice(0)
+            setTotalPrice(0);
+            setExtraEssenceCost(0);
+            setSolventMl(0);
         }
     }, [essenceMl, selectedBottleSize, basePrice, standardEssence]);
 
@@ -174,7 +178,7 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
                 </div>)}
                 {selectedAroma && (<div className="space-y-2">
                     <Label>3. Pilih Ukuran Botol</Label>
-                    <Select value={selectedBottleSize.toString()} onValueChange={(v) => setSelectedBottleSize(Number(v) || 0)}>
+                    <Select value={selectedBottleSize > 0 ? selectedBottleSize.toString() : ""} onValueChange={(v) => setSelectedBottleSize(Number(v) || 0)}>
                         <SelectTrigger><SelectValue placeholder="Pilih ukuran botol..." /></SelectTrigger>
                         <SelectContent>{bottleSizes.map(b => (<SelectItem key={b.value} value={b.value.toString()}>{b.label}</SelectItem>))}</SelectContent>
                     </Select>
@@ -249,6 +253,10 @@ export default function PosPage() {
     };
 
     const handleSaveOrder = () => {
+        if (cart.length === 0) {
+            toast({ variant: "destructive", title: "Keranjang Kosong", description: "Tidak bisa menyimpan pesanan kosong." });
+            return;
+        }
         toast({ title: "Pesanan Disimpan", description: "Pesanan saat ini telah disimpan untuk dilanjutkan nanti." });
     };
 
@@ -277,12 +285,19 @@ export default function PosPage() {
 
     // Effect to handle BOGO logic
     useEffect(() => {
+        // First, remove any existing promo items to avoid duplicates
+        const newCart = cart.filter(item => !item.isPromo);
+
+        let promoApplied = false;
         if (appliedPromo?.type === 'BOGO') {
             const freeProduct = productCatalog.find(p => p.id === appliedPromo.value);
-            if (freeProduct) {
+            // Check if cart has at least one non-promo item
+            const hasRegularItem = cart.some(item => !item.isPromo);
+
+            if (freeProduct && hasRegularItem) {
                 const promoItemInCart = cart.find(item => item.id === freeProduct.id && item.isPromo);
                 if (!promoItemInCart) {
-                    const newCartItem: CartItem = {
+                     const newCartItem: CartItem = {
                         id: freeProduct.id,
                         name: `GRATIS: ${freeProduct.name}`,
                         price: 0,
@@ -290,13 +305,17 @@ export default function PosPage() {
                         type: 'product',
                         isPromo: true
                     };
-                    setCart(prev => [...prev, newCartItem]);
+                    newCart.push(newCartItem);
+                    promoApplied = true;
                 }
             }
-        } else {
-            // Remove any BOGO items if the promo is changed or removed
-            setCart(prev => prev.filter(item => !item.isPromo));
         }
+        
+        // Only update cart if it has changed
+        if (JSON.stringify(cart) !== JSON.stringify(newCart)) {
+           setCart(newCart);
+        }
+
     }, [appliedPromo, cart]);
 
 
@@ -304,6 +323,9 @@ export default function PosPage() {
 
     const discount = useMemo(() => {
         if (!appliedPromo || subtotal === 0) return 0;
+        // Ignore discount calculation if it's a BOGO promo since the value is handled differently
+        if (appliedPromo.type === 'BOGO') return 0;
+
         if (appliedPromo.type === 'Persentase') {
             return subtotal * (parseFloat(appliedPromo.value) / 100);
         }
@@ -436,17 +458,15 @@ export default function PosPage() {
                             <CardContent className="p-4 space-y-2 text-sm">
                                 <div className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
                                 
-                                {appliedPromo && appliedPromo.type !== 'BOGO' ? (
-                                     <div className="flex justify-between items-center text-destructive">
-                                        <span>Diskon ({appliedPromo.name})</span>
-                                        <div className="flex items-center gap-2">
-                                          <span>- {formatCurrency(discount)}</span>
-                                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleSetPromo('')}><XCircle className="h-4 w-4" /></Button>
-                                        </div>
-                                     </div>
-                                ) : (
-                                    <Select onValueChange={handleSetPromo} value={appliedPromo?.id || ''}>
-                                        <SelectTrigger className="h-auto py-1.5 text-xs">
+                                <div className="flex justify-between items-center">
+                                    <Select onValueChange={(promoId) => {
+                                        if (promoId === "") {
+                                            setAppliedPromo(null);
+                                        } else {
+                                            handleSetPromo(promoId);
+                                        }
+                                    }} value={appliedPromo?.id || ''}>
+                                        <SelectTrigger className="h-auto py-1.5 text-xs w-full">
                                             <SelectValue placeholder="Gunakan Promosi/Voucher" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -456,6 +476,18 @@ export default function PosPage() {
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                     {appliedPromo && (
+                                         <Button variant="ghost" size="icon" className="h-7 w-7 ml-2" onClick={() => setAppliedPromo(null)}>
+                                             <XCircle className="h-4 w-4 text-muted-foreground" />
+                                         </Button>
+                                     )}
+                                </div>
+                                
+                                {appliedPromo && appliedPromo.type !== 'BOGO' && (
+                                     <div className="flex justify-between items-center text-destructive">
+                                        <span>Diskon ({appliedPromo.name})</span>
+                                        <span>- {formatCurrency(discount)}</span>
+                                     </div>
                                 )}
                                 
                                 <div className="flex justify-between"><span>Pajak (11%)</span><span>{formatCurrency(tax)}</span></div>
