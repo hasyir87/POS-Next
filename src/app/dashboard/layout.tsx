@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useContext, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -9,14 +9,14 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { BarChart3, Clock, Home, LogOut, Menu, Settings, DollarSign, BookUser, Store, ChevronsUpDown, Users, PackageSearch, SprayCan } from "lucide-react";
 import Link from "next/link";
 import { MPerfumeAmalLogo } from "@/components/m-perfume-amal-logo";
-import { AuthContext, UserRole } from '@/context/auth-context';
+import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 
 type NavItem = {
   href: string;
   label: string;
   icon: React.ElementType;
-  requiredRoles: UserRole[];
+  requiredRoles: Array<"owner" | "admin" | "cashier">;
 };
 
 const allNavItems: NavItem[] = [
@@ -26,17 +26,19 @@ const allNavItems: NavItem[] = [
   { href: "/dashboard/shifts", label: "Shift", icon: Clock, requiredRoles: ["owner", "admin", "cashier"] },
   { href: "/dashboard/inventory", label: "Inventaris", icon: PackageSearch, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/members", label: "Anggota", icon: Users, requiredRoles: ["owner", "admin", "cashier"] },
+  { href: "/dashboard/organizations", label: "Organisasi", icon: Store, requiredRoles: ["owner", "admin"] },
+  { href: "/dashboard/users", label: "Pengguna", icon: Users, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/expenses", label: "Beban", icon: DollarSign, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/accounts", label: "Akun", icon: BookUser, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/reports", label: "Laporan", icon: BarChart3, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/settings", label: "Pengaturan", icon: Settings, requiredRoles: ["owner"] },
 ];
 
-const outlets = [
-  { id: "all", name: "Semua Outlet" },
-  { id: "jkt", name: "M Perfume Amal - Jakarta Pusat" },
-  { id: "bdg", name: "M Perfume Amal - Bandung" },
-];
+type Organization = {
+  id: string;
+  name: string;
+  parent_organization_id: string | null;
+};
 
 export default function DashboardLayout({
   children,
@@ -44,29 +46,56 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { user, logout } = useContext(AuthContext);
+  const { user, profile, loading, logout, selectedOrganizationId, setSelectedOrganizationId } = useAuth();
+
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [isLoadingOrgs, setIsLoadingOrgs] = useState(true);
 
   useEffect(() => {
-    // If the user is not available (still loading or logged out), redirect to the login page.
-    // This check runs after the component has mounted, avoiding state updates during render.
-    if (!user) {
+    if (!loading && !user) {
       router.push('/');
+    } else if (user && profile) {
+      const fetchOrganizations = async () => {
+        setIsLoadingOrgs(true);
+        try {
+          const response = await fetch('/api/organizations');
+          if (!response.ok) throw new Error('Failed to fetch organizations');
+          
+          const data: Organization[] = await response.json();
+          setOrganizations(data);
+          
+          // Set default selected organization if not already set
+          if (!selectedOrganizationId && data.length > 0) {
+            const parentOrg = data.find(org => org.id === profile.organization_id) || data[0];
+            setSelectedOrganizationId(parentOrg.id);
+          }
+
+        } catch (error) {
+          console.error("Error fetching organizations:", error);
+        } finally {
+          setIsLoadingOrgs(false);
+        }
+      };
+      fetchOrganizations();
     }
-  }, [user, router]);
+  }, [user, loading, profile, router, selectedOrganizationId, setSelectedOrganizationId]);
 
-
-  // While the auth state is loading or redirecting, it's best to show a loader or nothing at all.
-  // Returning null prevents the dashboard from flashing before the redirect happens.
-  if (!user) {
-    return null;
+  if (loading || !user || !profile) {
+    return <div>Loading...</div>;
   }
 
-  const navItems = allNavItems.filter(item => user && item.requiredRoles.includes(user.role));
+  const navItems = allNavItems.filter(item => item.requiredRoles.includes(profile.role));
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push('/');
   };
+
+  const handleSelectOrganization = (orgId: string) => {
+    setSelectedOrganizationId(orgId);
+  };
+
+  const selectedOrganization = organizations.find(org => org.id === selectedOrganizationId);
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
@@ -98,21 +127,14 @@ export default function DashboardLayout({
         <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6">
           <Sheet>
             <SheetTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="shrink-0 md:hidden"
-              >
+              <Button variant="outline" size="icon" className="shrink-0 md:hidden">
                 <Menu className="h-5 w-5" />
-                <span className="sr-only">Buka/tutup menu navigasi</span>
+                <span className="sr-only">Toggle navigation menu</span>
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col">
               <nav className="grid gap-2 text-lg font-medium">
-                <Link
-                  href="#"
-                  className="flex items-center gap-2 text-lg font-semibold mb-4"
-                >
+                <Link href="#" className="flex items-center gap-2 text-lg font-semibold mb-4">
                   <MPerfumeAmalLogo className="h-6 w-6 text-primary" />
                   <span className="font-headline text-xl">M Perfume Amal</span>
                 </Link>
@@ -130,21 +152,21 @@ export default function DashboardLayout({
             </SheetContent>
           </Sheet>
           <div className="w-full flex-1">
-            {user.role === 'owner' && (
+            {profile.role === 'owner' && (
               <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                       <Button variant="outline" className="w-full max-w-xs">
                           <Store className="mr-2 h-4 w-4" />
-                          <span className="flex-1 text-left">Semua Outlet</span>
+                          <span className="flex-1 text-left">{isLoadingOrgs ? 'Loading...' : selectedOrganization?.name || 'Select Outlet'}</span>
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-full max-w-xs">
-                      <DropdownMenuLabel>Pilih Outlet</DropdownMenuLabel>
+                      <DropdownMenuLabel>Select Outlet</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      {outlets.map((outlet) => (
-                          <DropdownMenuItem key={outlet.id}>
-                              {outlet.name}
+                      {organizations.map((org) => (
+                          <DropdownMenuItem key={org.id} onSelect={() => handleSelectOrganization(org.id)}>
+                              {org.name}
                           </DropdownMenuItem>
                       ))}
                   </DropdownMenuContent>
@@ -155,21 +177,21 @@ export default function DashboardLayout({
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">
                 <Avatar>
-                  <AvatarImage src="https://placehold.co/40x40" alt="Avatar" data-ai-hint="avatar" />
-                  <AvatarFallback>{user.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                  <AvatarImage src="https://placehold.co/40x40" alt="Avatar" />
+                  <AvatarFallback>{profile.name.substring(0, 2).toUpperCase()}</AvatarFallback>
                 </Avatar>
-                <span className="sr-only">Buka/tutup menu pengguna</span>
+                <span className="sr-only">Toggle user menu</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>{user.name}</DropdownMenuLabel>
+              <DropdownMenuLabel>{profile.name}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Profil</DropdownMenuItem>
-              <DropdownMenuItem>Dukungan</DropdownMenuItem>
+              <DropdownMenuItem>Profile</DropdownMenuItem>
+              <DropdownMenuItem>Support</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
-                <span>Keluar</span>
+                <span>Log out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

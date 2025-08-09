@@ -1,12 +1,14 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/context/auth-context";
+import { supabase } from "@/lib/supabase";
 import { InventoryTool } from "@/components/inventory-tool";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MoreHorizontal, PlusCircle, PackageSearch } from "lucide-react";
@@ -16,6 +18,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
+// This type now reflects the 'raw_materials' table in Supabase
 type Material = {
   id: string;
   name: string;
@@ -24,23 +27,11 @@ type Material = {
   unit: string;
   category: string;
   purchasePrice: number;
+  organization_id: string;
+  created_at: string;
 };
 
-const initialAvailableMaterials: Material[] = [
-  { id: "MAT001", name: "Rose Absolute", brand: "Luxe Fragrance Co.", quantity: 50, unit: "ml", category: "Bibit Parfum", purchasePrice: 1500 },
-  { id: "MAT002", name: "Jasmine Sambac", brand: "Aroma Natural", quantity: 350, unit: "ml", category: "Bibit Parfum", purchasePrice: 1800 },
-  { id: "MAT003", name: "Bergamot Oil", brand: "Aroma Natural", quantity: 1200, unit: "ml", category: "Bibit Parfum", purchasePrice: 800 },
-  { id: "MAT004", name: "Sandalwood", brand: "Luxe Fragrance Co.", quantity: 0, unit: "g", category: "Bibit Parfum", purchasePrice: 2500 },
-  { id: "MAT005", name: "Vanilla Extract", brand: "Aroma Natural", quantity: 800, unit: "ml", category: "Bibit Parfum", purchasePrice: 950 },
-  { id: "MAT006", name: "Ethanol (Perfumer's Alcohol)", brand: "Generic Chemical", quantity: 5000, unit: "ml", category: "Pelarut", purchasePrice: 100 },
-  { id: "MAT007", name: "Iso E Super", brand: "SynthScents", quantity: 180, unit: "ml", category: "Bahan Sintetis", purchasePrice: 400 },
-  { id: "MAT008", name: "Ambroxan", brand: "SynthScents", quantity: 150, unit: "g", category: "Bahan Sintetis", purchasePrice: 3000 },
-  { id: "MAT009", name: "Botol Kaca 50ml", brand: "GlassPack", quantity: 150, unit: "pcs", category: "Kemasan", purchasePrice: 3500 },
-  { id: "MAT010", name: "Botol Kaca 100ml", brand: "GlassPack", quantity: 80, unit: "pcs", category: "Kemasan", purchasePrice: 5000 },
-];
-
-// In a real app, this data would come from a global state or be fetched from the settings.
-// For now, we keep it in sync with the settings page's initial data.
+// These can eventually be fetched from a dedicated 'settings' or 'options' table
 const initialCategories = [
     { value: "Bibit Parfum", label: "Bibit Parfum" },
     { value: "Pelarut", label: "Pelarut" },
@@ -69,9 +60,12 @@ const formatCurrency = (amount: number) => {
 
 export default function InventoryPage() {
   const { toast } = useToast();
-  const [materials, setMaterials] = useState<Material[]>(initialAvailableMaterials);
+  const { selectedOrganizationId, loading: authLoading } = useAuth();
+
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setDialogOpen] = useState(false);
-  const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
+  const [editingMaterial, setEditingMaterial] = useState<Partial<Material> | null>(null);
 
   // In a real app, these would come from the settings page or a global state management solution
   const [categories, setCategories] = useState(initialCategories);
@@ -79,34 +73,100 @@ export default function InventoryPage() {
   const [brands, setBrands] = useState(initialBrands);
   const [lowStockThreshold, setLowStockThreshold] = useState(200);
 
-  const emptyMaterial: Material = { id: "", name: "", brand: "", quantity: 0, unit: "", category: "", purchasePrice: 0 };
+  const emptyMaterial: Partial<Material> = { name: "", brand: "", quantity: 0, unit: "", category: "", purchasePrice: 0 };
 
-  const handleOpenDialog = (material: Material | null = null) => {
+  const fetchMaterials = async () => {
+    if (!selectedOrganizationId) return;
+
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('raw_materials')
+      .select('*')
+      .eq('organization_id', selectedOrganizationId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching materials:", error);
+      toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data inventaris." });
+      setMaterials([]);
+    } else {
+      setMaterials(data as Material[]);
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchMaterials();
+  }, [selectedOrganizationId]);
+
+  const handleOpenDialog = (material: Partial<Material> | null = null) => {
     setEditingMaterial(material ? { ...material } : emptyMaterial);
     setDialogOpen(true);
   };
 
-  const handleSaveMaterial = () => {
+  const handleSaveMaterial = async () => {
     if (!editingMaterial || !editingMaterial.name || !editingMaterial.unit || !editingMaterial.category || !editingMaterial.brand) {
       toast({ variant: "destructive", title: "Error", description: "Nama, brand, unit, dan kategori bahan harus diisi." });
       return;
     }
+    if (!selectedOrganizationId) {
+        toast({ variant: "destructive", title: "Error", description: "Organisasi tidak terpilih." });
+        return;
+    }
 
     if (editingMaterial.id) {
-      setMaterials(prev => prev.map(mat => mat.id === editingMaterial.id ? editingMaterial : mat));
-      toast({ title: "Sukses", description: "Bahan berhasil diperbarui." });
+      // Update existing material
+      const { error } = await supabase
+        .from('raw_materials')
+        .update({
+          name: editingMaterial.name,
+          brand: editingMaterial.brand,
+          quantity: editingMaterial.quantity,
+          unit: editingMaterial.unit,
+          category: editingMaterial.category,
+          purchasePrice: editingMaterial.purchasePrice,
+        })
+        .eq('id', editingMaterial.id);
+
+      if (error) {
+        toast({ variant: "destructive", title: "Error", description: `Gagal memperbarui bahan: ${error.message}` });
+      } else {
+        toast({ title: "Sukses", description: "Bahan berhasil diperbarui." });
+      }
+
     } else {
-      const newMaterial = { ...editingMaterial, id: `MAT${(materials.length + 1).toString().padStart(3, '0')}` };
-      setMaterials(prev => [newMaterial, ...prev]);
-      toast({ title: "Sukses", description: "Bahan baru berhasil ditambahkan." });
+      // Create new material
+      const { error } = await supabase
+        .from('raw_materials')
+        .insert([{
+          ...editingMaterial,
+          organization_id: selectedOrganizationId,
+        }]);
+
+      if (error) {
+        toast({ variant: "destructive", title: "Error", description: `Gagal menambahkan bahan: ${error.message}` });
+      } else {
+        toast({ title: "Sukses", description: "Bahan baru berhasil ditambahkan." });
+      }
     }
+    
     setDialogOpen(false);
     setEditingMaterial(null);
+    fetchMaterials(); // Refetch data after saving
   };
 
-  const handleDeleteMaterial = (id: string) => {
-    setMaterials(prev => prev.filter(mat => mat.id !== id));
-    toast({ title: "Sukses", description: "Bahan berhasil dihapus." });
+  const handleDeleteMaterial = async (id: string) => {
+    const { error } = await supabase
+        .from('raw_materials')
+        .delete()
+        .eq('id', id);
+
+    if (error) {
+         toast({ variant: "destructive", title: "Error", description: `Gagal menghapus bahan: ${error.message}` });
+    } else {
+        toast({ title: "Sukses", description: "Bahan berhasil dihapus." });
+        fetchMaterials(); // Refetch data after deleting
+    }
   };
   
   const groupedMaterials = materials.reduce((acc, material) => {
@@ -118,6 +178,9 @@ export default function InventoryPage() {
     return acc;
   }, {} as Record<string, Material[]>);
 
+  if (authLoading || isLoading) {
+    return <div className="p-6">Loading inventory...</div>
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -141,6 +204,7 @@ export default function InventoryPage() {
                             <DialogTitle className="font-headline">{editingMaterial?.id ? 'Ubah Bahan' : 'Tambah Bahan Baru'}</DialogTitle>
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
+                            {/* Form fields remain mostly the same */}
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="name" className="text-right">Nama</Label>
                                 <Input id="name" className="col-span-3" value={editingMaterial?.name || ''} onChange={(e) => setEditingMaterial(prev => prev ? {...prev, name: e.target.value} : null)} />
@@ -195,7 +259,7 @@ export default function InventoryPage() {
                 </CardHeader>
                 <CardContent>
                   <Accordion type="multiple" className="w-full" defaultValue={Object.keys(groupedMaterials)}>
-                    {Object.entries(groupedMaterials).map(([category, items]) => (
+                    {Object.keys(groupedMaterials).length > 0 ? Object.entries(groupedMaterials).map(([category, items]) => (
                       <AccordionItem value={category} key={category}>
                         <AccordionTrigger className="text-base font-medium">{category}</AccordionTrigger>
                         <AccordionContent>
@@ -251,7 +315,7 @@ export default function InventoryPage() {
                           </Table>
                         </AccordionContent>
                       </AccordionItem>
-                    ))}
+                    )) : <p className="text-center text-gray-500 py-4">Tidak ada data inventaris untuk outlet ini.</p>}
                   </Accordion>
                 </CardContent>
             </Card>
@@ -263,5 +327,3 @@ export default function InventoryPage() {
     </div>
   );
 }
-
-    

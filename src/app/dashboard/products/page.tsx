@@ -1,11 +1,13 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/context/auth-context";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PlusCircle, MoreHorizontal, SprayCan } from "lucide-react";
@@ -13,63 +15,124 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
 
+// This type now reflects the 'products' table in Supabase
 type Product = {
     id: string;
     name: string;
-    cogs: number; // Cost of Goods Sold / Harga Pokok Penjualan (HPP)
+    cogs: number; // Cost of Goods Sold
     price: number;
     stock: number;
-    image: string;
-    "data-ai-hint": string;
+    image_url: string;
+    organization_id: string;
+    created_at: string;
 };
-
-const initialProductCatalog: Product[] = [
-  { id: "PROD001", name: "Ocean Breeze", cogs: 32000, price: 79990, image: "https://placehold.co/150x150.png", stock: 15, "data-ai-hint": "perfume bottle" },
-  { id: "PROD002", name: "Mystic Woods", cogs: 35000, price: 85000, image: "https://placehold.co/150x150.png", stock: 10, "data-ai-hint": "perfume bottle" },
-  { id: "PROD003", name: "Citrus Grove", cogs: 30000, price: 75500, image: "https://placehold.co/150x150.png", stock: 20, "data-ai-hint": "perfume bottle" },
-  { id: "PROD004", name: "Floral Fantasy", cogs: 40000, price: 92000, image: "https://placehold.co/150x150.png", stock: 8, "data-ai-hint": "perfume bottle" },
-];
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
 };
 
-
 export default function ProductsPage() {
     const { toast } = useToast();
-    const [products, setProducts] = useState<Product[]>(initialProductCatalog);
+    const { selectedOrganizationId, loading: authLoading } = useAuth();
+    
+    const [products, setProducts] = useState<Product[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [isDialogOpen, setDialogOpen] = useState(false);
-    const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+    const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
 
-    const emptyProduct: Product = { id: "", name: "", price: 0, cogs: 0, stock: 0, image: "https://placehold.co/150x150.png", "data-ai-hint": "perfume bottle" };
+    const emptyProduct: Partial<Product> = { name: "", price: 0, cogs: 0, stock: 0, image_url: "https://placehold.co/150x150.png" };
+    
+    const fetchProducts = async () => {
+        if (!selectedOrganizationId) return;
 
-    const handleOpenDialog = (product: Product | null = null) => {
+        setIsLoading(true);
+        const { data, error } = await supabase
+            .from('products')
+            .select('*')
+            .eq('organization_id', selectedOrganizationId)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error("Error fetching products:", error);
+            toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data produk." });
+            setProducts([]);
+        } else {
+            setProducts(data as Product[]);
+        }
+        setIsLoading(false);
+    };
+
+    useEffect(() => {
+        fetchProducts();
+    }, [selectedOrganizationId]);
+
+    const handleOpenDialog = (product: Partial<Product> | null = null) => {
         setEditingProduct(product ? { ...product } : emptyProduct);
         setDialogOpen(true);
     };
 
-    const handleSaveProduct = () => {
+    const handleSaveProduct = async () => {
         if (!editingProduct || !editingProduct.name || !editingProduct.price) {
             toast({ variant: "destructive", title: "Error", description: "Nama dan harga produk harus diisi." });
             return;
         }
+        if (!selectedOrganizationId) {
+            toast({ variant: "destructive", title: "Error", description: "Organisasi tidak terpilih." });
+            return;
+        }
+
+        const productData = {
+            name: editingProduct.name,
+            cogs: editingProduct.cogs || 0,
+            price: editingProduct.price,
+            stock: editingProduct.stock || 0,
+            image_url: editingProduct.image_url,
+            organization_id: selectedOrganizationId,
+        };
+
+        let error;
 
         if (editingProduct.id) {
-            setProducts(prev => prev.map(p => p.id === editingProduct.id ? editingProduct : p));
-            toast({ title: "Sukses", description: "Produk berhasil diperbarui." });
+            // Update existing product
+            ({ error } = await supabase
+                .from('products')
+                .update(productData)
+                .eq('id', editingProduct.id));
         } else {
-            const newProduct = { ...editingProduct, id: `PROD${(products.length + 1).toString().padStart(3, '0')}` };
-            setProducts(prev => [newProduct, ...prev]);
-            toast({ title: "Sukses", description: "Produk baru berhasil ditambahkan." });
+            // Create new product
+            ({ error } = await supabase
+                .from('products')
+                .insert([productData]));
         }
+
+        if (error) {
+            toast({ variant: "destructive", title: "Error", description: `Gagal menyimpan produk: ${error.message}` });
+        } else {
+            toast({ title: "Sukses", description: `Produk berhasil ${editingProduct.id ? 'diperbarui' : 'ditambahkan'}.` });
+        }
+        
         setDialogOpen(false);
         setEditingProduct(null);
+        fetchProducts(); // Refetch data
     };
     
-    const handleDeleteProduct = (id: string) => {
-        setProducts(prev => prev.filter(p => p.id !== id));
-        toast({ title: "Sukses", description: "Produk berhasil dihapus." });
+    const handleDeleteProduct = async (id: string) => {
+        const { error } = await supabase
+            .from('products')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            toast({ variant: "destructive", title: "Error", description: `Gagal menghapus produk: ${error.message}` });
+        } else {
+            toast({ title: "Sukses", description: "Produk berhasil dihapus." });
+            fetchProducts(); // Refetch data
+        }
     };
+
+    if (authLoading || isLoading) {
+        return <div className="p-6">Loading products...</div>
+    }
 
     return (
         <div className="flex flex-col gap-6">
@@ -113,7 +176,7 @@ export default function ProductsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Daftar Produk Jadi</CardTitle>
-                    <CardDescription>Kelola produk parfum yang siap dijual. Harga untuk layanan isi ulang diatur di halaman POS.</CardDescription>
+                    <CardDescription>Kelola produk parfum yang siap dijual.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -128,10 +191,10 @@ export default function ProductsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {products.map((product) => (
+                            {products.length > 0 ? products.map((product) => (
                                 <TableRow key={product.id}>
                                     <TableCell>
-                                        <Image src={product.image} alt={product.name} width={50} height={50} className="rounded-md aspect-square object-cover" data-ai-hint={product['data-ai-hint']} />
+                                        <Image src={product.image_url || "https://placehold.co/50x50.png"} alt={product.name} width={50} height={50} className="rounded-md aspect-square object-cover" />
                                     </TableCell>
                                     <TableCell>
                                         <div className="font-medium">{product.name}</div>
@@ -155,7 +218,11 @@ export default function ProductsPage() {
                                         </DropdownMenu>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )) : (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="text-center">Tidak ada produk untuk outlet ini.</TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
                 </CardContent>
@@ -163,5 +230,3 @@ export default function ProductsPage() {
         </div>
     );
 }
-
-    
