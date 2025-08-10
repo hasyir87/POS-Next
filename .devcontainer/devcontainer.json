@@ -1,0 +1,14 @@
+{
+  "name": "AI Codespaces with Continue",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "features": {},
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "Continue.continue"
+      ],
+      "settings": {}
+    }
+  },
+  "postCreateCommand": "mkdir -p ~/.continue && cat << 'EOF' > ~/.continue/config.json\n{\n  \"models\": [\n    {\n      \"title\": \"GPT-4o\",\n      \"provider\": \"openai\",\n      \"model\": \"gpt-4o\",\n      \"apiKey\": \"${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}\"\n    },\n    {\n      \"title\": \"Claude 3.5 Sonnet\",\n      \"provider\": \"anthropic\",\n      \"model\": \"claude-3.5-sonnet\",\n      \"apiKey\": \"${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}\"\n    },\n    {\n      \"title\": \"DeepSeek Coder\",\n      \"provider\": \"openai\",\n      \"model\": \"deepseek-coder\",\n      \"apiBase\": \"https://api.deepseek.com\",\n      \"apiKey\": \"${sk-ea7a6de8e13f4b95963566d44fd0faf8}\"\n    }\n  ]\n}\nEOF"
+}
