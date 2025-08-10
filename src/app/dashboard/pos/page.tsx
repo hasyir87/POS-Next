@@ -247,7 +247,6 @@ export default function PosPage() {
                 supabase.from('promos').select('id, name, type, value, get_product_id').eq('organization_id', selectedOrganizationId).eq('is_active', true)
             ]);
             
-            // Handle Products
             if (productsResult.error) {
                 toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data produk." });
                 setProductCatalog([]);
@@ -255,7 +254,6 @@ export default function PosPage() {
                 setProductCatalog(productsResult.data as Product[]);
             }
 
-            // Handle Customers
             if (customersResult.error) {
                 toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data pelanggan." });
                 setMembers([]);
@@ -263,7 +261,6 @@ export default function PosPage() {
                 setMembers(customersResult.data as Customer[]);
             }
 
-            // Handle Promotions
             if (promotionsResult.error) {
                 toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data promosi." });
                 setPromotions([]);
@@ -320,6 +317,17 @@ export default function PosPage() {
         }
     }, [appliedPromo, cart, productCatalog]);
 
+    const addProductToCart = (product: Product) => { /* ... */ };
+    const addRefillToCart = (item: CartItem) => { /* ... */ };
+    const updateQuantity = (itemId: string, newQuantity: number) => { /* ... */ };
+    const handleSaveOrder = () => { /* ... */ };
+    const handleClearOrder = () => { /* ... */ };
+    const handleCheckout = () => { /* ... */ };
+    const handleApplyLoyaltyReward = () => { /* ... */ };
+
+    // --- PERHITUNGAN TOTAL (URUTAN DIPERBAIKI) ---
+    const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
+
     const discount = useMemo(() => {
         if (!appliedPromo || subtotal === 0 || appliedPromo.type === 'BOGO') return 0;
         if (appliedPromo.type === 'Persentase') {
@@ -331,16 +339,9 @@ export default function PosPage() {
         return 0;
     }, [appliedPromo, subtotal]);
 
-    const addProductToCart = (product: Product) => { /* ... */ };
-    const addRefillToCart = (item: CartItem) => { /* ... */ };
-    const updateQuantity = (itemId: string, newQuantity: number) => { /* ... */ };
-    const handleSaveOrder = () => { /* ... */ };
-    const handleClearOrder = () => { /* ... */ };
-    const handleCheckout = () => { /* ... */ };
-    const handleApplyLoyaltyReward = () => { /* ... */ };
-    const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
     const tax = useMemo(() => (subtotal - discount) * 0.11, [subtotal, discount]);
     const total = useMemo(() => subtotal - discount + tax, [subtotal, discount, tax]);
+
 
     if (authLoading || isLoadingData) {
         return <div className="p-6">Loading POS...</div>;
@@ -359,7 +360,7 @@ export default function PosPage() {
                         <>
                             {/* ... */}
                             <CardContent className="p-4 space-y-2 text-sm">
-                                {/* ... subtotal ... */}
+                                <div className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
                                 <div className="flex justify-between items-center">
                                     <Select onValueChange={(promoId) => promoId === "" ? setAppliedPromo(null) : handleSetPromo(promoId)} value={appliedPromo?.id || ''}>
                                         <SelectTrigger className="h-auto py-1.5 text-xs w-full">
@@ -385,7 +386,9 @@ export default function PosPage() {
                                         <span>- {formatCurrency(discount)}</span>
                                      </div>
                                 )}
-                                {/* ... tax and total ... */}
+                                <div className="flex justify-between"><span>Pajak (11%)</span><span>{formatCurrency(tax)}</span></div>
+                                <Separator />
+                                <div className="flex justify-between font-bold text-base"><span>Total</span><span>{formatCurrency(total)}</span></div>
                             </CardContent>
                             <CardFooter className="grid grid-cols-3 gap-2 p-4">
                                 <Button size="lg" variant="destructive" className="col-span-1" onClick={handleClearOrder}>Batal</Button>
