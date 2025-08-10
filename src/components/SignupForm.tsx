@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -6,6 +7,7 @@ import { useRouter } from 'next/navigation';
 export default function SignupForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [organizationName, setOrganizationName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -14,9 +16,16 @@ export default function SignupForm() {
 
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
     setSuccess(null);
+
+    // --- Validasi Verifikasi Password ---
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const response = await fetch('/api/auth/signup-owner', {
@@ -30,17 +39,19 @@ export default function SignupForm() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'An unexpected error occurred.');
-        console.error('Signup failed:', data.error);
-      } else {
-        setSuccess(data.message || 'Signup successful! You can now log in.');
-        setEmail('');
-        setPassword('');
-        setOrganizationName('');
-        console.log('Signup successful:', data);
-        // Optional: Redirect to login page after successful signup
-        // router.push('/login');
+        throw new Error(data.error || 'An unexpected error occurred.');
       }
+      
+      setSuccess(data.message || 'Signup successful! You can now log in.');
+      setEmail('');
+      setPassword('');
+      setConfirmPassword('');
+      setOrganizationName('');
+      // Arahkan pengguna ke halaman login setelah 2 detik
+      setTimeout(() => {
+        router.push('/'); // Asumsikan halaman login ada di root
+      }, 2000);
+
     } catch (err: any) {
       setError(err.message || 'An error occurred during signup.');
       console.error('Signup fetch error:', err);
@@ -54,6 +65,19 @@ export default function SignupForm() {
       <div className="p-8 bg-white rounded shadow-md w-96">
         <h2 className="text-2xl font-bold text-center mb-6">Owner Signup</h2>
         <form onSubmit={handleSignup}>
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="organizationName">
+              Organization Name
+            </label>
+            <input
+              type="text"
+              id="organizationName"
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              value={organizationName}
+              onChange={(e) => setOrganizationName(e.target.value)}
+              required
+            />
+          </div>
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">
               Email
@@ -74,34 +98,36 @@ export default function SignupForm() {
             <input
               type="password"
               id="password"
-              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
           </div>
            <div className="mb-6">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="organizationName">
-              Organization Name
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="confirmPassword">
+              Confirm Password
             </label>
             <input
-              type="text"
-              id="organizationName"
-              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-              value={organizationName}
-              onChange={(e) => setOrganizationName(e.target.value)}
+              type="password"
+              id="confirmPassword"
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               required
             />
           </div>
+          
           {error && <p className="text-red-500 text-xs italic mb-4">{error}</p>}
           {success && <p className="text-green-500 text-xs italic mb-4">{success}</p>}
+          
           <div className="flex items-center justify-center">
             <button
               type="submit"
               className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
               disabled={loading}
             >
-              {loading ? 'Loading...' : 'Sign Up as Owner'}
+              {loading ? 'Registering...' : 'Sign Up as Owner'}
             </button>
           </div>
         </form>
