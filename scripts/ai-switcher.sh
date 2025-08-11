@@ -1,16 +1,18 @@
 #!/bin/bash
 MODEL="$1"
+CONFIG="$HOME/.tabnine/tabnine_config.json"
+
 case $MODEL in
   gpt)
-    sed -i 's/"default_model".*/"default_model": { "provider": "openai", "model": "gpt-4o" },/' ~/.tabnine/tabnine_config.json
+    jq '.default_model = { "provider": "openai", "model": "gpt-4o" }' "$CONFIG" > tmp.$$.json && mv tmp.$$.json "$CONFIG"
     echo "✅ Switched to GPT-4o"
     ;;
   claude)
-    sed -i 's/"default_model".*/"default_model": { "provider": "anthropic", "model": "claude-3.5-sonnet" },/' ~/.tabnine/tabnine_config.json
+    jq '.default_model = { "provider": "anthropic", "model": "claude-3.5-sonnet" }' "$CONFIG" > tmp.$$.json && mv tmp.$$.json "$CONFIG"
     echo "✅ Switched to Claude 3.5 Sonnet"
     ;;
   deepseek)
-    sed -i 's/"default_model".*/"default_model": { "provider": "deepseek", "model": "deepseek-coder" },/' ~/.tabnine/tabnine_config.json
+    jq '.default_model = { "provider": "deepseek", "model": "deepseek-coder", "api_base": "https://api.deepseek.com/v1" }' "$CONFIG" > tmp.$$.json && mv tmp.$$.json "$CONFIG"
     echo "✅ Switched to DeepSeek Coder"
     ;;
   *)

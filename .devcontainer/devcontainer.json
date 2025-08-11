@@ -10,5 +10,5 @@
       ]
     }
   },
-  "postCreateCommand": "mkdir -p ~/.continue && cat << 'EOCFG' > ~/.continue/config.json\n{\n  \"models\": [\n    {\n      \"title\": \"GPT-4o\",\n      \"provider\": \"openai\",\n      \"model\": \"gpt-4o\",\n      \"apiKey\": \"${OPENAI_API_KEY}\"\n    },\n    {\n      \"title\": \"Claude 3.5 Sonnet\",\n      \"provider\": \"anthropic\",\n      \"model\": \"claude-3.5-sonnet\",\n      \"apiKey\": \"${ANTHROPIC_API_KEY}\"\n    },\n    {\n      \"title\": \"DeepSeek Coder\",\n      \"provider\": \"openai\",\n      \"model\": \"deepseek-coder\",\n      \"apiBase\": \"https://api.deepseek.com/v1\",\n      \"apiKey\": \"${DEEPSEEK_API_KEY}\"\n    }\n  ]\n}\nEOCFG\nmkdir -p ~/.tabnine && cat << 'EOTB' > ~/.tabnine/tabnine_config.json\n{\n  \"version\": \"4.0.0\",\n  \"api_keys\": {\n    \"openai\": \"${OPENAI_API_KEY}\",\n    \"anthropic\": \"${ANTHROPIC_API_KEY}\",\n    \"deepseek\": \"${DEEPSEEK_API_KEY}\"\n  },\n  \"default_model\": {\n    \"provider\": \"deepseek\",\n    \"api_base\": \"https://api.deepseek.com/v1\",\n    \"model\": \"deepseek-coder\"\n  }\n}\nEOTB"
+  "postCreateCommand": "bash /workspaces/codespaces-ai/scripts/post-setup.sh"
 }
