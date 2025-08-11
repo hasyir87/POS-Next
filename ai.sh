@@ -113,4 +113,4 @@ git commit -m "Initial AI Codespaces setup"
 gh repo create $PROJECT_NAME --public --source=. --remote=origin --push
 
 # ====== BUAT CODESPACE (PAKAI --wait) ======
-gh codespace create --repo $GITHUB_USER/$PROJECT_NAME --machine standardLinux --wait
+gh codespace create --repo $GITHUB_USER/$PROJECT_NAME --machine standardLinux --web
