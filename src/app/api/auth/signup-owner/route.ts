@@ -9,13 +9,13 @@ export async function POST(req: NextRequest) {
   const { email, password, organization_name } = await req.json();
   // cookies harus berupa fungsi, bukan hasil pemanggilan langsung
   // Inisialisasi Supabase admin client dengan service role key
-  if (!process.env.SERVICE_ROLE_KEY_SUPABASE || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
-      console.error("SERVICE_ROLE_KEY_SUPABASE atau NEXT_PUBLIC_SUPABASE_URL belum diset.");
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      console.error("SUPABASE_SERVICE_ROLE_KEY atau NEXT_PUBLIC_SUPABASE_URL belum diset.");
       return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
   }
   const serviceRoleSupabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SERVICE_ROLE_KEY_SUPABASE
+    process.env.SUPABASE_SERVICE_ROLE_KEY
   );
 
 
@@ -66,7 +66,8 @@ export async function POST(req: NextRequest) {
     .insert([
       {
         id: userId,
-        name: 'Pemilik ' + organization_name,
+        full_name: 'Pemilik ' + organization_name,
+        email: email,
         role: 'owner',
         organization_id: organizationId
       }

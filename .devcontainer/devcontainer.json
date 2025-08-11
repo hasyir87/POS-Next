@@ -9,7 +9,8 @@
     "vscode": {
       "extensions": [
         "Continue.continue",
-        "TabNine.tabnine-vscode"
+        "TabNine.tabnine-vscode",
+        "Supabase.vscode-supabase-extension"
       ]
     }
   },
