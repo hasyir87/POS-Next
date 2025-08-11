@@ -5,8 +5,7 @@ import { NextResponse } from 'next/server';
 
 // API Route untuk mendapatkan daftar organisasi (termasuk Outlet)
 export async function GET(req: Request) {
-  const cookieStore = cookies();
-  const supabase = createRouteHandlerClient({ cookies: cookieStore });
+  const supabase = createRouteHandlerClient({ cookies });
 
   // Dapatkan ID organisasi pengguna yang sedang request
   const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -82,8 +81,7 @@ export async function GET(req: Request) {
 // API Route untuk membuat organisasi baru (Outlet)
 export async function POST(req: Request) {
   const { name, parent_organization_id } = await req.json(); //parent_organization_id harus dikirim dari frontend (ID organisasi induk)
-  const cookieStore = cookies();
-  const supabase = createRouteHandlerClient({ cookies: cookieStore });
+  const supabase = createRouteHandlerClient({ cookies });
 
    // Dapatkan ID organisasi pengguna yang sedang request
   const { data: { user }, error: userError } = await supabase.auth.getUser();

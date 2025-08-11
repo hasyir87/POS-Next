@@ -1,0 +1,14 @@
+{
+  "name": "AI Codespaces Turbo",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "customizations": {
+    "codespaces": { "editorVersion": "next" },
+    "vscode": {
+      "extensions": [
+        "Continue.continue",
+        "TabNine.tabnine-vscode"
+      ]
+    }
+  },
+  "postCreateCommand": "bash /workspaces/codespaces-ai/scripts/post-setup.sh"
+}
