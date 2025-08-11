@@ -1,5 +1,7 @@
 
-"use client"
+
+"use client";
+import React from "react";
 
 import { useContext } from "react";
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -26,7 +28,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { MPerfumeAmalLogo } from "./m-perfume-amal-logo"
-import { AuthContext } from "@/context/auth-context";
+import { useAuth } from "@/context/auth-context";
 
 const formSchema = z.object({
   email: z.string().email({
@@ -42,7 +44,7 @@ const formSchema = z.object({
 
 export function LoginForm() {
   const router = useRouter();
-  const { login } = useContext(AuthContext);
+  const { login } = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -52,12 +54,22 @@ export function LoginForm() {
     },
   })
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    // In a real app, you would handle real authentication here.
-    // For this example, we'll just log the user in with the selected role.
-    const userName = values.email.split('@')[0];
-    login({ name: userName, role: values.role });
-    router.push("/dashboard");
+  const [loginError, setLoginError] = React.useState<string | null>(null);
+
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    setLoginError(null);
+    try {
+      await login({ email: values.email, password: values.password });
+      router.push("/dashboard");
+    } catch (error: any) {
+      let msg = error?.message || "Login gagal";
+      if (msg.toLowerCase().includes("invalid login credentials")) {
+        msg = "Email atau password salah.";
+      } else if (msg.toLowerCase().includes("user not found")) {
+        msg = "Akun tidak ditemukan.";
+      }
+      setLoginError(msg);
+    }
   }
 
   return (
@@ -118,6 +130,9 @@ export function LoginForm() {
               )}
             />
             <Button type="submit" className="w-full">Masuk</Button>
+            {loginError && (
+              <div className="text-red-500 text-sm mt-2 text-center">{loginError}</div>
+            )}
           </form>
         </Form>
       </CardContent>

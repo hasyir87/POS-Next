@@ -1,15 +1,21 @@
+
 "use client";
 
 import React, { createContext, useState, useEffect, ReactNode, useContext } from 'react';
 import { supabase } from '../lib/supabase';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 
-// Definisikan tipe untuk data profil tambahan kita
+// Tipe untuk peran pengguna, sesuai dengan tipe 'user_role' di Supabase
+export type UserRole = "owner" | "admin" | "cashier";
+
+// Perbarui interface UserProfile agar sesuai dengan skema tabel 'profiles' yang baru
 export interface UserProfile {
   id: string;
-  name: string;
-  role: "owner" | "admin" | "cashier";
-  organization_id: string;
+  full_name: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  role: UserRole;
+  organization_id: string | null;
 }
 
 // Definisikan tipe untuk AuthContext
@@ -34,42 +40,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     setLoading(true);
-    // Ambil sesi pengguna saat pertama kali dimuat
     const getInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user);
+      const sessionUser = session?.user ?? null;
+      setUser(sessionUser);
+      if (sessionUser) {
+        await fetchProfile(sessionUser);
       }
       setLoading(false);
     };
 
     getInitialSession();
 
-    // Berlangganan perubahan state otentikasi
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user);
+      const sessionUser = session?.user ?? null;
+      setUser(sessionUser);
+      if (sessionUser) {
+        await fetchProfile(sessionUser);
       } else {
-        setProfile(null); // Kosongkan profil jika logout
-        setSelectedOrganizationId(null); // Kosongkan organisasi jika logout
+        setProfile(null);
+        setSelectedOrganizationId(null);
       }
       setLoading(false);
     });
 
-    // Cleanup subscription saat komponen unmount
     return () => {
       subscription?.unsubscribe();
     };
   }, []);
 
-  // Fungsi untuk mengambil data profil pengguna dari tabel 'profiles'
   const fetchProfile = async (supabaseUser: SupabaseUser) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, full_name, email, avatar_url, role, organization_id')
         .eq('id', supabaseUser.id)
         .single();
 
@@ -77,9 +81,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error("Error fetching profile:", error);
         setProfile(null);
       } else if (data) {
-        setProfile(data as UserProfile);
+        const userProfile = data as UserProfile;
+        setProfile(userProfile);
         // Atur organisasi terpilih default ke organisasi pengguna saat profil dimuat
-        setSelectedOrganizationId(data.organization_id);
+        // Ini penting untuk pengguna yang bukan 'owner'
+        if (userProfile.organization_id) {
+          setSelectedOrganizationId(userProfile.organization_id);
+        }
       }
     } catch (e) {
       console.error("An unexpected error occurred while fetching profile:", e);
@@ -87,7 +95,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   
-  // Fungsi logout
   const logout = async () => {
     await supabase.auth.signOut();
   };

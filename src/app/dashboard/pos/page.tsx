@@ -1,26 +1,29 @@
+// Utility untuk format mata uang
+export const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
+};
 
-"use client";
-
-import { useState, useEffect, useMemo } from "react";
-import { useAuth } from "@/context/auth-context";
-import { supabase } from "@/lib/supabase";
-import { Button } from "@/components/ui/button";
+// Loyalty settings (sementara, bisa diganti dinamis)
+const loyaltySettings = {
+    threshold: 10,
+    rewardType: 'FreeProduct',
+    rewardValue: "50",
+    freeProductId: "PROD005"
+};
+// Import semua komponen UI dan hooks yang diperlukan
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, MinusCircle, X, Search, UserPlus, Droplets, SprayCan, Tag, User, XCircle, Star } from "lucide-react";
-import Image from "next/image";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
 import { Combobox } from "@/components/ui/combobox";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-
-// Define Data Types based on Supabase tables
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { PlusCircle, XCircle } from "lucide-react";
+import { useAuth } from "@/context/auth-context";
+import { supabase } from "@/lib/supabase";
+const EXTRA_ESSENCE_PRICE_PER_ML = 3500;
+// Deklarasi tipe agar dikenali TypeScript
 type Product = {
     id: string;
     name: string;
@@ -39,62 +42,33 @@ type Promotion = {
     id: string;
     name: string;
     type: 'Persentase' | 'Nominal' | 'BOGO';
-    value: number; // For Persentase and Nominal
-    get_product_id: string | null; // For BOGO
+    value: number;
+    get_product_id: string | null;
 };
-
-// --- SIMULASI DATA (Sebagian akan diganti dengan data dinamis) ---
-const loyaltySettings = {
-    threshold: 10,
-    rewardType: 'FreeProduct',
-    rewardValue: "50",
-    freeProductId: "PROD005" // This should also become dynamic
-}
-
-// ... (sisa data statis untuk refill)
-const grades = [
-    { value: "standard", label: "Standar" },
-    { value: "premium", label: "Premium" },
-];
-const aromas = [
-    { value: "sandalwood", label: "Sandalwood Supreme", grade: "standar" },
-    { value: "vanilla", label: "Vanilla Orchid", grade: "standar" },
-    { value: "ysl_black", label: "YSL Black Opium", grade: "premium" },
-    { value: "baccarat", label: "Baccarat Rouge", grade: "premium" },
-    { value: "aqua_digio", label: "Aqua di Gio", grade: "standar" },
-    { value: "creed_aventus", label: "Creed Aventus", grade: "premium" },
-];
-const bottleSizes = [
-    { value: 30, label: "Botol 30ml" },
-    { value: 50, label: "Botol 50ml" },
-    { value: 100, label: "Botol 100ml" },
-]
-const recipes: Record<string, Record<number, { essence: number; solvent: number; price: number }>> = {
-    sandalwood: { 30: { essence: 12, solvent: 18, price: 50000 }, 50: { essence: 20, solvent: 30, price: 80000 }, 100: { essence: 38, solvent: 62, price: 160000 } },
-    vanilla: { 30: { essence: 12, solvent: 18, price: 50000 }, 50: { essence: 20, solvent: 30, price: 80000 }, 100: { essence: 38, solvent: 62, price: 160000 } },
-    ysl_black: { 30: { essence: 13, solvent: 17, price: 55000 }, 50: { essence: 22, solvent: 28, price: 90000 }, 100: { essence: 40, solvent: 60, price: 170000 } },
-    baccarat: { 30: { essence: 13, solvent: 17, price: 55000 }, 50: { essence: 22, solvent: 28, price: 90000 }, 100: { essence: 40, solvent: 60, price: 170000 } },
-    aqua_digio: { 30: { essence: 12, solvent: 18, price: 50000 }, 50: { essence: 20, solvent: 30, price: 80000 }, 100: { essence: 38, solvent: 62, price: 160000 } },
-    creed_aventus: { 30: { essence: 15, solvent: 15, price: 65000 }, 50: { essence: 25, solvent: 25, price: 105000 }, 100: { essence: 45, solvent: 55, price: 200000 } },
-};
-const EXTRA_ESSENCE_PRICE_PER_ML = 3500;
 
 type CartItem = {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-  type: 'product' | 'refill';
-  details?: string;
-  isPromo?: boolean;
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    type: 'product' | 'refill';
+    details?: string;
+    isPromo?: boolean;
 };
 
-const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
+// Pastikan import React dan hooks
+import React, { useState, useEffect, useMemo } from "react";
+
+// RefillForm menerima data dinamis dari props
+type RefillFormProps = {
+    onAddToCart: (item: CartItem) => void;
+    grades: { value: string; label: string }[];
+    aromas: { value: string; label: string; grade: string }[];
+    bottleSizes: { value: number; label: string }[];
+    recipes: Record<string, Record<number, { essence: number; solvent: number; price: number }>>;
 };
 
-const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) => {
-    // ... (kode RefillForm tidak berubah untuk saat ini)
+const RefillForm = ({ onAddToCart, grades, aromas, bottleSizes, recipes }: RefillFormProps) => {
     const { toast } = useToast();
     const [selectedGrade, setSelectedGrade] = useState('');
     const [selectedAroma, setSelectedAroma] = useState('');
@@ -109,8 +83,8 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
     const availableAromas = useMemo(() => {
         if (!selectedGrade) return [];
         return aromas.filter(a => a.grade === selectedGrade);
-    }, [selectedGrade]);
-    
+    }, [selectedGrade, aromas]);
+
     useEffect(() => {
         setSelectedAroma('');
         setSelectedBottleSize(0);
@@ -125,11 +99,11 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
                 setBasePrice(recipe.price);
             }
         } else {
-             setEssenceMl(0);
-             setStandardEssence(0);
-             setBasePrice(0);
+            setEssenceMl(0);
+            setStandardEssence(0);
+            setBasePrice(0);
         }
-    }, [selectedAroma, selectedBottleSize]);
+    }, [selectedAroma, selectedBottleSize, recipes]);
 
     useEffect(() => {
         if (selectedBottleSize > 0 && basePrice > 0) {
@@ -170,7 +144,7 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
         <Card>
             <CardHeader><CardTitle>Formulir Isi Ulang Kustom</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-                 <div className="space-y-2">
+                <div className="space-y-2">
                     <Label>1. Pilih Grade</Label>
                     <Select value={selectedGrade} onValueChange={setSelectedGrade}>
                         <SelectTrigger><SelectValue placeholder="Pilih grade parfum..." /></SelectTrigger>
@@ -195,21 +169,21 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
                     <CardHeader className="pb-4"><CardTitle className="text-base">4. Atur Komposisi</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
-                           <div className="space-y-2">
-                               <Label htmlFor="essence-ml">Bibit (ml)</Label>
-                               <Input id="essence-ml" type="number" value={essenceMl} onChange={(e) => setEssenceMl(Math.max(1, Number(e.target.value)))} min="1"/>
-                               <p className="text-xs text-muted-foreground">Resep: {standardEssence}ml</p>
-                           </div>
-                           <div className="space-y-2">
-                               <Label htmlFor="solvent-ml">Campuran (ml)</Label>
-                               <Input id="solvent-ml" type="number" value={solventMl} readOnly disabled />
-                           </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="essence-ml">Bibit (ml)</Label>
+                                <Input id="essence-ml" type="number" value={essenceMl} onChange={(e) => setEssenceMl(Math.max(1, Number(e.target.value)))} min="1"/>
+                                <p className="text-xs text-muted-foreground">Resep: {standardEssence}ml</p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="solvent-ml">Campuran (ml)</Label>
+                                <Input id="solvent-ml" type="number" value={solventMl} readOnly disabled />
+                            </div>
                         </div>
                         <Separator />
                         <div className="space-y-1 text-sm">
                             <div className="flex justify-between"><span className="text-muted-foreground">Harga Resep Dasar</span><span>{formatCurrency(basePrice)}</span></div>
-                             <div className="flex justify-between"><span className="text-muted-foreground">Biaya Tambahan Bibit</span><span>{formatCurrency(extraEssenceCost)}</span></div>
-                             <div className="flex justify-between text-base font-bold"><span>Total Harga</span><span>{formatCurrency(totalPrice)}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Biaya Tambahan Bibit</span><span>{formatCurrency(extraEssenceCost)}</span></div>
+                            <div className="flex justify-between text-base font-bold"><span>Total Harga</span><span>{formatCurrency(totalPrice)}</span></div>
                         </div>
                     </CardContent>
                 </Card>
@@ -219,10 +193,15 @@ const RefillForm = ({ onAddToCart }: { onAddToCart: (item: CartItem) => void }) 
                 <Button className="w-full" onClick={handleAddToCart} disabled={!totalPrice || totalPrice <= 0}><PlusCircle className="mr-2"/> Tambah ke Keranjang</Button>
             </CardFooter>
         </Card>
-    )
+    );
 };
 
 export default function PosPage() {
+    // State dinamis refill
+    const [grades, setGrades] = useState<{ value: string; label: string }[]>([]);
+    const [aromas, setAromas] = useState<{ value: string; label: string; grade: string }[]>([]);
+    const [bottleSizes, setBottleSizes] = useState<{ value: number; label: string }[]>([]);
+    const [recipes, setRecipes] = useState<Record<string, Record<number, { essence: number; solvent: number; price: number }>>>({});
     const { toast } = useToast();
     const { selectedOrganizationId, loading: authLoading } = useAuth();
 
@@ -237,40 +216,54 @@ export default function PosPage() {
 
     useEffect(() => {
         const fetchPosData = async () => {
-            if (!selectedOrganizationId) return;
-
+            if (!selectedOrganizationId) {
+                setProductCatalog([]);
+                setMembers([]);
+                setPromotions([]);
+                setGrades([]);
+                setAromas([]);
+                setBottleSizes([]);
+                setRecipes({});
+                setIsLoadingData(false);
+                return;
+            }
             setIsLoadingData(true);
-            
-            const [productsResult, customersResult, promotionsResult] = await Promise.all([
+            const [productsResult, customersResult, promotionsResult, gradesResult, aromasResult, bottleSizesResult, recipesResult] = await Promise.all([
                 supabase.from('products').select('id, name, price, image_url, stock').eq('organization_id', selectedOrganizationId),
                 supabase.from('customers').select('id, name, total_transactions').eq('organization_id', selectedOrganizationId),
-                supabase.from('promos').select('id, name, type, value, get_product_id').eq('organization_id', selectedOrganizationId).eq('is_active', true)
+                supabase.from('promos').select('id, name, type, value, get_product_id').eq('organization_id', selectedOrganizationId).eq('is_active', true),
+                supabase.from('grades').select('value, label').eq('organization_id', selectedOrganizationId),
+                supabase.from('aromas').select('value, label, grade').eq('organization_id', selectedOrganizationId),
+                supabase.from('bottle_sizes').select('value, label').eq('organization_id', selectedOrganizationId),
+                supabase.from('recipes').select('aroma, bottle_size, essence, solvent, price').eq('organization_id', selectedOrganizationId)
             ]);
-            
-            if (productsResult.error) {
-                toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data produk." });
-                setProductCatalog([]);
+            setProductCatalog(Array.isArray(productsResult.data) ? productsResult.data as Product[] : []);
+            setMembers(Array.isArray(customersResult.data) ? customersResult.data as Customer[] : []);
+            setPromotions(Array.isArray(promotionsResult.data) ? promotionsResult.data as Promotion[] : []);
+            setGrades(Array.isArray(gradesResult.data) ? gradesResult.data as { value: string; label: string }[] : []);
+            setAromas(Array.isArray(aromasResult.data) ? aromasResult.data as { value: string; label: string; grade: string }[] : []);
+            setBottleSizes(Array.isArray(bottleSizesResult.data) ? bottleSizesResult.data as { value: number; label: string }[] : []);
+            // Transform recipes to nested object: { aroma: { bottleSize: { essence, solvent, price } } }
+            if (Array.isArray(recipesResult.data)) {
+                const recipesObj: Record<string, Record<number, { essence: number; solvent: number; price: number }>> = {};
+                for (const r of recipesResult.data) {
+                    if (!recipesObj[r.aroma]) recipesObj[r.aroma] = {};
+                    recipesObj[r.aroma][r.bottle_size] = { essence: r.essence, solvent: r.solvent, price: r.price };
+                }
+                setRecipes(recipesObj);
             } else {
-                setProductCatalog(productsResult.data as Product[]);
+                setRecipes({});
             }
-
-            if (customersResult.error) {
-                toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data pelanggan." });
-                setMembers([]);
-            } else {
-                setMembers(customersResult.data as Customer[]);
-            }
-
-            if (promotionsResult.error) {
-                toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data promosi." });
-                setPromotions([]);
-            } else {
-                setPromotions(promotionsResult.data as Promotion[]);
-            }
-
+            // Error handling
+            if (productsResult.error) toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data produk." });
+            if (customersResult.error) toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data pelanggan." });
+            if (promotionsResult.error) toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data promosi." });
+            if (gradesResult.error) toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data grades." });
+            if (aromasResult.error) toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data aromas." });
+            if (bottleSizesResult.error) toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data bottle sizes." });
+            if (recipesResult.error) toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data recipes." });
             setIsLoadingData(false);
         };
-
         fetchPosData();
     }, [selectedOrganizationId, toast]);
 
@@ -293,37 +286,62 @@ export default function PosPage() {
     
     // Effect to handle BOGO logic
     useEffect(() => {
-        const newCart = cart.filter(item => !item.isPromo || !item.id.startsWith('promo-bogo-'));
-        if (appliedPromo?.type === 'BOGO' && appliedPromo.get_product_id) {
-            const freeProduct = productCatalog.find(p => p.id === appliedPromo.get_product_id);
-            const hasRegularItem = cart.some(item => !item.isPromo);
-            if (freeProduct && hasRegularItem) {
-                const promoItemInCart = newCart.find(item => item.id === `promo-bogo-${freeProduct.id}`);
-                if (!promoItemInCart) {
-                     const newCartItem: CartItem = {
+        // Hindari infinite loop dengan dependensi cart
+        if (!appliedPromo || appliedPromo.type !== 'BOGO' || !appliedPromo.get_product_id) return;
+        const freeProduct = productCatalog.find(p => p.id === appliedPromo.get_product_id);
+        const hasRegularItem = cart.some(item => !item.isPromo);
+        if (freeProduct && hasRegularItem) {
+            const promoItemInCart = cart.find(item => item.id === `promo-bogo-${freeProduct.id}`);
+            if (!promoItemInCart) {
+                setCart(prevCart => [
+                    ...prevCart,
+                    {
                         id: `promo-bogo-${freeProduct.id}`,
                         name: `GRATIS: ${freeProduct.name}`,
                         price: 0,
                         quantity: 1,
                         type: 'product',
                         isPromo: true
-                    };
-                    newCart.push(newCartItem);
-                }
+                    }
+                ]);
             }
         }
-        if (JSON.stringify(cart) !== JSON.stringify(newCart)) {
-           setCart(newCart);
-        }
-    }, [appliedPromo, cart, productCatalog]);
+    }, [appliedPromo, productCatalog]);
 
-    const addProductToCart = (product: Product) => { /* ... */ };
-    const addRefillToCart = (item: CartItem) => { /* ... */ };
-    const updateQuantity = (itemId: string, newQuantity: number) => { /* ... */ };
-    const handleSaveOrder = () => { /* ... */ };
-    const handleClearOrder = () => { /* ... */ };
-    const handleCheckout = () => { /* ... */ };
-    const handleApplyLoyaltyReward = () => { /* ... */ };
+    // --- STUB FUNGSI EVENT HANDLER ---
+    const handleAddToCart = (item: CartItem) => {
+        setCart(prev => [...prev, item]);
+    };
+    const addProductToCart = (product: Product) => {
+        setCart(prev => {
+            const existing = prev.find(item => item.id === product.id && item.type === 'product');
+            if (existing) {
+                return prev.map(item => item.id === product.id && item.type === 'product' ? { ...item, quantity: item.quantity + 1 } : item);
+            }
+            return [...prev, { id: product.id, name: product.name, price: product.price, quantity: 1, type: 'product' }];
+        });
+    };
+    const addRefillToCart = (item: CartItem) => {
+        setCart(prev => [...prev, item]);
+    };
+    const updateQuantity = (itemId: string, newQuantity: number) => {
+        setCart(prev => prev.map(item => item.id === itemId ? { ...item, quantity: newQuantity } : item));
+    };
+    const handleSaveOrder = () => {
+        toast({ title: "Order disimpan (dummy)", description: "Fitur simpan belum diimplementasikan." });
+    };
+    const handleClearOrder = () => {
+        setCart([]);
+        setAppliedPromo(null);
+        setActiveCustomer(null);
+        setShowLoyaltyReward(false);
+    };
+    const handleCheckout = () => {
+        toast({ title: "Checkout (dummy)", description: "Fitur checkout belum diimplementasikan." });
+    };
+    const handleApplyLoyaltyReward = () => {
+        toast({ title: "Loyalty Reward (dummy)", description: "Fitur loyalty reward belum diimplementasikan." });
+    };
 
     // --- PERHITUNGAN TOTAL (URUTAN DIPERBAIKI) ---
     const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
@@ -350,9 +368,16 @@ export default function PosPage() {
     return (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 h-[calc(100vh-100px)]">
             <div className="lg:col-span-2 flex flex-col gap-4">
-                {/* ... Product Catalog and Refill Form UI ... */}
+                {/* Product Catalog dan Formulir Isi Ulang */}
+                {/* ... Product Catalog UI ... */}
+                <RefillForm
+                    onAddToCart={handleAddToCart}
+                    grades={grades}
+                    aromas={aromas}
+                    bottleSizes={bottleSizes}
+                    recipes={recipes}
+                />
             </div>
-            
             <div className="lg:col-span-1 flex flex-col gap-4">
                 <Card className="flex flex-col h-full">
                     {/* ... Customer and Cart UI ... */}
@@ -379,7 +404,6 @@ export default function PosPage() {
                                          </Button>
                                      )}
                                 </div>
-                                
                                 {appliedPromo && appliedPromo.type !== 'BOGO' && (
                                      <div className="flex justify-between items-center text-destructive">
                                         <span>Diskon ({appliedPromo.name})</span>
