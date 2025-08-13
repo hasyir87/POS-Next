@@ -1,14 +1,13 @@
+"use client";
 
-'use client';
-
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function SignupForm() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [organizationName, setOrganizationName] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [organizationName, setOrganizationName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -28,33 +27,36 @@ export default function SignupForm() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/signup-owner', {
-        method: 'POST',
+      const response = await fetch("/api/auth/signup-owner", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password, organization_name: organizationName }),
+        body: JSON.stringify({
+          email,
+          password,
+          organization_name: organizationName,
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'An unexpected error occurred.');
+        throw new Error(data.error || "An unexpected error occurred.");
       }
-      
-      setSuccess(data.message || 'Signup successful! You can now log in.');
-      setEmail('');
-      setPassword('');
-      setConfirmPassword('');
-      setOrganizationName('');
+
+      setSuccess(data.message || "Signup successful! You can now log in.");
+      setEmail("");
+      setPassword("");
+      setConfirmPassword("");
+      setOrganizationName("");
       // Arahkan pengguna ke halaman login setelah 2 detik
       setTimeout(() => {
-        router.push('/'); // Asumsikan halaman login ada di root
+        router.push("/"); // Asumsikan halaman login ada di root
       }, 2000);
-
     } catch (err: any) {
-      setError(err.message || 'An error occurred during signup.');
-      console.error('Signup fetch error:', err);
+      setError(err.message || "An error occurred during signup.");
+      console.error("Signup fetch error:", err);
     } finally {
       setLoading(false);
     }
@@ -66,7 +68,10 @@ export default function SignupForm() {
         <h2 className="text-2xl font-bold text-center mb-6">Owner Signup</h2>
         <form onSubmit={handleSignup}>
           <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="organizationName">
+            <label
+              className="block text-gray-700 text-sm font-bold mb-2"
+              htmlFor="organizationName"
+            >
               Organization Name
             </label>
             <input
@@ -79,7 +84,10 @@ export default function SignupForm() {
             />
           </div>
           <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">
+            <label
+              className="block text-gray-700 text-sm font-bold mb-2"
+              htmlFor="email"
+            >
               Email
             </label>
             <input
@@ -92,7 +100,10 @@ export default function SignupForm() {
             />
           </div>
           <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
+            <label
+              className="block text-gray-700 text-sm font-bold mb-2"
+              htmlFor="password"
+            >
               Password
             </label>
             <input
@@ -104,8 +115,11 @@ export default function SignupForm() {
               required
             />
           </div>
-           <div className="mb-6">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="confirmPassword">
+          <div className="mb-6">
+            <label
+              className="block text-gray-700 text-sm font-bold mb-2"
+              htmlFor="confirmPassword"
+            >
               Confirm Password
             </label>
             <input
@@ -117,17 +131,19 @@ export default function SignupForm() {
               required
             />
           </div>
-          
+
           {error && <p className="text-red-500 text-xs italic mb-4">{error}</p>}
-          {success && <p className="text-green-500 text-xs italic mb-4">{success}</p>}
-          
+          {success && (
+            <p className="text-green-500 text-xs italic mb-4">{success}</p>
+          )}
+
           <div className="flex items-center justify-center">
             <button
               type="submit"
               className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
               disabled={loading}
             >
-              {loading ? 'Registering...' : 'Sign Up as Owner'}
+              {loading ? "Registering..." : "Sign Up as Owner"}
             </button>
           </div>
         </form>
