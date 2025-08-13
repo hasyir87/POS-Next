@@ -95,38 +95,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Get initial session
     const getInitialSession = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-
+        // Force refresh session first
+        const { data: { session }, error } = await supabase.auth.refreshSession();
+        
         if (error) {
-          console.error('Error getting session:', error);
-        }
-
-        if (mounted) {
-          // Validate session is not expired
-          const isValidSession = session?.user && session?.expires_at && new Date(session.expires_at * 1000) > new Date();
+          console.log('Session refresh failed, getting session:', error.message);
+          // Fallback to getSession if refresh fails
+          const { data: { session: fallbackSession }, error: getError } = await supabase.auth.getSession();
           
-          if (isValidSession) {
-            setUser(session.user);
-            console.log('Valid session found:', session.user.id);
-          } else {
-            setUser(null);
-            console.log('No valid session found');
+          if (getError) {
+            console.error('Error getting session:', getError);
           }
-
-          if (isValidSession && session.user) {
-            await fetchUserProfile(session.user.id);
-          } else {
-            // Clear profile if no valid session
-            setProfile(null);
-            setSelectedOrganizationId(null);
-            
-            // If session is expired, sign out
-            if (session?.user && !isValidSession) {
-              await supabase.auth.signOut();
-            }
+          
+          if (mounted) {
+            handleSessionResult(fallbackSession);
           }
-
-          setLoading(false);
+        } else {
+          if (mounted) {
+            handleSessionResult(session);
+          }
         }
       } catch (error) {
         console.error('Error in getInitialSession:', error);
@@ -137,6 +124,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setLoading(false);
         }
       }
+    };
+
+    const handleSessionResult = async (session: any) => {
+      // Validate session is not expired
+      const isValidSession = session?.user && session?.expires_at && new Date(session.expires_at * 1000) > new Date();
+      
+      if (isValidSession) {
+        setUser(session.user);
+        console.log('Valid session found:', session.user.id);
+      } else {
+        setUser(null);
+        console.log('No valid session found');
+      }
+
+      if (isValidSession && session.user) {
+        await fetchUserProfile(session.user.id);
+      } else {
+        // Clear profile if no valid session
+        setProfile(null);
+        setSelectedOrganizationId(null);
+        
+        // If session is expired, sign out
+        if (session?.user && !isValidSession) {
+          await supabase.auth.signOut();
+        }
+      }
+
+      setLoading(false);
     };
 
     getInitialSession();
@@ -168,16 +183,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async ({ email, password }: { email: string; password: string }) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      // Clear any existing session first
+      await supabase.auth.signOut();
+      
+      // Sign in with new credentials
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
+      if (error) {
+        throw error;
+      }
+
+      // Force refresh to ensure session is properly stored
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError) {
+        console.warn('Session refresh after login failed:', refreshError.message);
+      }
+
+      console.log('Login successful, session data:', data.session?.user?.id);
+      return data;
+    } catch (error) {
+      console.error('Login error:', error);
       throw error;
     }
-
-    return data;
   };
 
   const logout = async () => {
