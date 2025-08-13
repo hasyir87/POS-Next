@@ -50,26 +50,3 @@ export default function Home() {
     </div>
   );
 }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <MPerfumeAmalLogo className="mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900">M Perfume Amal</h1>
-          <p className="text-gray-600 mb-4">Point of Sale System</p>
-          <p className="text-sm text-gray-500">Silakan masuk ke akun Anda</p>
-        </div>
-        <LoginForm />
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
-            Belum punya akun?{' '}
-            <a href="/signup" className="text-purple-600 hover:text-purple-800 font-medium">
-              Daftar di sini
-            </a>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
