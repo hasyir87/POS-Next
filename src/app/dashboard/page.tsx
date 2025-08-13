@@ -163,14 +163,19 @@ export default function PosPage() {
             const [productsResult, customersResult, promotionsResult] = await Promise.all([
                 supabase.from('products').select('id, name, price, cogs, image_url, stock').eq('organization_id', selectedOrganizationId),
                 supabase.from('customers').select('id, name, total_transactions').eq('organization_id', selectedOrganizationId),
-                supabase.from('promos').select('id, name, type, value, get_product_id').eq('organization_id', selectedOrganizationId).eq('is_active', true)
+                supabase.from('promotions').select('id, name, type, value, get_product_id').eq('organization_id', selectedOrganizationId).eq('is_active', true)
             ]);
             if (productsResult.error) { toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data produk." }); setProductCatalog([]); } 
             else { setProductCatalog(productsResult.data as Product[]); }
             if (customersResult.error) { toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data pelanggan." }); setMembers([]); } 
             else { setMembers(customersResult.data as Customer[]); }
-            if (promotionsResult.error) { toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data promosi." }); setPromotions([]); } 
-            else { setPromotions(promotionsResult.data as Promotion[]); }
+            if (promotionsResult.error) { 
+                console.error('Promotions error:', promotionsResult.error);
+                toast({ variant: "destructive", title: "Error", description: `Gagal mengambil data promosi: ${promotionsResult.error.message}` }); 
+                setPromotions([]); 
+            } else { 
+                setPromotions(promotionsResult.data as Promotion[]); 
+            }
             setIsLoadingData(false);
         };
         fetchPosData();
@@ -178,7 +183,14 @@ export default function PosPage() {
 
     const memberOptions = useMemo(() => members.map(m => ({ value: m.id, label: m.name })), [members]);
     
-    const handleSetPromo = (promoId: string) => setAppliedPromo(promotions.find(p => p.id === promoId) || null);
+    const handleSetPromo = (promoId: string) => {
+        if (!promoId) {
+            setAppliedPromo(null);
+            return;
+        }
+        const promo = promotions.find(p => p.id === promoId);
+        setAppliedPromo(promo || null);
+    };
     const handleSetCustomer = (customerId: string) => {
         const customer = members.find(m => m.id === customerId);
         setActiveCustomer(customer || null);

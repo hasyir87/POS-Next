@@ -1,4 +1,3 @@
-
 export type UserRole = 'owner' | 'cashier' | 'admin'
 export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'e_wallet'
 export type TransactionStatus = 'pending' | 'completed' | 'cancelled'
@@ -102,6 +101,41 @@ export interface Database {
         Row: TransactionItem
         Insert: Omit<TransactionItem, 'id' | 'created_at'>
         Update: Partial<Omit<TransactionItem, 'id' | 'created_at'>>
+      }
+      promotions: {
+        Row: {
+          id: string
+          organization_id: string
+          name: string
+          type: 'Persentase' | 'Nominal' | 'BOGO'
+          value: number
+          get_product_id: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          name: string
+          type: 'Persentase' | 'Nominal' | 'BOGO'
+          value: number
+          get_product_id?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          name?: string
+          type?: 'Persentase' | 'Nominal' | 'BOGO'
+          value?: number
+          get_product_id?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
       }
     }
   }
