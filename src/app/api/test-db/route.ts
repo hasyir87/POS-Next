@@ -1,3 +1,4 @@
+
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
@@ -7,7 +8,7 @@ export async function GET() {
 
   try {
     // Get organization data
-    const { data: organizationData, error: organizationError } = await supabase
+    let { data: organizationData, error: organizationError } = await supabase
       .from('organizations')
       .select('id')
       .limit(1);
@@ -43,7 +44,7 @@ export async function GET() {
         price: 250000,
         stock: 30
       }
-    ]
+    ];
 
     // Test promotions data
     const testPromotions = [
@@ -63,53 +64,39 @@ export async function GET() {
         get_product_id: null,
         is_active: true
       }
-    ]
+    ];
 
     console.log('Inserting test data...');
 
-    // Use supabaseAdmin for server-side operations to avoid issues with client-side auth
-    // Assuming you have a service role key configured in your Supabase project
-    const supabaseAdmin = createRouteHandlerClient({ cookies }); // Use the same client for simplicity in this example
-
     // Clear existing data to ensure a clean state for testing
-    await supabaseAdmin.from('promotions').delete().neq('id', null); // Delete all promotions
-    await supabaseAdmin.from('products').delete().neq('id', null); // Delete all products
-    await supabaseAdmin.from('organizations').delete().neq('id', null); // Delete all organizations
-
-    // Insert new organization
-    const { data: insertedOrg, error: insertedOrgError } = await supabaseAdmin
-      .from('organizations')
-      .insert([{ name: 'Default Org' }])
-      .select('id');
-
-    if (insertedOrgError || !insertedOrg || insertedOrg.length === 0) {
-      console.error('Error inserting organization:', insertedOrgError);
-      return NextResponse.json({ error: 'Failed to insert organization' }, { status: 500 });
-    }
-    const insertedOrganization = insertedOrg[0];
+    await supabase.from('promotions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
     // Insert test products
-    const { error: productsError } = await supabaseAdmin
+    const { error: productsError } = await supabase
       .from('products')
-      .insert(testProducts.map(p => ({ ...p, organization_id: insertedOrganization.id })))
+      .insert(testProducts);
 
     if (productsError) {
-      console.error('Error inserting products:', productsError)
-      return NextResponse.json({ error: 'Failed to insert test products' }, { status: 500 })
+      console.error('Error inserting products:', productsError);
+      return NextResponse.json({ error: 'Failed to insert test products' }, { status: 500 });
     }
 
     // Insert test promotions
-    const { error: promotionsError } = await supabaseAdmin
+    const { error: promotionsError } = await supabase
       .from('promotions')
-      .insert(testPromotions.map(p => ({ ...p, organization_id: insertedOrganization.id })))
+      .insert(testPromotions);
 
     if (promotionsError) {
-      console.error('Error inserting promotions:', promotionsError)
-      return NextResponse.json({ error: 'Failed to insert test promotions' }, { status: 500 })
+      console.error('Error inserting promotions:', promotionsError);
+      return NextResponse.json({ error: 'Failed to insert test promotions' }, { status: 500 });
     }
 
     return NextResponse.json({
       message: 'Test data created successfully',
+      organization: organization,
+      productsCount: testProducts.length,
+      promotionsCount: testPromotions.length
     });
 
   } catch (error: any) {

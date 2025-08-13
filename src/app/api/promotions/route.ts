@@ -1,102 +1,119 @@
 
-import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
-import type { Database } from '@/types/database'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
 
-type Promotion = Database['public']['Tables']['promotions']['Row']
-type PromotionInsert = Database['public']['Tables']['promotions']['Insert']
-
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url)
-    const organizationId = searchParams.get('organization_id')
+    const supabase = createRouteHandlerClient({ cookies });
 
-    let query = supabaseAdmin
+    // Get the current user
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get user profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('organization_id')
+      .eq('id', session.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    }
+
+    // Fetch promotions for the user's organization
+    const { data: promotions, error: promotionsError } = await supabase
       .from('promotions')
-      .select(`
-        id,
-        organization_id,
-        name,
-        type,
-        value,
-        get_product_id,
-        is_active,
-        created_at,
-        updated_at
-      `)
+      .select('*')
+      .eq('organization_id', profile.organization_id)
+      .order('created_at', { ascending: false });
 
-    if (organizationId) {
-      query = query.eq('organization_id', organizationId)
+    if (promotionsError) {
+      console.error('Error fetching promotions:', promotionsError);
+      return NextResponse.json({ error: 'Failed to fetch promotions' }, { status: 500 });
     }
 
-    // Only get active promotions by default
-    query = query.eq('is_active', true)
+    return NextResponse.json(promotions || []);
 
-    const { data: promotions, error } = await query.order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching promotions:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch promotions', details: error.message },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ promotions: promotions || [] })
-  } catch (error) {
-    console.error('Unexpected error:', error)
+  } catch (error: any) {
+    console.error('Unexpected error in promotions API:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: error.message },
       { status: 500 }
-    )
+    );
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const body: PromotionInsert = await request.json()
+    const supabase = createRouteHandlerClient({ cookies });
 
-    // Validasi required fields
-    if (!body.name || !body.type || !body.organization_id) {
-      return NextResponse.json(
-        { error: 'Missing required fields: name, type, organization_id' },
-        { status: 400 }
-      )
+    // Get the current user
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: promotion, error } = await supabaseAdmin
+    // Get user profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('organization_id, role')
+      .eq('id', session.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    }
+
+    // Check permissions
+    if (!['owner', 'admin'].includes(profile.role)) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { name, type, value, get_product_id, is_active } = body;
+
+    // Validate required fields
+    if (!name || !type || value === undefined) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // Validate promotion type
+    if (!['Persentase', 'Nominal', 'BOGO'].includes(type)) {
+      return NextResponse.json({ error: 'Invalid promotion type' }, { status: 400 });
+    }
+
+    // Create promotion
+    const { data: promotion, error: insertError } = await supabase
       .from('promotions')
-      .insert([{
-        ...body,
-        is_active: body.is_active ?? true
-      }])
-      .select(`
-        id,
-        organization_id,
+      .insert({
+        organization_id: profile.organization_id,
         name,
         type,
         value,
-        get_product_id,
-        is_active,
-        created_at,
-        updated_at
-      `)
-      .single()
+        get_product_id: get_product_id || null,
+        is_active: is_active !== undefined ? is_active : true
+      })
+      .select()
+      .single();
 
-    if (error) {
-      console.error('Error creating promotion:', error)
-      return NextResponse.json(
-        { error: 'Failed to create promotion' },
-        { status: 500 }
-      )
+    if (insertError) {
+      console.error('Error creating promotion:', insertError);
+      return NextResponse.json({ error: 'Failed to create promotion' }, { status: 500 });
     }
 
-    return NextResponse.json({ promotion }, { status: 201 })
-  } catch (error) {
-    console.error('Unexpected error:', error)
+    return NextResponse.json(promotion, { status: 201 });
+
+  } catch (error: any) {
+    console.error('Unexpected error in create promotion:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: error.message },
       { status: 500 }
-    )
+    );
   }
 }
