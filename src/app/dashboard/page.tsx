@@ -119,6 +119,12 @@ export default function DashboardPage() {
         console.log('Promotions data received:', promotionsData);
       } else {
         console.warn('Failed to fetch promotions:', promotionsResponse.status === 'fulfilled' ? promotionsResponse.value.status : 'Network error');
+        // Handle 401 error specifically for promotions
+        if (promotionsResponse.status === 'fulfilled' && promotionsResponse.value.status === 401) {
+          setError('Anda tidak memiliki izin untuk mengakses data promosi. Silakan hubungi administrator.');
+        } else if (promotionsResponse.status === 'rejected') {
+          setError('Gagal memuat data promosi. Periksa koneksi Anda.');
+        }
       }
 
       // Calculate stats
@@ -143,7 +149,11 @@ export default function DashboardPage() {
 
     } catch (err: any) {
       console.error('Error fetching dashboard data:', err);
-      setError('Gagal memuat data dashboard');
+      if (err.message.includes('401')) {
+        setError('Akses ditolak. Silakan login kembali.');
+      } else {
+        setError('Gagal memuat data dashboard');
+      }
       setPromotions([]);
       setStats({
         totalProducts: 0,
@@ -160,7 +170,12 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      fetchDashboardData();
+      // Add delay to ensure auth context is fully loaded
+      const timer = setTimeout(() => {
+        fetchDashboardData();
+      }, 100);
+
+      return () => clearTimeout(timer);
     }
   }, [user, authLoading]);
 

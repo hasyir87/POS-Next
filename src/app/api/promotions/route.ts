@@ -15,8 +15,11 @@ export async function GET() {
       return NextResponse.json({ error: 'Session error' }, { status: 401 });
     }
 
-    if (!session || !session.user) {
-      console.log('No valid session found for promotions request');
+    // Validate session exists and is not expired
+    const isValidSession = session?.user && session?.expires_at && new Date(session.expires_at * 1000) > new Date();
+    
+    if (!isValidSession) {
+      console.log('No valid session found for promotions request. Session:', !!session, 'User:', !!session?.user, 'Expires:', session?.expires_at);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

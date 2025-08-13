@@ -102,14 +102,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         if (mounted) {
-          setUser(session?.user ?? null);
+          // Validate session is not expired
+          const isValidSession = session?.user && session?.expires_at && new Date(session.expires_at * 1000) > new Date();
+          
+          setUser(isValidSession ? session.user : null);
 
-          if (session?.user) {
+          if (isValidSession && session.user) {
             await fetchUserProfile(session.user.id);
           } else {
-            // Clear profile if no session
+            // Clear profile if no valid session
             setProfile(null);
             setSelectedOrganizationId(null);
+            
+            // If session is expired, sign out
+            if (session?.user && !isValidSession) {
+              await supabase.auth.signOut();
+            }
           }
 
           setLoading(false);

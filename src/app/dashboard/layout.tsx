@@ -65,17 +65,19 @@ export default function DashboardLayout({
           const response = await fetch('/api/organizations');
           if (!response.ok) throw new Error('Failed to fetch organizations');
           
-          const data: Organization[] = await response.json();
-          setOrganizations(data);
+          const data = await response.json();
+          const organizationsArray = Array.isArray(data) ? data : [];
+          setOrganizations(organizationsArray);
           
           // Set default selected organization if not already set
-          if (!selectedOrganizationId && data.length > 0) {
-            const parentOrg = data.find(org => org.id === profile.organization_id) || data[0];
+          if (!selectedOrganizationId && organizationsArray.length > 0) {
+            const parentOrg = organizationsArray.find(org => org.id === profile.organization_id) || organizationsArray[0];
             setSelectedOrganizationId(parentOrg.id);
           }
 
         } catch (error) {
           console.error("Error fetching organizations:", error);
+          setOrganizations([]); // Ensure it's always an array
         } finally {
           setIsLoadingOrgs(false);
         }
@@ -128,7 +130,7 @@ export default function DashboardLayout({
     setSelectedOrganizationId(orgId);
   };
 
-  const selectedOrganization = organizations.find(org => org.id === selectedOrganizationId);
+  const selectedOrganization = Array.isArray(organizations) ? organizations.find(org => org.id === selectedOrganizationId) : null;
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
@@ -197,7 +199,7 @@ export default function DashboardLayout({
                   <DropdownMenuContent className="w-full max-w-xs">
                       <DropdownMenuLabel>Select Outlet</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      {organizations.map((org) => (
+                      {Array.isArray(organizations) && organizations.map((org) => (
                           <DropdownMenuItem key={org.id} onSelect={() => handleSelectOrganization(org.id)}>
                               {org.name}
                           </DropdownMenuItem>
