@@ -13,8 +13,14 @@ export async function middleware(req: NextRequest) {
 
   // Jika pengguna mengakses route yang dilindungi (/dashboard) dan belum login
   if (!user && req.nextUrl.pathname.startsWith('/dashboard')) {
-    // Redirect pengguna ke halaman login
-    const redirectUrl = new URL('/login', req.nextUrl.origin); // Ganti '/login' jika halaman login Anda berbeda
+    // Redirect pengguna ke halaman login (root page)
+    const redirectUrl = new URL('/', req.nextUrl.origin);
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  // Jika pengguna sudah login tetapi mengakses root page, redirect ke dashboard
+  if (user && req.nextUrl.pathname === '/') {
+    const redirectUrl = new URL('/dashboard', req.nextUrl.origin);
     return NextResponse.redirect(redirectUrl);
   }
 

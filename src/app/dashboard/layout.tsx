@@ -54,6 +54,9 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!loading && !user) {
       router.push('/');
+    } else if (!loading && user && !profile) {
+      console.error("User authenticated but no profile found");
+      router.push('/');
     } else if (user && profile) {
       const fetchOrganizations = async () => {
         setIsLoadingOrgs(true);
@@ -178,13 +181,13 @@ export default function DashboardLayout({
               <Button variant="secondary" size="icon" className="rounded-full">
                 <Avatar>
                   <AvatarImage src="https://placehold.co/40x40" alt="Avatar" />
-                  <AvatarFallback>{profile.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                  <AvatarFallback>{profile.full_name?.substring(0, 2).toUpperCase() || 'U'}</AvatarFallback>
                 </Avatar>
                 <span className="sr-only">Toggle user menu</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>{profile.name}</DropdownMenuLabel>
+              <DropdownMenuLabel>{profile.full_name || profile.email}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>Profile</DropdownMenuItem>
               <DropdownMenuItem>Support</DropdownMenuItem>

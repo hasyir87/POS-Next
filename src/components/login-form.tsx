@@ -18,13 +18,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { MPerfumeAmalLogo } from "./m-perfume-amal-logo"
@@ -36,9 +30,6 @@ const formSchema = z.object({
   }),
   password: z.string().min(6, {
     message: "Kata sandi harus minimal 6 karakter.",
-  }),
-  role: z.enum(["cashier", "admin", "owner"], {
-    required_error: "Anda harus memilih peran.",
   }),
 })
 
@@ -107,28 +98,7 @@ export function LoginForm() {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Peran</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih peran Anda" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="cashier">Kasir</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="owner">Pemilik</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            
             <Button type="submit" className="w-full">Masuk</Button>
             {loginError && (
               <div className="text-red-500 text-sm mt-2 text-center">{loginError}</div>
