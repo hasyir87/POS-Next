@@ -1,4 +1,3 @@
-
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
@@ -9,9 +8,10 @@ export async function GET() {
 
     // Get the current user
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
+
     if (sessionError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      console.log('No session found for promotions request');
+      return NextResponse.json([], { status: 200 }); // Return empty array instead of error
     }
 
     // Get user profile
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
     // Get the current user
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
+
     if (sessionError || !session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

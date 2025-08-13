@@ -52,7 +52,15 @@ export default function DashboardPage() {
       
       // Fetch promotions
       const promotionsResponse = await fetch('/api/promotions');
-      const promotionsData = await promotionsResponse.json();
+      let promotionsData = [];
+      
+      if (promotionsResponse.ok) {
+        promotionsData = await promotionsResponse.json();
+        console.log('Promotions data received:', promotionsData);
+      } else {
+        console.warn('Failed to fetch promotions:', promotionsResponse.status);
+        promotionsData = [];
+      }
       
       // Fetch users
       const usersResponse = await fetch('/api/users');
