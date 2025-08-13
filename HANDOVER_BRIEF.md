@@ -1,3 +1,4 @@
+
 # Rangkuman Serah Terima Proyek: ScentPOS
 
 Dokumen ini menyediakan ringkasan komprehensif tentang status proyek ScentPOS saat ini dan prompt detail agar developer AI baru dapat melanjutkan pekerjaan dengan lancar.
@@ -12,7 +13,7 @@ Kita memulai dengan aplikasi Next.js yang memiliki UI fungsional tetapi masih me
 
 1.  **Arsitektur Database Multi-Toko:**
     *   Skema database di Supabase telah dirancang dan diimplementasikan untuk mendukung banyak organisasi (toko) dan outlet.
-    *   Tabel inti yang dibuat meliputi `organizations` (dengan relasi `parent_organization_id` untuk struktur hierarki outlet), `profiles` (untuk menyimpan peran dan menghubungkan `auth.users` ke `organizations`), serta tabel data (`products`, `transactions`, `customers`, `raw_materials`, dll.) yang semuanya memiliki kolom `organization_id` untuk isolasi data.
+    *   Tabel inti yang dibuat meliputi `organizations` (dengan relasi `parent_organization_id` untuk struktur hierarki outlet), `profiles` (untuk menyimpan peran dan menghubungkan `auth.users` ke `organizations`), serta tabel data (`products`, `transactions`, `customers`, `raw_materials`, `promotions`, `grades`, `aromas`, `bottle_sizes`, `recipes`, `expenses`, `settings`) yang semuanya memiliki kolom `organization_id` untuk isolasi data.
 
 2.  **Keamanan Data dengan RLS:**
     *   Row-Level Security (RLS) telah berhasil diimplementasikan pada semua tabel data penting dan tabel `profiles`. Ini memastikan bahwa pengguna dari satu organisasi tidak dapat secara tidak sengaja (atau sengaja) mengakses data dari organisasi lain.
@@ -21,6 +22,7 @@ Kita memulai dengan aplikasi Next.js yang memiliki UI fungsional tetapi masih me
     *   Serangkaian API Route yang aman di Next.js telah dibangun untuk menangani semua logika bisnis:
         *   Pendaftaran pemilik toko (`/api/auth/signup-owner`) yang secara otomatis membuat pengguna, organisasi induk, dan profil.
         *   Fungsionalitas CRUD (Create, Read, Update, Delete) penuh untuk manajemen pengguna (`/api/users`) dan organisasi (`/api/organizations`), lengkap dengan pemeriksaan izin berbasis peran.
+        *   API untuk produk (`/api/products`), promosi (`/api/promotions`), dan transaksi (`/api/transactions`).
 
 4.  **Integrasi Frontend & Manajemen State:**
     *   `AuthContext` aplikasi telah direfaktor total menjadi sumber kebenaran tunggal (single source of truth) yang didukung oleh Supabase Auth.
@@ -32,15 +34,74 @@ Kita memulai dengan aplikasi Next.js yang memiliki UI fungsional tetapi masih me
     *   Halaman **Inventaris** (`/dashboard/inventory`) dan **Produk** (`/dashboard/products`) telah sepenuhnya diadaptasi untuk mengambil dan menyimpan data berdasarkan outlet yang dipilih.
     *   Halaman **Point of Sale (POS)** (`/dashboard/pos`) telah berhasil diadaptasi untuk **membaca** data dinamis (produk, pelanggan, promosi) dari Supabase.
 
-6.  **Fungsionalitas Transaksi Inti (Pencapaian Terakhir):**
+6.  **Fungsionalitas Transaksi Inti:**
     *   Sebuah **Fungsi RPC (PostgreSQL Function)** bernama `process_checkout` telah dibuat di Supabase untuk menangani seluruh proses checkout sebagai satu transaksi atomik (membuat record transaksi, item, dan memperbarui stok).
     *   Fungsi `handleCheckout` di halaman POS berhasil diimplementasikan untuk memanggil RPC ini, menjadikan alur penjualan inti **sepenuhnya berfungsi** dalam arsitektur multi-toko.
 
-**Status Proyek Saat Ini:** Aplikasi telah bertransformasi dari prototipe statis menjadi aplikasi web multi-tenant dengan fondasi backend dan keamanan yang kuat. Alur penjualan intinya sudah berfungsi. Tantangan berikutnya adalah menstabilkan halaman POS dan memindahkan sisa-sisa data statis ke database.
+7.  **Sistem Promosi:**
+    *   Tabel `promotions` telah diimplementasikan dengan dukungan untuk tiga jenis promosi: Persentase, Nominal, dan BOGO (Buy One Get One).
+    *   API promotions dengan RLS telah berfungsi dan terintegrasi dengan halaman POS.
+
+**Status Proyek Saat Ini:** Aplikasi telah bertransformasi dari prototipe statis menjadi aplikasi web multi-tenant dengan fondasi backend dan keamanan yang kuat. Alur penjualan intinya sudah berfungsi. Namun masih ada masalah dengan autentikasi session yang perlu diperbaiki.
 
 ---
 
-## Bagian 2: Prompt Serah Terima untuk AI Berikutnya
+## Bagian 2: Struktur Database Lengkap
+
+### 2.1. Tabel Utama dengan RLS:
+
+-   **Organizations** (`organizations`): `{ id, name, address, phone, logo_url, parent_organization_id, created_at, updated_at }`
+-   **Profiles** (`profiles`): `{ id, email, full_name, avatar_url, organization_id, role, created_at, updated_at }`
+-   **Products** (`products`): `{ id, organization_id, name, description, price, stock, category_id, image_url, created_at, updated_at }`
+-   **Raw Materials** (`raw_materials`): `{ id, organization_id, name, brand, quantity, unit, category, purchase_price, created_at, updated_at }`
+-   **Customers** (`customers`): `{ id, organization_id, name, email, phone, loyalty_points, transaction_count, created_at, updated_at }`
+-   **Transactions** (`transactions`): `{ id, organization_id, cashier_id, customer_id, total_amount, payment_method, status, created_at, updated_at }`
+-   **Transaction Items** (`transaction_items`): `{ id, transaction_id, product_id, raw_material_id, quantity, price, created_at }`
+-   **Promotions** (`promotions`): `{ id, organization_id, name, type, value, get_product_id, is_active, created_at, updated_at }`
+-   **Categories** (`categories`): `{ id, organization_id, name, created_at, updated_at }`
+-   **Grades** (`grades`): `{ id, organization_id, name, price_multiplier, created_at, updated_at }`
+-   **Aromas** (`aromas`): `{ id, organization_id, name, category, description, created_at, updated_at }`
+-   **Bottle Sizes** (`bottle_sizes`): `{ id, organization_id, size, unit, price, created_at, updated_at }`
+-   **Recipes** (`recipes`): `{ id, organization_id, name, grade_id, aroma_id, bottle_size_id, instructions, created_at, updated_at }`
+-   **Expenses** (`expenses`): `{ id, organization_id, date, category, description, amount, created_at, updated_at }`
+-   **Settings** (`settings`): `{ id, organization_id, key, value, created_at, updated_at }`
+
+### 2.2. PostgreSQL Functions:
+
+-   **process_checkout**: Fungsi RPC untuk menangani checkout dengan parameter organization_id, cashier_id, customer_id, items array, total_amount, dan payment_method.
+
+---
+
+## Bagian 3: Masalah Aktual yang Perlu Diperbaiki
+
+**MASALAH UTAMA SAAT INI:**
+Session authentication tidak berfungsi dengan baik. Dari log webview, terlihat bahwa session selalu `null` dan GoTrueClient terus mencoba auto refresh token tetapi tidak berhasil. Hal ini menyebabkan:
+
+1. User tidak bisa mengakses API yang memerlukan autentikasi
+2. Error "No session found" pada API promotions dan lainnya
+3. User harus login ulang setiap kali refresh halaman
+
+**Langkah-langkah yang harus Anda lakukan:**
+
+1.  **Perbaikan Session Management (Prioritas Tertinggi):**
+    *   Tinjau konfigurasi Supabase client dan auth context
+    *   Pastikan cookies dan localStorage session tersimpan dengan benar
+    *   Debug mengapa session tidak persist setelah login
+    *   Perbaiki auto refresh token mechanism
+
+2.  **Stabilisasi Halaman POS:**
+    *   Setelah session fixed, tinjau `src/app/dashboard/pos/page.tsx` secara menyeluruh
+    *   Perbaiki semua error TypeScript yang tersisa
+    *   Pastikan kode tangguh dalam menangani state loading dan kemungkinan data `null`
+
+3.  **Migrasi Data Statis ke Dinamis:**
+    *   Modifikasi `fetchPosData` untuk mengambil data dari tabel `grades`, `aromas`, `bottle_sizes`, dan `recipes`
+    *   Hapus array statis dan gunakan data dari database
+    *   Adaptasi komponen `RefillForm` untuk menggunakan data dinamis
+
+---
+
+## Bagian 4: Prompt Serah Terima untuk AI Berikutnya
 
 *Anda dapat menyalin dan menempelkan seluruh teks berikut ke AI lain.*
 
@@ -52,44 +113,57 @@ Anda adalah seorang AI software engineer ahli dengan spesialisasi pada tumpukan 
 ScentPOS adalah aplikasi POS komprehensif untuk bisnis parfum, mendukung penjualan produk jadi dan layanan isi ulang kustom dalam arsitektur multi-toko (multi-tenant) yang aman.
 
 **Konteks & Arsitektur Saat Ini:**
-Proyek ini telah melalui fase pengembangan yang signifikan. Berikut adalah status arsitektur saat ini:
-*   **Backend & Database:** Menggunakan Supabase. Skema database dirancang untuk multi-tenancy. Tabel `organizations` menggunakan `parent_organization_id` untuk hierarki outlet. Tabel `profiles` menghubungkan `auth.users` ke `organizations` dan menyimpan peran ('owner', 'admin', 'cashier'). Semua tabel data utama (`products`, `transactions`, `customers`, `raw_materials`, dll.) memiliki kolom `organization_id` untuk partisi data.
-*   **Keamanan:** Row-Level Security (RLS) diaktifkan dan dikonfigurasi pada semua tabel data dan tabel `profiles`, memastikan isolasi data yang ketat antar organisasi.
-*   **Transaksi Inti:** Proses checkout ditangani oleh Fungsi RPC (PostgreSQL Function) di Supabase bernama `process_checkout`. Fungsi ini secara atomik membuat record di `transactions` dan `transaction_items`, serta memperbarui stok di `products`.
-*   **Frontend:** Dibangun dengan Next.js App Router dan TypeScript.
-    *   **Manajemen State:** `AuthContext` (`src/context/auth-context.tsx`) berfungsi sebagai state manager global. Ini menangani state otentikasi Supabase (`user`, `profile`, `loading`) dan ID outlet yang dipilih secara global (`selectedOrganizationId`).
-    *   **Halaman yang Telah Diadaptasi:** Halaman Inventaris (`/dashboard/inventory`), Produk (`/dashboard/products`), Manajemen Pengguna (`/dashboard/users`), dan Manajemen Organisasi (`/dashboard/organizations`) sudah terintegrasi penuh dengan backend dan `AuthContext`. Halaman Point of Sale (POS) (`/dashboard/pos`) sudah berhasil diadaptasi untuk membaca data dinamis, dan fungsi checkout-nya sudah terhubung ke RPC.
-    *   **Navigasi:** Layout dashboard (`/dashboard/layout.tsx`) memiliki navigasi sadar peran dan "Outlet Selector" yang dinamis.
+Proyek ini telah melalui fase pengembangan yang signifikan dengan arsitektur database lengkap untuk multi-tenancy. Backend menggunakan Supabase dengan RLS yang ketat, frontend menggunakan Next.js App Router dengan TypeScript.
 
-**Status Proyek Saat Ini:**
-Alur penjualan inti di halaman POS berfungsi, namun file `src/app/dashboard/pos/page.tsx` baru-baru ini mengalami beberapa error TypeScript (seperti `Property 'id' does not exist on type 'never'`) karena kompleksitas dalam menangani data dinamis. Selain itu, bagian "Formulir Isi Ulang Kustom" (Refill Form) di halaman ini masih menggunakan data statis.
+**Database Schema Lengkap:**
+- Tabel organizations dengan parent_organization_id untuk hierarki outlet
+- Tabel profiles untuk menghubungkan auth.users ke organizations dengan role-based access
+- Tabel products, raw_materials, customers, transactions, transaction_items
+- Tabel promotions dengan dukungan Persentase, Nominal, dan BOGO
+- Tabel grades, aromas, bottle_sizes, recipes untuk sistem refill kustom
+- Tabel expenses dan settings untuk manajemen operasional
+- PostgreSQL Function process_checkout untuk transaksi atomik
 
-**TUGAS UTAMA ANDA SAAT INI:**
-Tugas Anda adalah **menstabilkan, memperbaiki, dan menyelesaikan adaptasi file `src/app/dashboard/pos/page.tsx`** dengan menghilangkan semua data statis yang tersisa.
+**MASALAH UTAMA YANG HARUS DIPERBAIKI:**
+Session authentication tidak berfungsi. Dari webview logs terlihat GoTrueClient selalu mendapat "session from storage: null" dan auto refresh token gagal. Ini menyebabkan user tidak bisa mengakses API yang memerlukan autentikasi.
 
-**Langkah-langkah yang harus Anda lakukan:**
-1.  **Koreksi & Stabilisasi (Prioritas Utama):** Tinjau `src/app/dashboard/pos/page.tsx` secara menyeluruh. Perbaiki semua error TypeScript yang tersisa. Pastikan kode tangguh dalam menangani state loading dan kemungkinan data `null` atau array kosong yang datang dari Supabase, terutama di dalam blok render `.map`.
-2.  **Migrasi Data Statis ke Dinamis:** Setelah halaman stabil, lanjutkan tugas migrasi:
-    *   **Modifikasi `fetchPosData`:** Perbarui fungsi `useEffect` ini. Selain mengambil data produk, pelanggan, dan promosi, tambahkan query untuk mengambil data dari tabel `grades`, `aromas`, `bottle_sizes`, dan `recipes` dari Supabase, difilter berdasarkan `selectedOrganizationId`.
-    *   **Buat State Baru:** Buat variabel state `useState` baru di komponen `PosPage` untuk menyimpan data yang baru diambil (contoh: `const [grades, setGrades] = useState<Grade[]>([]);`).
-    *   **Hapus Data Statis:** Hapus array statis untuk `grades`, `aromas`, `bottleSizes`, dan `recipes`.
-    *   **Adaptasi Komponen `RefillForm`:** Pastikan semua elemen UI di `RefillForm` (seperti `Select` dan `Combobox`) sekarang menggunakan data dari state dinamis yang baru.
+**TUGAS PRIORITAS:**
+1. **Fix Session Management**: Debug dan perbaiki mengapa session tidak tersimpan/tidak terbaca dari localStorage/cookies
+2. **Stabilkan POS Page**: Setelah auth fixed, perbaiki error TypeScript di dashboard/pos/page.tsx
+3. **Migrasi Data Statis**: Ubah data statis di POS (grades, aromas, bottle_sizes, recipes) menjadi dinamis dari database
+
+**Status Modul:**
+- ✅ Authentication & Authorization (RLS working, tapi session storage bermasalah)
+- ✅ User & Organization Management
+- ✅ Product & Inventory Management  
+- ✅ Promotions System
+- ✅ Core Transaction Flow (process_checkout function)
+- ⚠️ POS Page (berfungsi tapi masih ada data statis)
+- 🔄 Session Management (perlu diperbaiki)
+- ❌ Reports (masih statis)
+- ❌ Settings Management (masih mockup)
+
+**Teknologi Stack:**
+- Frontend: Next.js 15 App Router, TypeScript, Tailwind CSS, shadcn/ui
+- Backend: Supabase (PostgreSQL + Auth + RLS)
+- State Management: React Context (AuthContext)
+- Deployment: Replit
+
+Fokus utama Anda adalah memperbaiki masalah session authentication terlebih dahulu, kemudian melanjutkan stabilisasi dan pengembangan fitur yang tersisa.
 
 ---
 
-**Rencana Jangka Panjang (Setelah Tugas Utama Selesai):**
-
-Rencana pengembangan selanjutnya dibagi menjadi prioritas jangka pendek untuk menyelesaikan fungsionalitas inti, dan visi jangka panjang sesuai dengan blueprint awal aplikasi.
+## Rencana Jangka Panjang (Setelah Tugas Utama Selesai)
 
 ### Prioritas Jangka Pendek:
-1.  **Bangun Halaman Pengaturan Fungsional:** Buat antarmuka pengguna (UI) di `/dashboard/settings` yang memungkinkan admin/owner untuk mengelola data bisnis inti secara dinamis, termasuk data di tabel `grades`, `aromas`, `recipes`, dan `settings` (seperti aturan loyalitas).
-2.  **Sempurnakan Halaman Laporan:** Buat halaman `/dashboard/reports` menjadi dinamis sepenuhnya, menampilkan data analitik dari tabel `transactions` dan `transaction_items`. Implementasikan kemampuan filter berdasarkan outlet dan rentang tanggal.
-3.  **Polesan UI/UX Umum:** Lakukan perbaikan antarmuka dan pengalaman pengguna di seluruh aplikasi, seperti menambahkan notifikasi yang lebih baik, pagination, dan feedback loading yang lebih jelas.
+1.  **Bangun Halaman Settings Fungsional:** Buat UI di `/dashboard/settings` untuk mengelola data `grades`, `aromas`, `recipes`, dan `settings` secara dinamis.
+2.  **Sempurnakan Halaman Reports:** Buat halaman `/dashboard/reports` menjadi dinamis sepenuhnya dari tabel `transactions` dan `expenses`.
+3.  **Polesan UI/UX:** Perbaikan antarmuka dan pengalaman pengguna, notifikasi, pagination, loading states.
 
-### Visi Jangka Panjang (Sesuai Blueprint):
-- **Peningkatan Kemampuan AI**: Manajemen inventaris prediktif dan rekomendasi wewangian yang dipersonalisasi.
-- **Analitik Tingkat Lanjut**: Segmentasi pelanggan dan pelacakan kinerja pemasok.
-- **Integrasi E-commerce**: Membangun toko online dengan sinkronisasi inventaris real-time.
-- **Ekspansi Program Loyalitas**: Mengembangkan sistem loyalitas berjenjang dan hadiah yang bisa diotomatisasi.
-- **Integrasi Gerbang Pembayaran**: Mendukung lebih banyak opsi pembayaran digital.
-- **Optimasi Rantai Pasokan**: Fitur pemesanan ulang otomatis dan pelacakan batch/kedaluwarsa bahan baku.
+### Visi Jangka Panjang:
+- **Peningkatan AI**: Manajemen inventaris prediktif dan rekomendasi wewangian
+- **Analitik Lanjutan**: Segmentasi pelanggan dan pelacakan kinerja
+- **Integrasi E-commerce**: Toko online dengan sinkronisasi inventaris real-time
+- **Program Loyalitas**: Sistem loyalitas berjenjang yang otomatis
+- **Payment Gateway**: Dukungan pembayaran digital yang lebih luas
+- **Supply Chain**: Auto-reorder dan pelacakan batch/expired materials
