@@ -53,10 +53,11 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!loading && !user) {
+      console.log('No user in layout, redirecting to login');
       router.push('/');
     } else if (!loading && user && !profile) {
-      console.error("User authenticated but no profile found");
-      router.push('/');
+      console.log("User authenticated but no profile found, staying on page to allow profile creation");
+      // Don't redirect immediately, allow time for profile to be fetched/created
     } else if (user && profile) {
       const fetchOrganizations = async () => {
         setIsLoadingOrgs(true);
@@ -88,18 +89,29 @@ export default function DashboardLayout({
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Memuat...</p>
+          <p className="text-muted-foreground">Memuat aplikasi...</p>
         </div>
       </div>
     );
   }
 
-  if (!user || !profile) {
+  if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <p className="text-red-600 mb-4">Sesi tidak valid atau profil tidak ditemukan</p>
-          <Button onClick={() => router.push('/')}>Kembali ke Login</Button>
+          <p className="text-red-600 mb-4">Sesi tidak valid. Mengalihkan ke login...</p>
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-600 mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Memuat profil pengguna...</p>
         </div>
       </div>
     );

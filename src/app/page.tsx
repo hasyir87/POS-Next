@@ -38,6 +38,20 @@ export default function Home() {
   }
 
   return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+      <div className="mx-auto max-w-sm space-y-6">
+        <div className="space-y-2 text-center">
+          <MPerfumeAmalLogo className="mx-auto h-12 w-12 text-white" />
+          <h1 className="text-3xl font-bold text-white font-headline">M Perfume Amal</h1>
+          <p className="text-blue-200">Masuk ke sistem manajemen toko</p>
+        </div>
+        <LoginForm />
+      </div>
+    </div>
+  );
+}
+
+  return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-8">
         <div className="text-center mb-8">

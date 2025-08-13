@@ -38,10 +38,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null);
 
-  // Helper function to set the session and user
-  const setSession = (session: any) => {
-    setUser(session?.user ?? null);
-  };
+  
 
   // Helper function to fetch user profile
   const fetchUserProfile = async (userId: string) => {
@@ -105,7 +102,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         if (mounted) {
-          setSession(session);
           setUser(session?.user ?? null);
 
           if (session?.user) {
@@ -137,10 +133,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log('Auth state changed:', event, session?.user?.id);
 
         if (mounted) {
-          setSession(session);
           setUser(session?.user ?? null);
 
-          if (session?.user && event === 'SIGNED_IN') {
+          if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
             await fetchUserProfile(session.user.id);
           } else if (event === 'SIGNED_OUT') {
             setProfile(null);

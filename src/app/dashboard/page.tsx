@@ -45,6 +45,7 @@ export default function DashboardPage() {
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
+      console.log('User not authenticated, redirecting to login');
       router.push('/');
       return;
     }
@@ -53,6 +54,7 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     // Only fetch if user is authenticated
     if (!user) {
+      console.log('No user, skipping data fetch');
       setStats({
         totalProducts: 0,
         totalUsers: 0,
@@ -66,45 +68,58 @@ export default function DashboardPage() {
       return;
     }
 
+    console.log('Fetching dashboard data for user:', user.id);
     setLoading(true);
     setError(null);
 
     try {
-      // Fetch products
-      const productsResponse = await fetch('/api/products', {
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
-      const productsData = await productsResponse.json();
+      const fetchPromises = [
+        fetch('/api/products', {
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        }),
+        fetch('/api/users', {
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        }),
+        fetch('/api/transactions', {
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        }),
+        fetch('/api/promotions', {
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        })
+      ];
 
-      // Fetch promotions
-      const promotionsResponse = await fetch('/api/promotions', {
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
-      let promotionsData = [];
+      const [productsResponse, usersResponse, transactionsResponse, promotionsResponse] = await Promise.allSettled(fetchPromises);
 
-      if (promotionsResponse.ok) {
-        promotionsData = await promotionsResponse.json();
-        console.log('Promotions data received:', promotionsData);
-      } else {
-        console.warn('Failed to fetch promotions:', promotionsResponse.status);
-        promotionsData = [];
+      // Process products
+      let productsData = [];
+      if (productsResponse.status === 'fulfilled' && productsResponse.value.ok) {
+        productsData = await productsResponse.value.json();
       }
 
-      // Fetch users
-      const usersResponse = await fetch('/api/users', {
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
-      const usersData = await usersResponse.json();
+      // Process users  
+      let usersData = [];
+      if (usersResponse.status === 'fulfilled' && usersResponse.value.ok) {
+        usersData = await usersResponse.value.json();
+      }
 
-      // Fetch transactions
-      const transactionsResponse = await fetch('/api/transactions', {
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
-      const transactionsData = await transactionsResponse.json();
+      // Process transactions
+      let transactionsData = [];
+      if (transactionsResponse.status === 'fulfilled' && transactionsResponse.value.ok) {
+        transactionsData = await transactionsResponse.value.json();
+      }
+
+      // Process promotions
+      let promotionsData = [];
+      if (promotionsResponse.status === 'fulfilled' && promotionsResponse.value.ok) {
+        promotionsData = await promotionsResponse.value.json();
+        console.log('Promotions data received:', promotionsData);
+      } else {
+        console.warn('Failed to fetch promotions:', promotionsResponse.status === 'fulfilled' ? promotionsResponse.value.status : 'Network error');
+      }
 
       // Calculate stats
       const products = Array.isArray(productsData) ? productsData : [];
@@ -128,11 +143,7 @@ export default function DashboardPage() {
 
     } catch (err: any) {
       console.error('Error fetching dashboard data:', err);
-      if (err.message === 'Failed to fetch promotions') {
-        setError('Gagal memuat data promosi');
-      } else {
-        setError(err.message || 'Gagal memuat data dashboard');
-      }
+      setError('Gagal memuat data dashboard');
       setPromotions([]);
       setStats({
         totalProducts: 0,
