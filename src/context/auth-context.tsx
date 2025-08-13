@@ -25,6 +25,7 @@ interface AuthContextType {
   loading: boolean;
   selectedOrganizationId: string | null;
   setSelectedOrganizationId: (orgId: string | null) => void;
+  login: ({ email, password }: { email: string; password: string }) => Promise<any>;
   logout: () => Promise<void>;
 }
 
@@ -95,6 +96,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   
+  const login = async ({ email, password }: { email: string; password: string }) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  };
+
   const logout = async () => {
     await supabase.auth.signOut();
   };
@@ -105,6 +119,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     loading,
     selectedOrganizationId,
     setSelectedOrganizationId,
+    login,
     logout,
   };
 
