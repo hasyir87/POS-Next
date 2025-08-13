@@ -1,6 +1,6 @@
 'use client';
 
-import LoginForm from '@/components/login-form';
+import { LoginForm } from '@/components/login-form';
 import { MPerfumeAmalLogo } from '@/components/m-perfume-amal-logo';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';

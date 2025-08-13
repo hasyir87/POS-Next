@@ -110,6 +110,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           if (session?.user) {
             await fetchUserProfile(session.user.id);
+          } else {
+            // Clear profile if no session
+            setProfile(null);
+            setSelectedOrganizationId(null);
           }
 
           setLoading(false);
@@ -117,6 +121,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (error) {
         console.error('Error in getInitialSession:', error);
         if (mounted) {
+          setUser(null);
+          setProfile(null);
+          setSelectedOrganizationId(null);
           setLoading(false);
         }
       }

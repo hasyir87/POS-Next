@@ -9,9 +9,14 @@ export async function GET() {
     // Get the current user
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-    if (sessionError || !session) {
-      console.log('No session found for promotions request');
-      return NextResponse.json([], { status: 200 }); // Return empty array instead of error
+    if (sessionError) {
+      console.error('Session error:', sessionError);
+      return NextResponse.json({ error: 'Session error' }, { status: 401 });
+    }
+
+    if (!session || !session.user) {
+      console.log('No valid session found for promotions request');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get user profile

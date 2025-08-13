@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -8,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Package, Users, ShoppingCart, TrendingUp, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Package, Users, ShoppingCart, TrendingUp, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface DashboardStats {
   totalProducts: number;
@@ -29,6 +29,7 @@ interface Promotion {
 
 export default function DashboardPage() {
   const { user, selectedOrganizationId, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
     totalUsers: 0,
@@ -41,19 +42,48 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/');
+      return;
+    }
+  }, [user, authLoading, router]);
+
   const fetchDashboardData = async () => {
+    // Only fetch if user is authenticated
+    if (!user) {
+      setStats({
+        totalProducts: 0,
+        totalUsers: 0,
+        totalTransactions: 0,
+        totalRevenue: 0,
+        lowStockProducts: 0,
+        activePromotions: 0
+      });
+      setPromotions([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    
+
     try {
       // Fetch products
-      const productsResponse = await fetch('/api/products');
+      const productsResponse = await fetch('/api/products', {
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
       const productsData = await productsResponse.json();
-      
+
       // Fetch promotions
-      const promotionsResponse = await fetch('/api/promotions');
+      const promotionsResponse = await fetch('/api/promotions', {
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
       let promotionsData = [];
-      
+
       if (promotionsResponse.ok) {
         promotionsData = await promotionsResponse.json();
         console.log('Promotions data received:', promotionsData);
@@ -61,13 +91,19 @@ export default function DashboardPage() {
         console.warn('Failed to fetch promotions:', promotionsResponse.status);
         promotionsData = [];
       }
-      
+
       // Fetch users
-      const usersResponse = await fetch('/api/users');
+      const usersResponse = await fetch('/api/users', {
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
       const usersData = await usersResponse.json();
-      
+
       // Fetch transactions
-      const transactionsResponse = await fetch('/api/transactions');
+      const transactionsResponse = await fetch('/api/transactions', {
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
       const transactionsData = await transactionsResponse.json();
 
       // Calculate stats
@@ -75,7 +111,7 @@ export default function DashboardPage() {
       const activePromotions = Array.isArray(promotionsData) ? promotionsData.filter(p => p.is_active) : [];
       const users = Array.isArray(usersData) ? usersData : [];
       const transactions = Array.isArray(transactionsData) ? transactionsData : [];
-      
+
       const lowStockProducts = products.filter(p => p.stock < 10).length;
       const totalRevenue = transactions.reduce((sum, t) => sum + (t.total_amount || 0), 0);
 
@@ -89,62 +125,64 @@ export default function DashboardPage() {
       });
 
       setPromotions(activePromotions);
-      
+
     } catch (err: any) {
       console.error('Error fetching dashboard data:', err);
-      setError(err.message || 'Gagal memuat data dashboard');
+      if (err.message === 'Failed to fetch promotions') {
+        setError('Gagal memuat data promosi');
+      } else {
+        setError(err.message || 'Gagal memuat data dashboard');
+      }
+      setPromotions([]);
+      setStats({
+        totalProducts: 0,
+        totalUsers: 0,
+        totalTransactions: 0,
+        totalRevenue: 0,
+        lowStockProducts: 0,
+        activePromotions: 0
+      });
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (user) {
+    if (!authLoading && user) {
       fetchDashboardData();
-    } else if (!user && !loading) {
-      // If no user and not loading, redirect to login
-      window.location.href = '/';
     }
-  }, [user, selectedOrganizationId]);
+  }, [user, authLoading]);
 
   const refreshData = () => {
     fetchDashboardData();
   };
 
-  // Check authentication first
+  // Show loading while checking authentication
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-lg">Memuat dashboard...</p>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p>Memuat dashboard...</p>
         </div>
       </div>
     );
   }
 
+  // Redirect if not authenticated
   if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg mb-4">Anda perlu login untuk mengakses dashboard</p>
-          <Button onClick={() => window.location.href = '/'}>
-            Kembali ke Login
-          </Button>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="p-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <Skeleton className="h-10 w-32" />
         </div>
-        
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-6">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -164,7 +202,7 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <Button onClick={refreshData} variant="outline">
@@ -172,14 +210,14 @@ export default function DashboardPage() {
             Refresh
           </Button>
         </div>
-        
+
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             {error}
           </AlertDescription>
         </Alert>
-        
+
         <Button onClick={refreshData} className="w-full">
           Coba Lagi
         </Button>
@@ -188,7 +226,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <Button onClick={refreshData} variant="outline">
@@ -270,7 +308,7 @@ export default function DashboardPage() {
           {promotions.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground">Tidak ada promosi aktif</p>
-              <Button variant="outline" className="mt-4" onClick={() => window.location.href = '/dashboard/promotions'}>
+              <Button variant="outline" className="mt-4" onClick={() => router.push('/dashboard/promotions')}>
                 Buat Promosi Baru
               </Button>
             </div>
@@ -304,16 +342,16 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
-            <Button onClick={() => window.location.href = '/dashboard/pos'} className="w-full">
+            <Button onClick={() => router.push('/dashboard/pos')} className="w-full">
               Buka POS
             </Button>
-            <Button onClick={() => window.location.href = '/dashboard/products'} variant="outline" className="w-full">
+            <Button onClick={() => router.push('/dashboard/products')} variant="outline" className="w-full">
               Kelola Produk
             </Button>
-            <Button onClick={() => window.location.href = '/dashboard/inventory'} variant="outline" className="w-full">
+            <Button onClick={() => router.push('/dashboard/inventory')} variant="outline" className="w-full">
               Inventaris
             </Button>
-            <Button onClick={() => window.location.href = '/dashboard/reports'} variant="outline" className="w-full">
+            <Button onClick={() => router.push('/dashboard/reports')} variant="outline" className="w-full">
               Laporan
             </Button>
           </div>
