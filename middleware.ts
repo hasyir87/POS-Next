@@ -29,5 +29,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*'], // Terapkan middleware ke semua route di bawah /dashboard
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'], // Terapkan middleware ke semua route kecuali API dan assets
 };

@@ -46,20 +46,27 @@ export function LoginForm() {
   })
 
   const [loginError, setLoginError] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoginError(null);
+    setIsLoading(true);
+    
     try {
       await login({ email: values.email, password: values.password });
-      router.push("/dashboard");
+      // Middleware akan handle redirect
     } catch (error: any) {
       let msg = error?.message || "Login gagal";
       if (msg.toLowerCase().includes("invalid login credentials")) {
         msg = "Email atau password salah.";
       } else if (msg.toLowerCase().includes("user not found")) {
         msg = "Akun tidak ditemukan.";
+      } else if (msg.toLowerCase().includes("email not confirmed")) {
+        msg = "Email belum dikonfirmasi. Silakan periksa email Anda.";
       }
       setLoginError(msg);
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -99,7 +106,9 @@ export function LoginForm() {
               )}
             />
             
-            <Button type="submit" className="w-full">Masuk</Button>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Memproses..." : "Masuk"}
+            </Button>
             {loginError && (
               <div className="text-red-500 text-sm mt-2 text-center">{loginError}</div>
             )}

@@ -80,12 +80,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error("Error fetching profile:", error);
-        setProfile(null);
+        if (error.code === 'PGRST116') {
+          // Profile tidak ditemukan, buat profile default
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              id: supabaseUser.id,
+              email: supabaseUser.email,
+              full_name: supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0] || 'User',
+              role: 'cashier',
+              organization_id: null
+            })
+            .select()
+            .single();
+
+          if (createError) {
+            console.error("Error creating profile:", createError);
+            setProfile(null);
+          } else {
+            setProfile(newProfile as UserProfile);
+          }
+        } else {
+          setProfile(null);
+        }
       } else if (data) {
         const userProfile = data as UserProfile;
         setProfile(userProfile);
         // Atur organisasi terpilih default ke organisasi pengguna saat profil dimuat
-        // Ini penting untuk pengguna yang bukan 'owner'
         if (userProfile.organization_id) {
           setSelectedOrganizationId(userProfile.organization_id);
         }
