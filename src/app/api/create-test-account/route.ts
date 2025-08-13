@@ -5,7 +5,8 @@ import { NextResponse } from 'next/server';
 
 export async function POST() {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
     
     // Create test organization
     const { data: orgData, error: orgError } = await supabase
@@ -20,7 +21,7 @@ export async function POST() {
 
     // Create test user with Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: 'test@mperfumeamal.com',
+      email: 'test@example.com',
       password: 'test123456',
       options: {
         data: {
@@ -37,7 +38,7 @@ export async function POST() {
         .from('profiles')
         .insert({
           id: authData.user.id,
-          email: 'test@mperfumeamal.com',
+          email: 'test@example.com',
           full_name: 'User Test',
           role: 'owner',
           organization_id: orgData.id
