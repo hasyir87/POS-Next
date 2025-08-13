@@ -15,13 +15,20 @@ export async function GET() {
       return NextResponse.json({ error: 'Session error' }, { status: 401 });
     }
 
-    // Validate session exists and is not expired
-    const isValidSession = session?.user && session?.expires_at && new Date(session.expires_at * 1000) > new Date();
-    
-    if (!isValidSession) {
-      console.log('No valid session found for promotions request. Session:', !!session, 'User:', !!session?.user, 'Expires:', session?.expires_at);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Check if session exists
+    if (!session?.user) {
+      console.log('No session or user found for promotions request');
+      return NextResponse.json({ error: 'No session found' }, { status: 401 });
     }
+
+    // Validate session is not expired
+    const isExpired = session.expires_at && new Date(session.expires_at * 1000) <= new Date();
+    if (isExpired) {
+      console.log('Session expired for user:', session.user.id);
+      return NextResponse.json({ error: 'Session expired' }, { status: 401 });
+    }
+
+    console.log('Valid session found for user:', session.user.id);
 
     // Get user profile
     const { data: profile, error: profileError } = await supabase

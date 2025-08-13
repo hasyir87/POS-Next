@@ -105,7 +105,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Validate session is not expired
           const isValidSession = session?.user && session?.expires_at && new Date(session.expires_at * 1000) > new Date();
           
-          setUser(isValidSession ? session.user : null);
+          if (isValidSession) {
+            setUser(session.user);
+            console.log('Valid session found:', session.user.id);
+          } else {
+            setUser(null);
+            console.log('No valid session found');
+          }
 
           if (isValidSession && session.user) {
             await fetchUserProfile(session.user.id);
