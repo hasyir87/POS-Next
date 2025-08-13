@@ -11,8 +11,7 @@ export async function POST() {
     const { data: orgData, error: orgError } = await supabase
       .from('organizations')
       .insert({
-        name: 'Toko Test',
-        parent_organization_id: null
+        name: 'Toko Test'
       })
       .select()
       .single();
