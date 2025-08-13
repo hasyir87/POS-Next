@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useState, useEffect, ReactNode, useContext } from 'react';
@@ -39,43 +38,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null);
 
-  useEffect(() => {
-    setLoading(true);
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const sessionUser = session?.user ?? null;
-      setUser(sessionUser);
-      if (sessionUser) {
-        await fetchProfile(sessionUser);
-      }
-      setLoading(false);
-    };
+  // Helper function to set the session and user
+  const setSession = (session: any) => {
+    setUser(session?.user ?? null);
+  };
 
-    getInitialSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const sessionUser = session?.user ?? null;
-      setUser(sessionUser);
-      if (sessionUser) {
-        await fetchProfile(sessionUser);
-      } else {
-        setProfile(null);
-        setSelectedOrganizationId(null);
-      }
-      setLoading(false);
-    });
-
-    return () => {
-      subscription?.unsubscribe();
-    };
-  }, []);
-
-  const fetchProfile = async (supabaseUser: SupabaseUser) => {
+  // Helper function to fetch user profile
+  const fetchUserProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, email, avatar_url, role, organization_id')
-        .eq('id', supabaseUser.id)
+        .eq('id', userId)
         .single();
 
       if (error) {
@@ -85,9 +59,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const { data: newProfile, error: createError } = await supabase
             .from('profiles')
             .insert({
-              id: supabaseUser.id,
-              email: supabaseUser.email,
-              full_name: supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0] || 'User',
+              id: userId,
+              email: user?.email || null, // Use the current user's email if available
+              full_name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User',
               role: 'cashier',
               organization_id: null
             })
@@ -116,7 +90,67 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setProfile(null);
     }
   };
-  
+
+
+  useEffect(() => {
+    let mounted = true;
+
+    // Get initial session
+    const getInitialSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error('Error getting session:', error);
+        }
+
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+
+          if (session?.user) {
+            await fetchUserProfile(session.user.id);
+          }
+
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error in getInitialSession:', error);
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    getInitialSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id);
+
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+
+          if (session?.user && event === 'SIGNED_IN') {
+            await fetchUserProfile(session.user.id);
+          } else if (event === 'SIGNED_OUT') {
+            setProfile(null);
+            setSelectedOrganizationId(null);
+          }
+
+          setLoading(false);
+        }
+      }
+    );
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
   const login = async ({ email, password }: { email: string; password: string }) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,

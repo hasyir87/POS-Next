@@ -28,7 +28,7 @@ interface Promotion {
 }
 
 export default function DashboardPage() {
-  const { user, selectedOrganizationId } = useAuth();
+  const { user, selectedOrganizationId, loading: authLoading } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
     totalUsers: 0,
@@ -101,12 +101,40 @@ export default function DashboardPage() {
   useEffect(() => {
     if (user) {
       fetchDashboardData();
+    } else if (!user && !loading) {
+      // If no user and not loading, redirect to login
+      window.location.href = '/';
     }
   }, [user, selectedOrganizationId]);
 
   const refreshData = () => {
     fetchDashboardData();
   };
+
+  // Check authentication first
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-lg">Memuat dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg mb-4">Anda perlu login untuk mengakses dashboard</p>
+          <Button onClick={() => window.location.href = '/'}>
+            Kembali ke Login
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
