@@ -36,6 +36,7 @@ export async function POST(req: Request) {
   // --- Langkah 2: Buat Organisasi Induk ---
   // Hapus parent_organization_id karena skema baru tidak memilikinya
   const { data: organization, error: orgError } = await serviceRoleSupabase // Gunakan serviceRoleSupabase
+
     .from("organizations")
     .insert([{ name: organization_name }])
     .select() // Penting untuk mendapatkan ID organisasi yang baru dibuat
@@ -53,6 +54,7 @@ export async function POST(req: Request) {
 
   // --- Langkah 3: Buat Profil Pengguna (Pemilik) dan Hubungkan ke Organisasi ---
   const { data: userProfile, error: profileError } = await serviceRoleSupabase // Gunakan serviceRoleSupabase
+
     .from("profiles")
     .insert([
       {
@@ -72,6 +74,7 @@ export async function POST(req: Request) {
       .from("organizations")
       .delete()
       .eq("id", organization.id); // Gunakan serviceRoleSupabase
+
     return NextResponse.json({ error: profileError.message }, { status: 500 });
   }
 

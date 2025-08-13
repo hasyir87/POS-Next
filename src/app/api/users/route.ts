@@ -59,7 +59,62 @@ export async function GET(request: NextRequest) {
 
 // API Route untuk mengundang/membuat pengguna baru
 export async function POST(req: Request) {
-  const { email, password, name, role, organization_id } = await req.json(); // password bisa opsional jika menggunakan invite
+  const { email, password, full_name, role, organization_id } =
+    await req.json();
+
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient({ cookies: cookieStore });
+
+  // Dapatkan profil pengguna yang sedang request
+  const {
+    data: { user: requestingUser },
+    error: requestingUserError,
+  } = await supabase.auth.getUser();
+  if (requestingUserError || !requestingUser) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { data: requestingProfile, error: requestingProfileError } =
+    await supabase
+      .from("profiles")
+      .select("organization_id, role")
+      .eq("id", requestingUser.id)
+      .single();
+
+  if (
+    requestingProfileError ||
+    !requestingProfile ||
+    !requestingProfile.organization_id
+  ) {
+    return NextResponse.json(
+      { error: "Requesting user profile not found" },
+      { status: 404 },
+    );
+  }
+
+  // --- Pemeriksaan Izin ---
+  if (
+    requestingProfile.role !== "owner" &&
+    requestingProfile.role !== "admin"
+  ) {
+    return NextResponse.json(
+      { error: "Forbidden: Only owners or admins can add users" },
+      { status: 403 },
+    );
+  }
+  if (organization_id !== requestingProfile.organization_id) {
+    return NextResponse.json(
+      { error: "Forbidden: Cannot add user to a different organization" },
+      { status: 403 },
+    );
+  }
+  const allowedRoles = ["cashier", "admin"];
+  if (!allowedRoles.includes(role)) {
+    return NextResponse.json(
+      { error: `Forbidden: Cannot assign role "${role}"` },
+      { status: 403 },
+    );
+  }
 
   // Perlu Service Role Key untuk operasi admin
   const serviceRoleSupabase = createRouteHandlerClient({
