@@ -58,14 +58,11 @@ export default function DashboardLayout({
       setIsLoadingOrgs(true);
 
       let query;
-      if (profile.role === 'superadmin') {
+      // Superadmin dan Owner bisa melihat semua organisasi
+      if (profile.role === 'superadmin' || profile.role === 'owner') {
         query = supabase.from('organizations').select('*');
-      } else if (profile.role === 'owner' && profile.organization_id) {
-        query = supabase
-          .from('organizations')
-          .select('*')
-          .or(`parent_organization_id.eq.${profile.organization_id},id.eq.${profile.organization_id}`);
       } else if (profile.organization_id) {
+        // Role lain (admin, cashier) hanya melihat organisasi mereka sendiri
         query = supabase.from('organizations').select('*').eq('id', profile.organization_id);
       } else {
         setOrganizations([]);
