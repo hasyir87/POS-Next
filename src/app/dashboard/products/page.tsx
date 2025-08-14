@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,11 +8,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, MoreHorizontal, SprayCan } from "lucide-react";
+import { PlusCircle, MoreHorizontal, SprayCan, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
-import type { Product } from "@/types/database";
+import type { Database } from "@/types/database";
+
+type Product = Database['public']['Tables']['products']['Row'];
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
@@ -29,8 +31,8 @@ export default function ProductsPage() {
 
     const emptyProduct: Partial<Product> = { name: "", price: 0, stock: 0, image_url: "https://placehold.co/150x150.png" };
     
-    const fetchProducts = async () => {
-        if (!selectedOrganizationId) return;
+    const fetchProducts = useCallback(async () => {
+        if (!selectedOrganizationId || !supabase) return;
 
         setIsLoading(true);
         const { data, error } = await supabase
@@ -47,13 +49,16 @@ export default function ProductsPage() {
             setProducts(data as Product[]);
         }
         setIsLoading(false);
-    };
+    }, [selectedOrganizationId, supabase, toast]);
 
     useEffect(() => {
         if (!authLoading && selectedOrganizationId) {
             fetchProducts();
+        } else if (!selectedOrganizationId && !authLoading) {
+            setIsLoading(false);
+            setProducts([]);
         }
-    }, [selectedOrganizationId, authLoading]);
+    }, [selectedOrganizationId, authLoading, fetchProducts]);
 
     const handleOpenDialog = (product: Partial<Product> | null = null) => {
         setEditingProduct(product ? { ...product } : emptyProduct);
@@ -65,8 +70,8 @@ export default function ProductsPage() {
             toast({ variant: "destructive", title: "Error", description: "Nama dan harga produk harus diisi." });
             return;
         }
-        if (!selectedOrganizationId) {
-            toast({ variant: "destructive", title: "Error", description: "Organisasi tidak terpilih." });
+        if (!selectedOrganizationId || !supabase) {
+            toast({ variant: "destructive", title: "Error", description: "Organisasi tidak terpilih atau koneksi DB gagal." });
             return;
         }
 
@@ -89,7 +94,7 @@ export default function ProductsPage() {
         } else {
             ({ error } = await supabase
                 .from('products')
-                .insert([productData]));
+                .insert([productData as Product]));
         }
 
         if (error) {
@@ -100,10 +105,11 @@ export default function ProductsPage() {
         
         setDialogOpen(false);
         setEditingProduct(null);
-        fetchProducts(); // Refetch data
+        await fetchProducts();
     };
     
     const handleDeleteProduct = async (id: string) => {
+        if (!supabase) return;
         const { error } = await supabase
             .from('products')
             .delete()
@@ -113,12 +119,12 @@ export default function ProductsPage() {
             toast({ variant: "destructive", title: "Error", description: `Gagal menghapus produk: ${error.message}` });
         } else {
             toast({ title: "Sukses", description: "Produk berhasil dihapus." });
-            fetchProducts();
+            await fetchProducts();
         }
     };
 
-    if (authLoading || isLoading) {
-        return <div className="p-6">Loading products...</div>
+    if (authLoading) {
+        return <div className="p-6 flex justify-center items-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
     }
 
     return (
@@ -127,7 +133,7 @@ export default function ProductsPage() {
                 <h1 className="font-headline text-3xl font-bold flex items-center gap-2"><SprayCan className="h-8 w-8" /> Manajemen Produk Jadi</h1>
                 <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button onClick={() => handleOpenDialog()}>
+                        <Button onClick={() => handleOpenDialog()} disabled={!selectedOrganizationId}>
                             <PlusCircle className="mr-2 h-4 w-4" /> Tambah Produk Baru
                         </Button>
                     </DialogTrigger>
@@ -173,35 +179,45 @@ export default function ProductsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {products.length > 0 ? products.map((product) => (
-                                <TableRow key={product.id}>
-                                    <TableCell>
-                                        <Image src={product.image_url || "https://placehold.co/50x50.png"} alt={product.name} width={50} height={50} className="rounded-md aspect-square object-cover" data-ai-hint="perfume bottle" />
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="font-medium">{product.name}</div>
-                                        <div className="text-sm text-muted-foreground">{product.id}</div>
-                                    </TableCell>
-                                    <TableCell>{product.stock} pcs</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(product.price)}</TableCell>
-                                    <TableCell>
-                                       <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                                    <span className="sr-only">Buka menu</span>
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => handleOpenDialog(product)}>Ubah</DropdownMenuItem>
-                                                <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteProduct(product.id)}>Hapus</DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </TableCell>
-                                </TableRow>
-                            )) : (
+                            {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center">Tidak ada produk untuk outlet ini.</TableCell>
+                                    <TableCell colSpan={5} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell>
+                                </TableRow>
+                            ) : !selectedOrganizationId ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center">Pilih outlet untuk melihat data produk.</TableCell>
+                                </TableRow>
+                            ) : products.length > 0 ? (
+                                products.map((product) => (
+                                    <TableRow key={product.id}>
+                                        <TableCell>
+                                            <Image src={product.image_url || "https://placehold.co/50x50.png"} alt={product.name} width={50} height={50} className="rounded-md aspect-square object-cover" data-ai-hint="perfume bottle" />
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="font-medium">{product.name}</div>
+                                            <div className="text-sm text-muted-foreground">{product.id}</div>
+                                        </TableCell>
+                                        <TableCell>{product.stock} pcs</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(product.price)}</TableCell>
+                                        <TableCell>
+                                           <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0">
+                                                        <span className="sr-only">Buka menu</span>
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => handleOpenDialog(product)}>Ubah</DropdownMenuItem>
+                                                    <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteProduct(product.id)}>Hapus</DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center">Tidak ada produk untuk outlet ini.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>

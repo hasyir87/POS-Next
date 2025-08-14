@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/auth-context";
 import { InventoryTool } from "@/components/inventory-tool";
 import { Button } from "@/components/ui/button";
@@ -9,15 +9,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MoreHorizontal, PlusCircle, PackageSearch } from "lucide-react";
+import { MoreHorizontal, PlusCircle, PackageSearch, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import type { RawMaterial } from "@/types/database";
+import type { Database } from '@/types/database';
 
-// These can eventually be fetched from a dedicated 'settings' or 'options' table
+type RawMaterial = Database['public']['Tables']['raw_materials']['Row'];
+
 const initialCategories = [
     { value: "Bibit Parfum", label: "Bibit Parfum" },
     { value: "Pelarut", label: "Pelarut" },
@@ -60,8 +61,8 @@ export default function InventoryPage() {
 
   const emptyMaterial: Partial<RawMaterial> = { name: "", brand: "", quantity: 0, unit: "", category: "", purchase_price: 0 };
 
-  const fetchMaterials = async () => {
-    if (!selectedOrganizationId) return;
+  const fetchMaterials = useCallback(async () => {
+    if (!selectedOrganizationId || !supabase) return;
 
     setIsLoading(true);
     const { data, error } = await supabase
@@ -78,13 +79,16 @@ export default function InventoryPage() {
       setMaterials(data as RawMaterial[]);
     }
     setIsLoading(false);
-  };
+  }, [selectedOrganizationId, supabase, toast]);
 
   useEffect(() => {
     if(!authLoading && selectedOrganizationId) {
       fetchMaterials();
+    } else if (!selectedOrganizationId && !authLoading) {
+      setIsLoading(false);
+      setMaterials([]);
     }
-  }, [selectedOrganizationId, authLoading]);
+  }, [selectedOrganizationId, authLoading, fetchMaterials]);
 
   const handleOpenDialog = (material: Partial<RawMaterial> | null = null) => {
     setEditingMaterial(material ? { ...material } : emptyMaterial);
@@ -96,13 +100,12 @@ export default function InventoryPage() {
       toast({ variant: "destructive", title: "Error", description: "Nama, brand, unit, dan kategori bahan harus diisi." });
       return;
     }
-    if (!selectedOrganizationId) {
-        toast({ variant: "destructive", title: "Error", description: "Organisasi tidak terpilih." });
+    if (!selectedOrganizationId || !supabase) {
+        toast({ variant: "destructive", title: "Error", description: "Organisasi tidak terpilih atau koneksi DB gagal." });
         return;
     }
 
     if (editingMaterial.id) {
-      // Update existing material
       const { error } = await supabase
         .from('raw_materials')
         .update({
@@ -122,13 +125,9 @@ export default function InventoryPage() {
       }
 
     } else {
-      // Create new material
       const { error } = await supabase
         .from('raw_materials')
-        .insert([{
-          ...editingMaterial,
-          organization_id: selectedOrganizationId,
-        }]);
+        .insert([{ ...editingMaterial, organization_id: selectedOrganizationId } as RawMaterial]);
 
       if (error) {
         toast({ variant: "destructive", title: "Error", description: `Gagal menambahkan bahan: ${error.message}` });
@@ -139,10 +138,11 @@ export default function InventoryPage() {
     
     setDialogOpen(false);
     setEditingMaterial(null);
-    fetchMaterials(); // Refetch data after saving
+    await fetchMaterials();
   };
 
   const handleDeleteMaterial = async (id: string) => {
+    if (!supabase) return;
     const { error } = await supabase
         .from('raw_materials')
         .delete()
@@ -152,12 +152,12 @@ export default function InventoryPage() {
          toast({ variant: "destructive", title: "Error", description: `Gagal menghapus bahan: ${error.message}` });
     } else {
         toast({ title: "Sukses", description: "Bahan berhasil dihapus." });
-        fetchMaterials(); // Refetch data after deleting
+        await fetchMaterials();
     }
   };
   
   const groupedMaterials = materials.reduce((acc, material) => {
-    const categoryLabel = categories.find(c => c.value === material.category)?.label || material.category || 'Lainnya';
+    const categoryLabel = material.category || 'Lainnya';
     if (!acc[categoryLabel]) {
       acc[categoryLabel] = [];
     }
@@ -165,8 +165,8 @@ export default function InventoryPage() {
     return acc;
   }, {} as Record<string, RawMaterial[]>);
 
-  if (authLoading || isLoading) {
-    return <div className="p-6">Loading inventory...</div>
+  if (authLoading) {
+    return <div className="p-6 flex justify-center items-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
   }
 
   return (
@@ -184,7 +184,7 @@ export default function InventoryPage() {
                     </div>
                     <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button size="sm" onClick={() => handleOpenDialog()}><PlusCircle className="mr-2" /> Tambah Bahan</Button>
+                        <Button size="sm" onClick={() => handleOpenDialog()} disabled={!selectedOrganizationId}><PlusCircle className="mr-2" /> Tambah Bahan</Button>
                       </DialogTrigger>
                        <DialogContent className="sm:max-w-md">
                         <DialogHeader>
@@ -197,7 +197,7 @@ export default function InventoryPage() {
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="brand" className="text-right">Brand</Label>
-                                <Select value={editingMaterial?.brand} onValueChange={(value) => setEditingMaterial(prev => prev ? {...prev, brand: value} : null)}>
+                                <Select value={editingMaterial?.brand || ''} onValueChange={(value) => setEditingMaterial(prev => prev ? {...prev, brand: value} : null)}>
                                     <SelectTrigger id="brand" className="col-span-3">
                                         <SelectValue placeholder="Pilih brand" />
                                     </SelectTrigger>
@@ -208,7 +208,7 @@ export default function InventoryPage() {
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="category" className="text-right">Kategori</Label>
-                                 <Select value={editingMaterial?.category} onValueChange={(value) => setEditingMaterial(prev => prev ? {...prev, category: value} : null)}>
+                                 <Select value={editingMaterial?.category || ''} onValueChange={(value) => setEditingMaterial(prev => prev ? {...prev, category: value} : null)}>
                                     <SelectTrigger id="category" className="col-span-3">
                                         <SelectValue placeholder="Pilih kategori" />
                                     </SelectTrigger>
@@ -223,7 +223,7 @@ export default function InventoryPage() {
                             </div>
                              <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="unit" className="text-right">Unit</Label>
-                                <Select value={editingMaterial?.unit} onValueChange={(value) => setEditingMaterial(prev => prev ? {...prev, unit: value} : null)}>
+                                <Select value={editingMaterial?.unit || ''} onValueChange={(value) => setEditingMaterial(prev => prev ? {...prev, unit: value} : null)}>
                                     <SelectTrigger id="unit" className="col-span-3">
                                         <SelectValue placeholder="Pilih unit" />
                                     </SelectTrigger>
@@ -244,65 +244,71 @@ export default function InventoryPage() {
                     </Dialog>
                 </CardHeader>
                 <CardContent>
-                  <Accordion type="multiple" className="w-full" defaultValue={Object.keys(groupedMaterials)}>
-                    {Object.keys(groupedMaterials).length > 0 ? Object.entries(groupedMaterials).map(([category, items]) => (
-                      <AccordionItem value={category} key={category}>
-                        <AccordionTrigger className="text-base font-medium">{category}</AccordionTrigger>
-                        <AccordionContent>
-                          <Table>
-                              <TableHeader>
-                                  <TableRow>
-                                      <TableHead>Bahan</TableHead>
-                                      <TableHead>Brand</TableHead>
-                                      <TableHead>Harga Beli</TableHead>
-                                      <TableHead className="text-right">Kuantitas</TableHead>
-                                      <TableHead className="text-right">Nilai Stok</TableHead>
-                                      <TableHead className="w-[50px]"></TableHead>
-                                  </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                  {items.map((material) => {
-                                      const isLowStock = material.quantity > 0 && material.quantity < lowStockThreshold;
-                                      const isOutOfStock = material.quantity === 0;
-                                      return (
-                                        <TableRow key={material.id}>
-                                            <TableCell className="font-medium">{material.name}</TableCell>
-                                            <TableCell>{material.brand}</TableCell>
-                                            <TableCell>{formatCurrency(material.purchase_price)}</TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                     {(isLowStock || isOutOfStock) && (
-                                                        <span className={cn("h-2 w-2 rounded-full", {
-                                                            "bg-yellow-500": isLowStock,
-                                                            "bg-red-500": isOutOfStock,
-                                                        })} title={isOutOfStock ? "Stok Habis" : "Stok Menipis"}></span>
-                                                     )}
-                                                    {material.quantity.toLocaleString('id-ID')} {material.unit}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-right font-semibold">{formatCurrency(material.quantity * material.purchase_price)}</TableCell>
-                                            <TableCell>
-                                              <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" className="h-8 w-8 p-0">
-                                                            <span className="sr-only">Buka menu</span>
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem onClick={() => handleOpenDialog(material)}>Ubah</DropdownMenuItem>
-                                                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteMaterial(material.id)}>Hapus</DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </TableCell>
-                                        </TableRow>
-                                    )})}
-                              </TableBody>
-                          </Table>
-                        </AccordionContent>
-                      </AccordionItem>
-                    )) : <p className="text-center text-gray-500 py-4">Tidak ada data inventaris untuk outlet ini.</p>}
-                  </Accordion>
+                  {isLoading ? (
+                     <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin"/></div>
+                  ) : !selectedOrganizationId ? (
+                    <p className="text-center text-gray-500 py-4">Pilih outlet untuk melihat data inventaris.</p>
+                  ) : (
+                    <Accordion type="multiple" className="w-full" defaultValue={Object.keys(groupedMaterials)}>
+                      {Object.keys(groupedMaterials).length > 0 ? Object.entries(groupedMaterials).map(([category, items]) => (
+                        <AccordionItem value={category} key={category}>
+                          <AccordionTrigger className="text-base font-medium">{category}</AccordionTrigger>
+                          <AccordionContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Bahan</TableHead>
+                                        <TableHead>Brand</TableHead>
+                                        <TableHead>Harga Beli</TableHead>
+                                        <TableHead className="text-right">Kuantitas</TableHead>
+                                        <TableHead className="text-right">Nilai Stok</TableHead>
+                                        <TableHead className="w-[50px]"></TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {items.map((material) => {
+                                        const isLowStock = material.quantity > 0 && material.quantity < lowStockThreshold;
+                                        const isOutOfStock = material.quantity === 0;
+                                        return (
+                                          <TableRow key={material.id}>
+                                              <TableCell className="font-medium">{material.name}</TableCell>
+                                              <TableCell>{material.brand}</TableCell>
+                                              <TableCell>{formatCurrency(material.purchase_price)}</TableCell>
+                                              <TableCell className="text-right">
+                                                  <div className="flex items-center justify-end gap-2">
+                                                       {(isLowStock || isOutOfStock) && (
+                                                          <span className={cn("h-2 w-2 rounded-full", {
+                                                              "bg-yellow-500": isLowStock,
+                                                              "bg-red-500": isOutOfStock,
+                                                          })} title={isOutOfStock ? "Stok Habis" : "Stok Menipis"}></span>
+                                                       )}
+                                                      {material.quantity.toLocaleString('id-ID')} {material.unit}
+                                                  </div>
+                                              </TableCell>
+                                              <TableCell className="text-right font-semibold">{formatCurrency(material.quantity * material.purchase_price)}</TableCell>
+                                              <TableCell>
+                                                <DropdownMenu>
+                                                      <DropdownMenuTrigger asChild>
+                                                          <Button variant="ghost" className="h-8 w-8 p-0">
+                                                              <span className="sr-only">Buka menu</span>
+                                                              <MoreHorizontal className="h-4 w-4" />
+                                                          </Button>
+                                                      </DropdownMenuTrigger>
+                                                      <DropdownMenuContent align="end">
+                                                          <DropdownMenuItem onClick={() => handleOpenDialog(material)}>Ubah</DropdownMenuItem>
+                                                          <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteMaterial(material.id)}>Hapus</DropdownMenuItem>
+                                                      </DropdownMenuContent>
+                                                  </DropdownMenu>
+                                              </TableCell>
+                                          </TableRow>
+                                      )})}
+                                </TableBody>
+                            </Table>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )) : <p className="text-center text-gray-500 py-4">Tidak ada data inventaris untuk outlet ini.</p>}
+                    </Accordion>
+                  )}
                 </CardContent>
             </Card>
         </div>

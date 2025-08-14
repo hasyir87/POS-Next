@@ -25,16 +25,15 @@ export interface Organization {
 
 export interface UserProfile {
     id: string;
-    email?: string | null;
-    full_name?: string | null;
-    avatar_url?: string | null;
-    organization_id?: string | null;
+    email: string | null;
+    full_name: string | null;
+    avatar_url: string | null;
+    organization_id: string | null;
     role: UserRole;
     created_at: string;
     updated_at: string;
     organizations?: Organization | null;
 }
-
 
 export interface Category {
   id: string
@@ -48,24 +47,24 @@ export interface Product {
   id: string
   organization_id: string
   name: string
-  description?: string
+  description?: string | null
   price: number
   stock: number
-  category_id?: string
-  image_url?: string
+  category_id?: string | null
+  image_url?: string | null
   created_at: string
   updated_at: string
-  categories?: Category
+  categories?: Category | null
 }
 
 export interface RawMaterial {
   id: string
   organization_id: string
   name: string
-  brand?: string
+  brand: string | null
   quantity: number
   unit: string
-  category?: string
+  category: string | null
   purchase_price: number
   created_at: string
   updated_at: string
@@ -75,8 +74,8 @@ export interface Customer {
   id: string
   organization_id: string
   name: string
-  email?: string
-  phone?: string
+  email: string | null
+  phone: string | null
   loyalty_points: number
   transaction_count: number
   created_at: string
@@ -93,8 +92,8 @@ export interface Transaction {
   status: TransactionStatus
   created_at: string
   updated_at: string
-  profiles?: UserProfile
-  customers?: Customer
+  profiles?: UserProfile | null
+  customers?: Customer | null
 }
 
 export interface TransactionItem {
@@ -120,7 +119,7 @@ export interface Promotion {
   is_active: boolean
   created_at: string
   updated_at: string
-  products?: Product
+  products?: Product | null
 }
 
 export interface Grade {
@@ -136,8 +135,8 @@ export interface Aroma {
   id: string
   organization_id: string
   name: string
-  category?: string
-  description?: string
+  category?: string | null
+  description?: string | null
   created_at: string
   updated_at: string
 }
@@ -159,7 +158,7 @@ export interface Recipe {
   grade_id: string
   aroma_id: string
   bottle_size_id: string
-  instructions?: string
+  instructions?: string | null
   created_at: string
   updated_at: string
   grades?: Grade
