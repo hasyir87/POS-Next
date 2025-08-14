@@ -1,33 +1,57 @@
 // middleware.ts
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
-  const supabase = createMiddlewareClient({ req, res });
+  const res = NextResponse.next()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return req.cookies.get(name)?.value
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          req.cookies.set({ name, value, ...options })
+        },
+        remove(name: string, options: CookieOptions) {
+          req.cookies.set({ name, value: '', ...options })
+        },
+      },
+    }
+  )
+
+  const { data: { session } } = await supabase.auth.getSession()
+
+  const user = session?.user
 
   // Jika pengguna mengakses route yang dilindungi (/dashboard) dan belum login
   if (!user && req.nextUrl.pathname.startsWith('/dashboard')) {
-    // Redirect pengguna ke halaman login (root page)
-    const redirectUrl = new URL('/', req.nextUrl.origin);
-    return NextResponse.redirect(redirectUrl);
+    return NextResponse.redirect(new URL('/', req.url))
   }
 
   // Jika pengguna sudah login tetapi mengakses root page, redirect ke dashboard
   if (user && req.nextUrl.pathname === '/') {
-    const redirectUrl = new URL('/dashboard', req.nextUrl.origin);
-    return NextResponse.redirect(redirectUrl);
+    return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
-  // Jika pengguna sudah login atau mengakses route lain, lanjutkan request
-  return res;
+  // Refresh session if expired
+  await supabase.auth.getSession()
+
+  return res
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'], // Terapkan middleware ke semua route kecuali API dan assets
-};
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - api (API routes)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|api).*)',
+  ],
+}

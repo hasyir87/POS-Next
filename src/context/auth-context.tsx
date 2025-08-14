@@ -1,24 +1,13 @@
+
 "use client";
 
-import React, { createContext, useState, useEffect, ReactNode, useContext } from 'react';
-import { supabase } from '../lib/supabase';
-import { User as SupabaseUser } from '@supabase/supabase-js';
+import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback } from 'react';
+import { createClient } from '@/lib/supabase';
+import type { SupabaseClient, User as SupabaseUser } from '@supabase/supabase-js';
+import type { UserProfile } from '@/types/database';
 
-// Tipe untuk peran pengguna, sesuai dengan tipe 'user_role' di Supabase
-export type UserRole = "owner" | "admin" | "cashier";
-
-// Perbarui interface UserProfile agar sesuai dengan skema tabel 'profiles' yang baru
-export interface UserProfile {
-  id: string;
-  full_name: string | null;
-  email: string | null;
-  avatar_url: string | null;
-  role: UserRole;
-  organization_id: string | null;
-}
-
-// Definisikan tipe untuk AuthContext
 interface AuthContextType {
+  supabase: SupabaseClient;
   user: SupabaseUser | null;
   profile: UserProfile | null;
   loading: boolean;
@@ -28,195 +17,84 @@ interface AuthContextType {
   logout: () => Promise<void>;
 }
 
-// Buat AuthContext dengan nilai default
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// AuthProvider component
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const supabase = createClient();
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null);
 
-  
-
-  // Helper function to fetch user profile
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, avatar_url, role, organization_id')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error("Error fetching profile:", error);
-        if (error.code === 'PGRST116') {
-          // Profile tidak ditemukan, buat profile default
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert({
-              id: userId,
-              email: user?.email || null, // Use the current user's email if available
-              full_name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User',
-              role: 'cashier',
-              organization_id: null
-            })
-            .select()
-            .single();
-
-          if (createError) {
-            console.error("Error creating profile:", createError);
-            setProfile(null);
-          } else {
-            setProfile(newProfile as UserProfile);
-          }
-        } else {
-          setProfile(null);
-        }
-      } else if (data) {
-        const userProfile = data as UserProfile;
-        setProfile(userProfile);
-        // Atur organisasi terpilih default ke organisasi pengguna saat profil dimuat
-        if (userProfile.organization_id) {
-          setSelectedOrganizationId(userProfile.organization_id);
-        }
-      }
-    } catch (e) {
-      console.error("An unexpected error occurred while fetching profile:", e);
+  const fetchUserProfile = useCallback(async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (error) {
+      console.error("Error fetching profile:", error);
       setProfile(null);
+    } else {
+      const userProfile = data as UserProfile;
+      setProfile(userProfile);
+      if (!selectedOrganizationId && userProfile.organization_id) {
+        setSelectedOrganizationId(userProfile.organization_id);
+      }
     }
-  };
-
+    return data;
+  }, [supabase, selectedOrganizationId]);
 
   useEffect(() => {
-    let mounted = true;
-
-    // Get initial session
-    const getInitialSession = async () => {
-      try {
-        // Force refresh session first
-        const { data: { session }, error } = await supabase.auth.refreshSession();
-        
-        if (error) {
-          console.log('Session refresh failed, getting session:', error.message);
-          // Fallback to getSession if refresh fails
-          const { data: { session: fallbackSession }, error: getError } = await supabase.auth.getSession();
-          
-          if (getError) {
-            console.error('Error getting session:', getError);
-          }
-          
-          if (mounted) {
-            handleSessionResult(fallbackSession);
-          }
-        } else {
-          if (mounted) {
-            handleSessionResult(session);
-          }
-        }
-      } catch (error) {
-        console.error('Error in getInitialSession:', error);
-        if (mounted) {
-          setUser(null);
-          setProfile(null);
-          setSelectedOrganizationId(null);
-          setLoading(false);
-        }
-      }
-    };
-
-    const handleSessionResult = async (session: any) => {
-      // Validate session is not expired
-      const isValidSession = session?.user && session?.expires_at && new Date(session.expires_at * 1000) > new Date();
+    const getSession = async () => {
+      setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (isValidSession) {
+      if (session?.user) {
         setUser(session.user);
-        console.log('Valid session found:', session.user.id);
-      } else {
-        setUser(null);
-        console.log('No valid session found');
-      }
-
-      if (isValidSession && session.user) {
         await fetchUserProfile(session.user.id);
-      } else {
-        // Clear profile if no valid session
-        setProfile(null);
-        setSelectedOrganizationId(null);
-        
-        // If session is expired, sign out
-        if (session?.user && !isValidSession) {
-          await supabase.auth.signOut();
-        }
       }
-
       setLoading(false);
     };
+    
+    getSession();
 
-    getInitialSession();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.id);
-
-        if (mounted) {
-          setUser(session?.user ?? null);
-
-          if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
-            await fetchUserProfile(session.user.id);
-          } else if (event === 'SIGNED_OUT') {
-            setProfile(null);
-            setSelectedOrganizationId(null);
-          }
-
-          setLoading(false);
-        }
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setLoading(true);
+      if (session?.user) {
+        setUser(session.user);
+        await fetchUserProfile(session.user.id);
+      } else {
+        setUser(null);
+        setProfile(null);
+        setSelectedOrganizationId(null);
       }
-    );
+      setLoading(false);
+    });
 
     return () => {
-      mounted = false;
-      subscription.unsubscribe();
+      authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [supabase, fetchUserProfile]);
+
 
   const login = async ({ email, password }: { email: string; password: string }) => {
-    try {
-      // Clear any existing session first
-      await supabase.auth.signOut();
-      
-      // Sign in with new credentials
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      // Force refresh to ensure session is properly stored
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-      
-      if (refreshError) {
-        console.warn('Session refresh after login failed:', refreshError.message);
-      }
-
-      console.log('Login successful, session data:', data.session?.user?.id);
-      return data;
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    }
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) throw error;
+    return data;
   };
 
   const logout = async () => {
     await supabase.auth.signOut();
+    router.push('/');
   };
-
+  
   const value = {
+    supabase,
     user,
     profile,
     loading,
@@ -226,14 +104,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logout,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Custom hook untuk menggunakan AuthContext
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

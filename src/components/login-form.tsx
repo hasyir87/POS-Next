@@ -1,13 +1,10 @@
 
-
 "use client";
 import React from "react";
 
-import { useContext } from "react";
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -20,9 +17,11 @@ import {
 } from "@/components/ui/form"
 
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { MPerfumeAmalLogo } from "./m-perfume-amal-logo"
+import { Card, CardContent } from "@/components/ui/card"
 import { useAuth } from "@/context/auth-context";
+import { Loader2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const formSchema = z.object({
   email: z.string().email({
@@ -34,7 +33,6 @@ const formSchema = z.object({
 })
 
 export function LoginForm() {
-  const router = useRouter();
   const { login } = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -54,15 +52,11 @@ export function LoginForm() {
     
     try {
       await login({ email: values.email, password: values.password });
-      // Middleware akan handle redirect
+      // Middleware akan menangani redirect on success
     } catch (error: any) {
-      let msg = error?.message || "Login gagal";
-      if (msg.toLowerCase().includes("invalid login credentials")) {
+      let msg = "Login gagal. Silakan coba lagi.";
+      if (error?.message?.toLowerCase().includes("invalid login credentials")) {
         msg = "Email atau password salah.";
-      } else if (msg.toLowerCase().includes("user not found")) {
-        msg = "Akun tidak ditemukan.";
-      } else if (msg.toLowerCase().includes("email not confirmed")) {
-        msg = "Email belum dikonfirmasi. Silakan periksa email Anda.";
       }
       setLoginError(msg);
     } finally {
@@ -71,14 +65,17 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader className="items-center text-center">
-        <MPerfumeAmalLogo className="w-16 h-16 mb-2 text-primary" />
-        <CardTitle className="font-headline text-3xl">M Perfume Amal</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <Card>
+      <CardContent className="p-6">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {loginError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{loginError}</AlertDescription>
+              </Alert>
+            )}
             <FormField
               control={form.control}
               name="email"
@@ -107,11 +104,9 @@ export function LoginForm() {
             />
             
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Memproses..." : "Masuk"}
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Masuk
             </Button>
-            {loginError && (
-              <div className="text-red-500 text-sm mt-2 text-center">{loginError}</div>
-            )}
           </form>
         </Form>
       </CardContent>
