@@ -6,39 +6,30 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { BarChart3, Clock, Home, LogOut, Menu, Settings, DollarSign, BookUser, Store, ChevronsUpDown, Users, PackageSearch, SprayCan } from "lucide-react";
+import { BarChart3, Clock, Home, LogOut, Menu, Settings, DollarSign, BookUser, Store, ChevronsUpDown, Users, PackageSearch, SprayCan, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { MPerfumeAmalLogo } from "@/components/m-perfume-amal-logo";
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
+import type { Organization, UserProfile } from '@/types/database';
 
 type NavItem = {
   href: string;
   label: string;
   icon: React.ElementType;
-  requiredRoles: Array<"owner" | "admin" | "cashier">;
+  requiredRoles: Array<UserProfile['role']>;
 };
 
 const allNavItems: NavItem[] = [
   { href: "/dashboard", label: "Dasbor", icon: Home, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/pos", label: "Point of Sale", icon: Store, requiredRoles: ["owner", "admin", "cashier"] },
   { href: "/dashboard/products", label: "Produk", icon: SprayCan, requiredRoles: ["owner", "admin"] },
-  { href: "/dashboard/shifts", label: "Shift", icon: Clock, requiredRoles: ["owner", "admin", "cashier"] },
   { href: "/dashboard/inventory", label: "Inventaris", icon: PackageSearch, requiredRoles: ["owner", "admin"] },
-  { href: "/dashboard/members", label: "Anggota", icon: Users, requiredRoles: ["owner", "admin", "cashier"] },
-  { href: "/dashboard/organizations", label: "Organisasi", icon: Store, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/users", label: "Pengguna", icon: Users, requiredRoles: ["owner", "admin"] },
-  { href: "/dashboard/expenses", label: "Beban", icon: DollarSign, requiredRoles: ["owner", "admin"] },
-  { href: "/dashboard/accounts", label: "Akun", icon: BookUser, requiredRoles: ["owner", "admin"] },
+  { href: "/dashboard/organizations", label: "Outlet", icon: Store, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/reports", label: "Laporan", icon: BarChart3, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/settings", label: "Pengaturan", icon: Settings, requiredRoles: ["owner"] },
 ];
-
-type Organization = {
-  id: string;
-  name: string;
-  parent_organization_id: string | null;
-};
 
 export default function DashboardLayout({
   children,
@@ -46,76 +37,59 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { user, profile, loading, logout, selectedOrganizationId, setSelectedOrganizationId } = useAuth();
-
+  const { user, profile, loading, logout, selectedOrganizationId, setSelectedOrganizationId, supabase } = useAuth();
+  
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoadingOrgs, setIsLoadingOrgs] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) {
-      console.log('No user in layout, redirecting to login');
       router.push('/');
-    } else if (!loading && user && !profile) {
-      console.log("User authenticated but no profile found, staying on page to allow profile creation");
-      // Don't redirect immediately, allow time for profile to be fetched/created
-    } else if (user && profile) {
-      const fetchOrganizations = async () => {
-        setIsLoadingOrgs(true);
-        try {
-          const response = await fetch('/api/organizations');
-          if (!response.ok) throw new Error('Failed to fetch organizations');
-          
-          const data = await response.json();
-          const organizationsArray = Array.isArray(data) ? data : [];
-          setOrganizations(organizationsArray);
-          
-          // Set default selected organization if not already set
-          if (!selectedOrganizationId && organizationsArray.length > 0) {
-            const parentOrg = organizationsArray.find(org => org.id === profile.organization_id) || organizationsArray[0];
-            setSelectedOrganizationId(parentOrg.id);
-          }
-
-        } catch (error) {
-          console.error("Error fetching organizations:", error);
-          setOrganizations([]); // Ensure it's always an array
-        } finally {
-          setIsLoadingOrgs(false);
-        }
-      };
-      fetchOrganizations();
     }
-  }, [user, loading, profile, router, selectedOrganizationId, setSelectedOrganizationId]);
+  }, [user, loading, router]);
+  
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      if (!profile || (profile.role !== 'owner' && profile.role !== 'superadmin')) {
+          setIsLoadingOrgs(false);
+          return;
+      };
+
+      setIsLoadingOrgs(true);
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('*')
+        .or(`parent_organization_id.eq.${profile.organization_id},id.eq.${profile.organization_id}`);
+
+      if (error) {
+        console.error("Error fetching organizations:", error);
+        setOrganizations([]);
+      } else if (data) {
+        setOrganizations(data);
+      }
+      setIsLoadingOrgs(false);
+    };
+
+    if (profile) {
+        fetchOrganizations();
+    }
+  }, [profile, supabase]);
+
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Memuat aplikasi...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">Sesi tidak valid. Mengalihkan ke login...</p>
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-600 mx-auto"></div>
-        </div>
+      <div className="flex h-screen w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   if (!profile) {
+    // This can happen briefly. Or if there's a serious issue.
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Memuat profil pengguna...</p>
+        <div className="flex h-screen w-full items-center justify-center">
+            <p>Mencari profil pengguna...</p>
         </div>
-      </div>
     );
   }
 
@@ -123,14 +97,14 @@ export default function DashboardLayout({
 
   const handleLogout = async () => {
     await logout();
-    router.push('/');
   };
 
   const handleSelectOrganization = (orgId: string) => {
     setSelectedOrganizationId(orgId);
   };
+  
+  const selectedOrganization = organizations.find(org => org.id === selectedOrganizationId);
 
-  const selectedOrganization = Array.isArray(organizations) ? organizations.find(org => org.id === selectedOrganizationId) : null;
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
@@ -139,7 +113,7 @@ export default function DashboardLayout({
           <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
             <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
               <MPerfumeAmalLogo className="h-6 w-6 text-primary" />
-              <span className="font-headline text-xl">M Perfume Amal</span>
+              <span className="font-headline text-xl">ScentPOS</span>
             </Link>
           </div>
           <div className="flex-1">
@@ -164,14 +138,14 @@ export default function DashboardLayout({
             <SheetTrigger asChild>
               <Button variant="outline" size="icon" className="shrink-0 md:hidden">
                 <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle navigation menu</span>
+                <span className="sr-only">Buka menu navigasi</span>
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col">
               <nav className="grid gap-2 text-lg font-medium">
                 <Link href="#" className="flex items-center gap-2 text-lg font-semibold mb-4">
                   <MPerfumeAmalLogo className="h-6 w-6 text-primary" />
-                  <span className="font-headline text-xl">M Perfume Amal</span>
+                  <span className="font-headline text-xl">ScentPOS</span>
                 </Link>
                 {navItems.map((item) => (
                   <Link
@@ -187,23 +161,27 @@ export default function DashboardLayout({
             </SheetContent>
           </Sheet>
           <div className="w-full flex-1">
-            {profile.role === 'owner' && (
+            {(profile.role === 'owner' || profile.role === 'superadmin') && (
               <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                       <Button variant="outline" className="w-full max-w-xs">
                           <Store className="mr-2 h-4 w-4" />
-                          <span className="flex-1 text-left">{isLoadingOrgs ? 'Loading...' : selectedOrganization?.name || 'Select Outlet'}</span>
+                          <span className="flex-1 text-left">{isLoadingOrgs ? 'Memuat...' : selectedOrganization?.name || 'Pilih Outlet'}</span>
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-full max-w-xs">
-                      <DropdownMenuLabel>Select Outlet</DropdownMenuLabel>
+                      <DropdownMenuLabel>Pilih Outlet</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      {Array.isArray(organizations) && organizations.map((org) => (
+                      {isLoadingOrgs ? (
+                        <DropdownMenuItem disabled>Memuat...</DropdownMenuItem>
+                      ) : (
+                        organizations.map((org) => (
                           <DropdownMenuItem key={org.id} onSelect={() => handleSelectOrganization(org.id)}>
                               {org.name}
                           </DropdownMenuItem>
-                      ))}
+                        ))
+                      )}
                   </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -212,21 +190,21 @@ export default function DashboardLayout({
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">
                 <Avatar>
-                  <AvatarImage src="https://placehold.co/40x40" alt="Avatar" />
+                  <AvatarImage src={profile.avatar_url || "https://placehold.co/40x40"} alt={profile.full_name || 'Avatar'} data-ai-hint="avatar" />
                   <AvatarFallback>{profile.full_name?.substring(0, 2).toUpperCase() || 'U'}</AvatarFallback>
                 </Avatar>
-                <span className="sr-only">Toggle user menu</span>
+                <span className="sr-only">Buka menu pengguna</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>{profile.full_name || profile.email}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Profile</DropdownMenuItem>
-              <DropdownMenuItem>Support</DropdownMenuItem>
+              <DropdownMenuItem>Profil</DropdownMenuItem>
+              <DropdownMenuItem>Dukungan</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
+                <span>Keluar</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

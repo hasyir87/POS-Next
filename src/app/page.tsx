@@ -1,3 +1,4 @@
+
 'use client';
 
 import { LoginForm } from '@/components/login-form';
@@ -17,7 +18,7 @@ export default function Home() {
     }
   }, [user, loading, router]);
 
-  if (loading || user) {
+  if (loading || (!loading && user)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">

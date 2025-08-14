@@ -3,7 +3,7 @@
 
 import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import type { SupabaseClient, User as SupabaseUser, Session } from '@supabase/supabase-js';
+import type { SupabaseClient, User as SupabaseUser } from '@supabase/supabase-js';
 import type { Database, UserProfile } from '@/types/database';
 import { useRouter } from 'next/navigation';
 
@@ -31,7 +31,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null);
 
-  const fetchUserProfile = useCallback(async (userId: string) => {
+  const fetchUserProfile = useCallback(async (userId: string | undefined) => {
     if (!userId) return null;
     try {
       const { data, error } = await supabase
@@ -48,8 +48,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       const userProfile = data as UserProfile;
       setProfile(userProfile);
-      if (!selectedOrganizationId && userProfile.organization_id) {
-        setSelectedOrganizationId(userProfile.organization_id);
+      // Set the selected organization to the user's own organization by default
+      if (userProfile?.organization_id) {
+          setSelectedOrganizationId(userProfile.organization_id);
       }
       return data;
     } catch (e) {
@@ -57,39 +58,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setProfile(null);
       return null;
     }
-  }, [supabase, selectedOrganizationId]);
+  }, [supabase]);
 
   useEffect(() => {
+    const getInitialSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user ?? null);
+        await fetchUserProfile(session?.user?.id);
+        setLoading(false);
+    }
+    
+    getInitialSession();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        setLoading(true);
-        if (session?.user) {
-          setUser(session.user);
-          await fetchUserProfile(session.user.id);
-        } else {
-          setUser(null);
-          setProfile(null);
-          setSelectedOrganizationId(null);
+        setUser(session?.user ?? null);
+        if (event === 'SIGNED_IN') {
+           await fetchUserProfile(session?.user.id);
         }
-        setLoading(false);
+        if (event === 'SIGNED_OUT') {
+           setProfile(null);
+           setSelectedOrganizationId(null);
+           router.push('/');
+        }
       }
     );
-
-    // Also check initial session
-    const checkInitialSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-            setUser(session.user);
-            await fetchUserProfile(session.user.id);
-        }
-        setLoading(false);
-    };
-    checkInitialSession();
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase, fetchUserProfile]);
+  }, [supabase, fetchUserProfile, router]);
 
 
   const login = async ({ email, password }: { email: string; password: string }) => {
@@ -105,7 +103,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     await supabase.auth.signOut();
     // The onAuthStateChange listener will handle clearing user and profile
-    router.push('/');
   };
   
   const value = {
