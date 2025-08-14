@@ -1,359 +1,334 @@
-
--- Ekstensi yang diperlukan
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- Fungsi helper untuk mengekstrak claim dari JWT
-CREATE OR REPLACE FUNCTION auth.get_user_role(p_user_id uuid)
-RETURNS TEXT AS $$
-DECLARE
-  role TEXT;
+-- Fungsi untuk mengeksekusi SQL dinamis (jika belum ada)
+CREATE OR REPLACE FUNCTION exec_sql(sql TEXT) RETURNS VOID AS $$
 BEGIN
-  SELECT r.rolname INTO role
-  FROM pg_catalog.pg_roles r
-  JOIN pg_catalog.pg_auth_members m ON (m.roleid = r.oid)
-  JOIN pg_catalog.pg_authid u ON (m.member = u.oid)
-  WHERE u.rolname = p_user_id::text;
-  
-  IF role IS NULL THEN
-    -- Fallback ke tabel profiles jika tidak ditemukan di pg_roles
-     SELECT p.role INTO role
-     FROM public.profiles p
-     WHERE p.id = p_user_id;
-  END IF;
-
-  RETURN role;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-
--- Fungsi untuk mendapatkan semua pengguna dalam satu organisasi (termasuk sub-outlet)
-CREATE OR REPLACE FUNCTION get_users_in_organization(p_organization_id uuid)
-RETURNS TABLE(user_id uuid) AS $$
-BEGIN
-  RETURN QUERY
-  SELECT id
-  FROM public.profiles
-  WHERE organization_id IN (
-    WITH RECURSIVE org_hierarchy AS (
-      SELECT id FROM public.organizations WHERE id = p_organization_id
-      UNION ALL
-      SELECT o.id FROM public.organizations o JOIN org_hierarchy oh ON o.parent_organization_id = oh.id
-    )
-    SELECT id FROM org_hierarchy
-  );
+  EXECUTE sql;
 END;
 $$ LANGUAGE plpgsql;
 
--- 1. Tabel Organizations
+-- 1. Buat tabel organizations
 CREATE TABLE IF NOT EXISTS public.organizations (
-    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
-    name character varying NOT NULL,
-    address character varying,
-    phone character varying,
-    logo_url character varying,
-    parent_organization_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    name text NOT NULL,
+    address text,
+    phone text,
+    logo_url text,
+    parent_organization_id uuid,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
-ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow individual read access" ON public.organizations FOR SELECT USING (true);
-CREATE POLICY "Allow owner/superadmin to manage" ON public.organizations FOR ALL
-USING (
-    auth.get_user_role(auth.uid()) = 'superadmin' OR
-    id IN (
-        SELECT organization_id FROM public.profiles WHERE id = auth.uid() AND role = 'owner'
-    )
-);
+ALTER TABLE public.organizations ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
+ALTER TABLE public.organizations ADD CONSTRAINT organizations_parent_organization_id_fkey FOREIGN KEY (parent_organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
-
--- 2. Tabel Profiles
+-- 2. Buat tabel profiles
 CREATE TABLE IF NOT EXISTS public.profiles (
-    id uuid NOT NULL PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    email character varying,
-    full_name character varying,
-    avatar_url character varying,
-    organization_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL,
-    role public.user_role NOT NULL,
+    id uuid NOT NULL,
+    updated_at timestamp with time zone,
+    full_name text,
+    avatar_url text,
+    organization_id uuid,
+    role text DEFAULT 'cashier'::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    email text
 );
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow individual access to their own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Allow owners/admins to view users in their org" ON public.profiles FOR SELECT
-USING (
-    auth.get_user_role(auth.uid()) IN ('owner', 'admin', 'superadmin') AND
-    organization_id IN (
-        SELECT org.id FROM public.organizations org
-        JOIN public.profiles p ON p.organization_id = org.id
-        WHERE p.id = auth.uid()
-    )
-);
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_pkey PRIMARY KEY (id);
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
--- 3. Tabel Categories
+-- 3. Buat tabel categories
 CREATE TABLE IF NOT EXISTS public.categories (
-    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    name character varying NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    name text NOT NULL,
+    organization_id uuid NOT NULL
 );
-ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow read access based on organization" ON public.categories FOR SELECT
-USING (organization_id IN (SELECT id FROM public.organizations));
-CREATE POLICY "Allow full access based on user role" ON public.categories FOR ALL
-USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+ALTER TABLE public.categories ADD CONSTRAINT categories_pkey PRIMARY KEY (id);
+ALTER TABLE public.categories ADD CONSTRAINT categories_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
--- 4. Tabel Products
+-- 4. Buat tabel products
 CREATE TABLE IF NOT EXISTS public.products (
-    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    name character varying NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    name text NOT NULL,
     description text,
-    price numeric NOT NULL,
-    stock integer NOT NULL,
-    category_id uuid REFERENCES public.categories(id) ON DELETE SET NULL,
-    image_url character varying,
+    price real DEFAULT '0'::real NOT NULL,
+    stock integer DEFAULT 0 NOT NULL,
+    category_id uuid,
+    image_url text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
-ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow read access based on organization" ON public.products FOR SELECT
-USING (organization_id IN (SELECT id FROM public.organizations));
-CREATE POLICY "Allow full access based on user role" ON public.products FOR ALL
-USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+ALTER TABLE public.products ADD CONSTRAINT products_pkey PRIMARY KEY (id);
+ALTER TABLE public.products ADD CONSTRAINT products_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+ALTER TABLE public.products ADD CONSTRAINT products_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id) ON DELETE SET NULL;
 
--- 5. Tabel Raw Materials
-CREATE TABLE IF NOT EXISTS public.raw_materials (
-    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    name character varying NOT NULL,
-    brand character varying,
-    quantity numeric NOT NULL,
-    unit character varying NOT NULL,
-    category character varying,
-    purchase_price numeric NOT NULL,
+-- 5. Buat tabel promotions
+CREATE TABLE IF NOT EXISTS public.promotions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    name text NOT NULL,
+    type text NOT NULL,
+    value real NOT NULL,
+    get_product_id uuid,
+    is_active boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
-ALTER TABLE public.raw_materials ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow read access based on organization" ON public.raw_materials FOR SELECT
-USING (organization_id IN (SELECT id FROM public.organizations));
-CREATE POLICY "Allow full access based on user role" ON public.raw_materials FOR ALL
-USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+ALTER TABLE public.promotions ADD CONSTRAINT promotions_pkey PRIMARY KEY (id);
+ALTER TABLE public.promotions ADD CONSTRAINT promotions_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+ALTER TABLE public.promotions ADD CONSTRAINT promotions_get_product_id_fkey FOREIGN KEY (get_product_id) REFERENCES public.products(id) ON DELETE SET NULL;
 
--- 6. Tabel Customers
+
+-- 6. Buat tabel customers
 CREATE TABLE IF NOT EXISTS public.customers (
-    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    name character varying NOT NULL,
-    email character varying,
-    phone character varying,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    name text NOT NULL,
+    email text,
+    phone text,
     loyalty_points integer DEFAULT 0 NOT NULL,
     transaction_count integer DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
-ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow read access based on organization" ON public.customers FOR SELECT
-USING (organization_id IN (SELECT id FROM public.organizations));
-CREATE POLICY "Allow full access based on user role" ON public.customers FOR ALL
-USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+ALTER TABLE public.customers ADD CONSTRAINT customers_pkey PRIMARY KEY (id);
+ALTER TABLE public.customers ADD CONSTRAINT customers_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
-
--- 7. Tabel Transactions
-CREATE TABLE IF NOT EXISTS public.transactions (
-    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    cashier_id uuid NOT NULL REFERENCES public.profiles(id),
-    customer_id uuid REFERENCES public.customers(id),
-    total_amount numeric NOT NULL,
-    payment_method public.payment_method NOT NULL,
-    status public.transaction_status NOT NULL,
+-- 7. Buat tabel raw_materials
+CREATE TABLE IF NOT EXISTS public.raw_materials (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    name text NOT NULL,
+    brand text,
+    quantity real DEFAULT '0'::real NOT NULL,
+    unit text NOT NULL,
+    category text,
+    purchase_price real DEFAULT '0'::real NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
-ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow read access based on organization" ON public.transactions FOR SELECT
-USING (organization_id IN (SELECT id FROM public.organizations));
-CREATE POLICY "Allow full access based on user role" ON public.transactions FOR ALL
-USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
-
--- 8. Tabel Transaction Items
-CREATE TABLE IF NOT EXISTS public.transaction_items (
-    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
-    transaction_id uuid NOT NULL REFERENCES public.transactions(id) ON DELETE CASCADE,
-    product_id uuid REFERENCES public.products(id),
-    raw_material_id uuid REFERENCES public.raw_materials(id),
-    quantity integer NOT NULL,
-    price numeric NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-ALTER TABLE public.transaction_items ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow read access based on organization" ON public.transaction_items FOR SELECT
-USING (transaction_id IN (SELECT id FROM public.transactions));
-CREATE POLICY "Allow full access based on user role" ON public.transaction_items FOR ALL
-USING (transaction_id IN (SELECT id FROM public.transactions WHERE organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid())));
+ALTER TABLE public.raw_materials ADD CONSTRAINT raw_materials_pkey PRIMARY KEY (id);
+ALTER TABLE public.raw_materials ADD CONSTRAINT raw_materials_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
 
--- 9. Tabel Promotions
-CREATE TABLE IF NOT EXISTS public.promotions (
-    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    name character varying NOT NULL,
-    type public.promotion_type NOT NULL,
-    value numeric NOT NULL,
-    get_product_id uuid REFERENCES public.products(id),
-    is_active boolean DEFAULT true NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
-);
-ALTER TABLE public.promotions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow read access based on organization" ON public.promotions FOR SELECT
-USING (organization_id IN (SELECT id FROM public.organizations));
-CREATE POLICY "Allow full access based on user role" ON public.promotions FOR ALL
-USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
-
--- 10. Tabel Grades
+-- 8. Buat tabel grades
 CREATE TABLE IF NOT EXISTS public.grades (
-    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    name character varying NOT NULL,
-    price_multiplier numeric NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    name text NOT NULL,
+    price_multiplier real DEFAULT '1'::real NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
-ALTER TABLE public.grades ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow read access based on organization" ON public.grades FOR SELECT
-USING (organization_id IN (SELECT id FROM public.organizations));
-CREATE POLICY "Allow full access based on user role" ON public.grades FOR ALL
-USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+ALTER TABLE public.grades ADD CONSTRAINT grades_pkey PRIMARY KEY (id);
+ALTER TABLE public.grades ADD CONSTRAINT grades_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
--- 11. Tabel Aromas
+-- 9. Buat tabel aromas
 CREATE TABLE IF NOT EXISTS public.aromas (
-    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    name character varying NOT NULL,
-    category character varying,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    name text NOT NULL,
+    category text,
     description text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
-ALTER TABLE public.aromas ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow read access based on organization" ON public.aromas FOR SELECT
-USING (organization_id IN (SELECT id FROM public.organizations));
-CREATE POLICY "Allow full access based on user role" ON public.aromas FOR ALL
-USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+ALTER TABLE public.aromas ADD CONSTRAINT aromas_pkey PRIMARY KEY (id);
+ALTER TABLE public.aromas ADD CONSTRAINT aromas_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
--- 12. Tabel Bottle Sizes
+-- 10. Buat tabel bottle_sizes
 CREATE TABLE IF NOT EXISTS public.bottle_sizes (
-    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    size integer NOT NULL,
-    unit character varying NOT NULL,
-    price numeric NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    size real NOT NULL,
+    unit text NOT NULL,
+    price real DEFAULT '0'::real NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
-ALTER TABLE public.bottle_sizes ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow read access based on organization" ON public.bottle_sizes FOR SELECT
-USING (organization_id IN (SELECT id FROM public.organizations));
-CREATE POLICY "Allow full access based on user role" ON public.bottle_sizes FOR ALL
-USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+ALTER TABLE public.bottle_sizes ADD CONSTRAINT bottle_sizes_pkey PRIMARY KEY (id);
+ALTER TABLE public.bottle_sizes ADD CONSTRAINT bottle_sizes_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
--- 13. Tabel Recipes
+-- 11. Buat tabel recipes
 CREATE TABLE IF NOT EXISTS public.recipes (
-    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    name character varying NOT NULL,
-    grade_id uuid NOT NULL REFERENCES public.grades(id) ON DELETE CASCADE,
-    aroma_id uuid NOT NULL REFERENCES public.aromas(id) ON DELETE CASCADE,
-    bottle_size_id uuid NOT NULL REFERENCES public.bottle_sizes(id) ON DELETE CASCADE,
-    price numeric NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    name text NOT NULL,
+    grade_id uuid NOT NULL,
+    aroma_id uuid NOT NULL,
+    bottle_size_id uuid NOT NULL,
     instructions text,
+    price real NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
-ALTER TABLE public.recipes ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow read access based on organization" ON public.recipes FOR SELECT
-USING (organization_id IN (SELECT id FROM public.organizations));
-CREATE POLICY "Allow full access based on user role" ON public.recipes FOR ALL
-USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+ALTER TABLE public.recipes ADD CONSTRAINT recipes_pkey PRIMARY KEY (id);
+ALTER TABLE public.recipes ADD CONSTRAINT recipes_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+ALTER TABLE public.recipes ADD CONSTRAINT recipes_grade_id_fkey FOREIGN KEY (grade_id) REFERENCES public.grades(id) ON DELETE CASCADE;
+ALTER TABLE public.recipes ADD CONSTRAINT recipes_aroma_id_fkey FOREIGN KEY (aroma_id) REFERENCES public.aromas(id) ON DELETE CASCADE;
+ALTER TABLE public.recipes ADD CONSTRAINT recipes_bottle_size_id_fkey FOREIGN KEY (bottle_size_id) REFERENCES public.bottle_sizes(id) ON DELETE CASCADE;
 
--- 14. Tabel Expenses
+-- 12. Buat tabel expenses
 CREATE TABLE IF NOT EXISTS public.expenses (
-    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
     date date NOT NULL,
-    category character varying NOT NULL,
+    category text NOT NULL,
     description text NOT NULL,
-    amount numeric NOT NULL,
+    amount real NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
-ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow read access based on organization" ON public.expenses FOR SELECT
-USING (organization_id IN (SELECT id FROM public.organizations));
-CREATE POLICY "Allow full access based on user role" ON public.expenses FOR ALL
-USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+ALTER TABLE public.expenses ADD CONSTRAINT expenses_pkey PRIMARY KEY (id);
+ALTER TABLE public.expenses ADD CONSTRAINT expenses_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
--- 15. Tabel Settings
+-- 13. Buat tabel settings
 CREATE TABLE IF NOT EXISTS public.settings (
-    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    key character varying NOT NULL,
-    value character varying NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    key text NOT NULL,
+    value text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    UNIQUE(organization_id, key)
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+ALTER TABLE public.settings ADD CONSTRAINT settings_pkey PRIMARY KEY (id);
+ALTER TABLE public.settings ADD CONSTRAINT settings_organization_id_key_key UNIQUE (organization_id, key);
+ALTER TABLE public.settings ADD CONSTRAINT settings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+-- 14. Buat tabel transactions
+CREATE TABLE IF NOT EXISTS public.transactions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    cashier_id uuid NOT NULL,
+    customer_id uuid,
+    total_amount real NOT NULL,
+    payment_method text NOT NULL,
+    status text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE public.transactions ADD CONSTRAINT transactions_pkey PRIMARY KEY (id);
+ALTER TABLE public.transactions ADD CONSTRAINT transactions_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+ALTER TABLE public.transactions ADD CONSTRAINT transactions_cashier_id_fkey FOREIGN KEY (cashier_id) REFERENCES public.profiles(id);
+ALTER TABLE public.transactions ADD CONSTRAINT transactions_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id);
+
+
+-- 15. Buat tabel transaction_items
+CREATE TABLE IF NOT EXISTS public.transaction_items (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    transaction_id uuid NOT NULL,
+    product_id uuid,
+    raw_material_id uuid,
+    quantity real NOT NULL,
+    price real NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE public.transaction_items ADD CONSTRAINT transaction_items_pkey PRIMARY KEY (id);
+ALTER TABLE public.transaction_items ADD CONSTRAINT transaction_items_transaction_id_fkey FOREIGN KEY (transaction_id) REFERENCES public.transactions(id) ON DELETE CASCADE;
+ALTER TABLE public.transaction_items ADD CONSTRAINT transaction_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id);
+ALTER TABLE public.transaction_items ADD CONSTRAINT transaction_items_raw_material_id_fkey FOREIGN KEY (raw_material_id) REFERENCES public.raw_materials(id);
+
+
+-- Aktifkan RLS untuk semua tabel
+ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.promotions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.raw_materials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.grades ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.aromas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bottle_sizes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.recipes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow read access based on organization" ON public.settings FOR SELECT
-USING (organization_id IN (SELECT id FROM public.organizations));
-CREATE POLICY "Allow full access based on user role" ON public.settings FOR ALL
-USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.transaction_items ENABLE ROW LEVEL SECURITY;
 
-
--- Fungsi RPC untuk checkout
-CREATE OR REPLACE FUNCTION public.process_checkout(
-    p_organization_id uuid,
-    p_cashier_id uuid,
-    p_customer_id uuid,
-    p_items json,
-    p_total_amount numeric,
-    p_payment_method public.payment_method
-)
-RETURNS uuid
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    v_transaction_id uuid;
-    v_item json;
+-- Fungsi Helper untuk RLS
+CREATE OR REPLACE FUNCTION get_user_role(p_user_id uuid)
+RETURNS text AS $$
 BEGIN
-    -- 1. Buat record transaksi baru
-    INSERT INTO public.transactions(organization_id, cashier_id, customer_id, total_amount, payment_method, status)
-    VALUES (p_organization_id, p_cashier_id, p_customer_id, p_total_amount, p_payment_method, 'completed')
-    RETURNING id INTO v_transaction_id;
-
-    -- 2. Loop melalui item dan masukkan ke transaction_items & update stok
-    FOR v_item IN SELECT * FROM json_array_elements(p_items)
-    LOOP
-        INSERT INTO public.transaction_items(transaction_id, product_id, quantity, price)
-        VALUES (v_transaction_id, (v_item->>'product_id')::uuid, (v_item->>'quantity')::integer, (v_item->>'price')::numeric);
-
-        -- Update stok produk
-        UPDATE public.products
-        SET stock = stock - (v_item->>'quantity')::integer
-        WHERE id = (v_item->>'product_id')::uuid;
-    END LOOP;
-
-    -- 3. Update data pelanggan jika ada
-    IF p_customer_id IS NOT NULL THEN
-        UPDATE public.customers
-        SET transaction_count = transaction_count + 1
-        WHERE id = p_customer_id;
-    END IF;
-
-    RETURN v_transaction_id;
+  RETURN (SELECT role FROM public.profiles WHERE id = p_user_id);
 END;
-$$;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+CREATE OR REPLACE FUNCTION get_user_organization_id(p_user_id uuid)
+RETURNS uuid AS $$
+BEGIN
+  RETURN (SELECT organization_id FROM public.profiles WHERE id = p_user_id);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+CREATE OR REPLACE FUNCTION get_users_in_organization(p_organization_id uuid)
+RETURNS TABLE(user_id uuid) AS $$
+BEGIN
+  RETURN QUERY SELECT id FROM public.profiles WHERE organization_id = p_organization_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Kebijakan RLS
+
+-- Organizations
+DROP POLICY IF EXISTS "Allow ALL for superadmin" ON public.organizations;
+CREATE POLICY "Allow ALL for superadmin" ON public.organizations FOR ALL USING (get_user_role(auth.uid()) = 'superadmin');
+
+DROP POLICY IF EXISTS "Allow read access to owner and their outlet members" ON public.organizations;
+CREATE POLICY "Allow read access to owner and their outlet members" ON public.organizations FOR SELECT USING (id = get_user_organization_id(auth.uid()) OR parent_organization_id = get_user_organization_id(auth.uid()));
+
+DROP POLICY IF EXISTS "Allow owner to manage their own outlets" ON public.organizations;
+CREATE POLICY "Allow owner to manage their own outlets" ON public.organizations FOR ALL USING (get_user_role(auth.uid()) = 'owner' AND parent_organization_id = get_user_organization_id(auth.uid())) WITH CHECK (get_user_role(auth.uid()) = 'owner' AND parent_organization_id = get_user_organization_id(auth.uid()));
+
+
+-- Profiles
+DROP POLICY IF EXISTS "Allow ALL for superadmin" ON public.profiles;
+CREATE POLICY "Allow ALL for superadmin" ON public.profiles FOR ALL USING (get_user_role(auth.uid()) = 'superadmin');
+
+DROP POLICY IF EXISTS "Allow users to view their own profile" ON public.profiles;
+CREATE POLICY "Allow users to view their own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Allow owner/admin to view users in their organization" ON public.profiles;
+CREATE POLICY "Allow owner/admin to view users in their organization" ON public.profiles FOR SELECT USING (organization_id = get_user_organization_id(auth.uid()) AND get_user_role(auth.uid()) IN ('owner', 'admin'));
+
+DROP POLICY IF EXISTS "Allow owner/admin to update users in their organization" ON public.profiles;
+CREATE POLICY "Allow owner/admin to update users in their organization" ON public.profiles FOR UPDATE USING (organization_id = get_user_organization_id(auth.uid()) AND get_user_role(auth.uid()) IN ('owner', 'admin')) WITH CHECK (organization_id = get_user_organization_id(auth.uid()));
+
+
+-- Generic Policies for Data Tables
+CREATE OR REPLACE FUNCTION create_generic_policies(table_name text) RETURNS void AS $$
+BEGIN
+    -- Policy untuk Superadmin
+    EXECUTE format('DROP POLICY IF EXISTS "Allow ALL for superadmin" ON public.%I;', table_name);
+    EXECUTE format('CREATE POLICY "Allow ALL for superadmin" ON public.%I FOR ALL USING (get_user_role(auth.uid()) = ''superadmin'');', table_name);
+
+    -- Policy untuk Owner/Admin/Cashier
+    EXECUTE format('DROP POLICY IF EXISTS "Allow access to organization members" ON public.%I;', table_name);
+    EXECUTE format('CREATE POLICY "Allow access to organization members" ON public.%I FOR ALL USING (organization_id = get_user_organization_id(auth.uid())) WITH CHECK (organization_id = get_user_organization_id(auth.uid()));', table_name);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Terapkan generic policies ke semua tabel data
+SELECT create_generic_policies('products');
+SELECT create_generic_policies('categories');
+SELECT create_generic_policies('promotions');
+SELECT create_generic_policies('customers');
+SELECT create_generic_policies('raw_materials');
+SELECT create_generic_policies('grades');
+SELECT create_generic_policies('aromas');
+SELECT create_generic_policies('bottle_sizes');
+SELECT create_generic_policies('recipes');
+SELECT create_generic_policies('expenses');
+SELECT create_generic_policies('settings');
+SELECT create_generic_policies('transactions');
+
+-- Kebijakan khusus untuk transaction_items
+DROP POLICY IF EXISTS "Allow access based on transaction" ON public.transaction_items;
+CREATE POLICY "Allow access based on transaction" ON public.transaction_items FOR ALL
+USING (
+    (SELECT organization_id FROM public.transactions WHERE id = transaction_id) = get_user_organization_id(auth.uid()) OR get_user_role(auth.uid()) = 'superadmin'
+)
+WITH CHECK (
+    (SELECT organization_id FROM public.transactions WHERE id = transaction_id) = get_user_organization_id(auth.uid()) OR get_user_role(auth.uid()) = 'superadmin'
+);
