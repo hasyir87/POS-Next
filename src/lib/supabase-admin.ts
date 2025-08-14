@@ -15,3 +15,4 @@ export const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseService
     persistSession: false
   }
 });
+
