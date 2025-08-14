@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -50,22 +51,30 @@ export default function DashboardLayout({
   
   useEffect(() => {
     const fetchOrganizations = async () => {
-      if (!profile || (profile.role !== 'owner' && profile.role !== 'superadmin')) {
-          setIsLoadingOrgs(false);
-          // For non-owners, just show their own organization
-          if (profile?.organization_id) {
-            const { data, error } = await supabase.from('organizations').select('*').eq('id', profile.organization_id).single();
-            if (data) setOrganizations([data]);
-          }
-          return;
-      };
-
+      if (!profile || !supabase) {
+        setIsLoadingOrgs(false);
+        return;
+      }
       setIsLoadingOrgs(true);
-      const { data, error } = await supabase
-        .from('organizations')
-        .select('*')
-        .or(`parent_organization_id.eq.${profile.organization_id},id.eq.${profile.organization_id}`);
 
+      let query;
+      if (profile.role === 'superadmin') {
+        query = supabase.from('organizations').select('*');
+      } else if (profile.role === 'owner' && profile.organization_id) {
+        query = supabase
+          .from('organizations')
+          .select('*')
+          .or(`parent_organization_id.eq.${profile.organization_id},id.eq.${profile.organization_id}`);
+      } else if (profile.organization_id) {
+        query = supabase.from('organizations').select('*').eq('id', profile.organization_id);
+      } else {
+        setOrganizations([]);
+        setIsLoadingOrgs(false);
+        return;
+      }
+
+      const { data, error } = await query;
+      
       if (error) {
         console.error("Error fetching organizations:", error);
         setOrganizations([]);

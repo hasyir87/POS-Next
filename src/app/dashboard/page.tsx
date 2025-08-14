@@ -11,7 +11,7 @@ import { Package, Users, ShoppingCart, TrendingUp, AlertTriangle, RefreshCw, Loa
 import { useRouter } from 'next/navigation';
 import { SalesChart } from '@/components/sales-chart';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from '@/components/ui/table';
 import { Droplets, Trophy } from 'lucide-react';
 import Link from 'next/link';
 
