@@ -1,42 +1,38 @@
-
-import { createClient } from '../../../utils/supabase/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
 import type { Database } from '@/types/database';
 
-// --- GET: Fetch a list of users for the LOGGED-IN USER's organization ---
 export async function GET(request: NextRequest) {
   const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
   try {
-    // 1. Get the session and profile of the user making the request
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
     }
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('organization_id')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
 
     if (profileError || !profile || !profile.organization_id) {
       return NextResponse.json({ error: 'Profile or organization not found.' }, { status: 404 });
     }
 
-    // 2. Query profiles ONLY for that user's organization
     const { data: profiles, error } = await supabase
       .from('profiles')
-      .select(\`
+      .select(`
         id,
         email,
         full_name,
         avatar_url,
         organization_id,
         role
-      \`)
+      `)
       .eq('organization_id', profile.organization_id);
 
     if (error) {
@@ -51,41 +47,37 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// --- POST: Invite or create a new user within the LOGGED-IN USER's organization ---
 export async function POST(req: Request) {
   const { email, password, full_name, role } = await req.json();
   
   const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
   try {
-    // 1. Get the profile and permissions of the user making the request
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session) {
+    const { data: { user: requestingUser }, error: userError } = await supabase.auth.getUser();
+    if (userError || !requestingUser) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
     }
 
     const { data: requestingProfile, error: profileError } = await supabase
       .from('profiles')
       .select('organization_id, role')
-      .eq('id', session.user.id)
+      .eq('id', requestingUser.id)
       .single();
 
     if (profileError || !requestingProfile || !requestingProfile.organization_id) {
       return NextResponse.json({ error: 'Requesting user profile not found.' }, { status: 404 });
     }
     
-    // 2. Permission Check
     if (requestingProfile.role !== 'owner' && requestingProfile.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden: Only owners or admins can add users.' }, { status: 403 });
     }
 
     const allowedRoles = ['cashier', 'admin'];
     if (!allowedRoles.includes(role)) {
-      return NextResponse.json({ error: \`Forbidden: Cannot assign role "\${role}".\` }, { status: 403 });
+      return NextResponse.json({ error: `Forbidden: Cannot assign role "${role}".` }, { status: 403 });
     }
 
-    // 3. Create the new user in Supabase Auth (requires admin privileges)
     const { data: userAuthData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
@@ -101,7 +93,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Supabase Auth user creation failed.' }, { status: 500 });
     }
 
-    // 4. Create the user profile and link it to the CORRECT organization
     const { data: newUserProfile, error: insertProfileError } = await supabase
       .from('profiles')
       .insert([

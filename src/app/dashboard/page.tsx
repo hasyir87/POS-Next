@@ -15,89 +15,46 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components
 import { Droplets, Trophy } from 'lucide-react';
 import Link from 'next/link';
 
-interface DashboardStats {
-  totalProducts: number;
-  totalUsers: number;
-  totalTransactions: number;
-  totalRevenue: number;
-  lowStockProducts: number;
-  activePromotions: number;
-}
+// This is a placeholder. In a real app, this data would come from the API.
+const salesData = [
+  { name: "Sen", sales: 4000 },
+  { name: "Sel", sales: 3000 },
+  { name: "Rab", sales: 2000 },
+  { name: "Kam", sales: 2780 },
+  { name: "Jum", sales: 1890 },
+  { name: "Sab", sales: 2390 },
+  { name: "Min", sales: 3490 },
+];
 
-interface Promotion {
-  id: string;
-  name: string;
-  type: string;
-  value: number;
-  is_active: boolean;
-}
+const topProducts = [
+    { rank: 1, name: "Ocean Breeze", sales: 124 },
+    { rank: 2, name: "Mystic Woods", sales: 98 },
+    { rank: 3, name: "Citrus Grove", sales: 76 },
+];
+
+const topRefillAromas = [
+    { rank: 1, aroma: "YSL Black Opium", sales: 88 },
+    { rank: 2, aroma: "Baccarat Rouge", sales: 81 },
+    { rank: 3, aroma: "Creed Aventus", sales: 65 },
+];
+
 
 export default function DashboardPage() {
   const { user, selectedOrganizationId, loading: authLoading, profile } = useAuth();
-  const router = useRouter();
   
-  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  const salesData = [
-    { name: "Sen", sales: 4000 },
-    { name: "Sel", sales: 3000 },
-    { name: "Rab", sales: 2000 },
-    { name: "Kam", sales: 2780 },
-    { name: "Jum", sales: 1890 },
-    { name: "Sab", sales: 2390 },
-    { name: "Min", sales: 3490 },
-  ];
-
-  const topProducts = [
-      { rank: 1, name: "Ocean Breeze", sales: 124 },
-      { rank: 2, name: "Mystic Woods", sales: 98 },
-      { rank: 3, name: "Citrus Grove", sales: 76 },
-  ];
-
-  const topRefillAromas = [
-      { rank: 1, aroma: "YSL Black Opium", sales: 88 },
-      { rank: 2, aroma: "Baccarat Rouge", sales: 81 },
-      { rank: 3, aroma: "Creed Aventus", sales: 65 },
-  ];
-
-
-  const fetchDashboardData = async () => {
-    if (!selectedOrganizationId) {
-      setError("Pilih outlet terlebih dahulu.");
-      setLoading(false);
-      return;
-    }
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const res = await fetch(`/api/dashboard?organization_id=${selectedOrganizationId}`);
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || `Error: ${res.statusText}`);
-      }
-      const data = await res.json();
-      setStats(data);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
     if (!authLoading && user && selectedOrganizationId) {
-      fetchDashboardData();
+      setLoading(false);
     }
   }, [user, authLoading, selectedOrganizationId]);
 
 
   if (authLoading || (!profile && !loading)) {
     return (
-      <div className="p-6">
+      <div className="flex h-full w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -130,13 +87,12 @@ export default function DashboardPage() {
           <AlertTitle>Gagal Memuat Data</AlertTitle>
           <AlertDescription>
             {error}
-            <Button onClick={fetchDashboardData} variant="link" className="p-0 h-auto ml-2">Coba lagi</Button>
           </AlertDescription>
         </Alert>
       )
     }
 
-    if (!stats) {
+    if (!selectedOrganizationId) {
         return <p>Pilih outlet untuk melihat data.</p>
     }
 
@@ -145,14 +101,14 @@ export default function DashboardPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Produk</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Pendapatan Hari Ini</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalProducts}</div>
+              <div className="text-2xl font-bold">Rp 0</div>
+              <p className="text-xs text-muted-foreground">Data belum tersedia</p>
             </CardContent>
           </Card>
-          {/* other cards */}
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
@@ -170,7 +126,7 @@ export default function DashboardPage() {
                 <CardTitle>Notifikasi</CardTitle>
               </CardHeader>
               <CardContent>
-                {/* Notifications content here */}
+                <p className="text-center text-muted-foreground">Tidak ada notifikasi baru.</p>
               </CardContent>
             </Card>
         </div>
@@ -208,13 +164,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Dasbor</h1>
-        <Button onClick={fetchDashboardData} variant="outline" disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Segarkan
-        </Button>
+        <h1 className="text-3xl font-bold font-headline">Dasbor</h1>
       </div>
       {renderContent()}
     </div>

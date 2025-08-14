@@ -3,28 +3,26 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { Database } from '@/types/database';
 
-// --- GET: Mengambil semua produk untuk organisasi pengguna yang sedang login ---
 export async function GET(req: Request) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
   try {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
     }
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('organization_id')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
 
     if (profileError || !profile || !profile.organization_id) {
       return NextResponse.json({ error: 'Profile or organization not found for user.' }, { status: 404 });
     }
 
-    // FIX: Menambahkan filter .eq('organization_id', ...)
     const { data: products, error } = await supabase
       .from('products')
       .select(`
@@ -44,21 +42,20 @@ export async function GET(req: Request) {
   }
 }
 
-// --- POST: Membuat produk baru untuk organisasi pengguna ---
 export async function POST(req: Request) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
   try {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
     }
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('organization_id')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
 
     if (profileError || !profile || !profile.organization_id) {
@@ -67,7 +64,6 @@ export async function POST(req: Request) {
 
     const productData = await req.json();
 
-    // FIX: Menambahkan organization_id ke data yang di-insert
     const { data, error } = await supabase
       .from('products')
       .insert([

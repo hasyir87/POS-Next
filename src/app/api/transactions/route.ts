@@ -1,5 +1,4 @@
-
-import { createClient } from '../../../utils/supabase/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
 import type { Database } from '@/types/database';
@@ -7,21 +6,20 @@ import type { Database } from '@/types/database';
 type TransactionInsert = Database['public']['Tables']['transactions']['Insert'];
 type TransactionItemInsert = Database['public']['Tables']['transaction_items']['Insert'];
 
-// --- GET: Mengambil transaksi untuk organisasi pengguna yang sedang login ---
 export async function GET(request: NextRequest) {
   const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
   try {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
     }
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('organization_id, role')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
 
     if (profileError || !profile || !profile.organization_id) {
@@ -34,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('transactions')
-      .select(\`
+      .select(`
         id,
         organization_id,
         cashier_id,
@@ -50,7 +48,7 @@ export async function GET(request: NextRequest) {
           price,
           products (id, name, description)
         )
-      \`)
+      `)
       .eq('organization_id', profile.organization_id);
 
     if (status) {
@@ -75,21 +73,20 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// --- POST: Membuat transaksi baru untuk organisasi pengguna ---
 export async function POST(request: NextRequest) {
   const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
   try {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
     }
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('organization_id')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
 
     if (profileError || !profile || !profile.organization_id) {
@@ -105,7 +102,7 @@ export async function POST(request: NextRequest) {
     const transactionToInsert: TransactionInsert = {
       ...body,
       organization_id: profile.organization_id,
-      cashier_id: session.user.id,
+      cashier_id: user.id,
       status: body.status || 'completed',
     };
 
@@ -128,7 +125,7 @@ export async function POST(request: NextRequest) {
     const { data: items, error: itemsError } = await supabase
       .from('transaction_items')
       .insert(transactionItems)
-      .select(\`*\`);
+      .select(`*`);
 
     if (itemsError) {
       console.error('Error creating transaction items:', itemsError);

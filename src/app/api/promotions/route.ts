@@ -3,31 +3,26 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { Database } from '@/types/database';
 
-// --- GET: Mengambil semua promosi untuk organisasi pengguna yang sedang login ---
 export async function GET(req: Request) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
   try {
-    // 1. Dapatkan sesi pengguna untuk otorisasi
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
     }
 
-    // 2. Dapatkan profil pengguna untuk menemukan organization_id mereka
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('organization_id')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
 
     if (profileError || !profile || !profile.organization_id) {
       return NextResponse.json({ error: 'Profile or organization not found for user.' }, { status: 404 });
     }
-
-    // 3. Ambil promosi HANYA untuk organisasi tersebut
-    // FIX: Menambahkan filter .eq() untuk mencegah kebocoran data antar toko
+    
     const { data: promotions, error } = await supabase
       .from('promotions')
       .select('*')
@@ -44,22 +39,20 @@ export async function GET(req: Request) {
   }
 }
 
-// --- POST: Membuat promosi baru untuk organisasi pengguna ---
 export async function POST(req: Request) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
   try {
-    // 1. Dapatkan sesi dan profil pengguna
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
     }
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('organization_id')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
 
     if (profileError || !profile || !profile.organization_id) {
@@ -68,8 +61,6 @@ export async function POST(req: Request) {
     
     const promotionData = await req.json();
 
-    // 2. Insert promosi baru dengan menyertakan organization_id
-    // FIX: Menambahkan organization_id ke data yang di-insert
     const { data, error } = await supabase
       .from('promotions')
       .insert([
