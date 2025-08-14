@@ -28,31 +28,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null);
 
-  const fetchUserProfile = useCallback(async (userId: string | undefined) => {
-    if (!userId) return null;
+  const fetchUserProfile = useCallback(async (user: SupabaseUser | null) => {
+    if (!user) {
+      setProfile(null);
+      setSelectedOrganizationId(null);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', userId)
+        .eq('id', user.id)
         .single();
       
       if (error) {
         console.error("Error fetching profile:", error);
         setProfile(null);
-        return null;
+        setSelectedOrganizationId(null);
+      } else {
+        const userProfile = data as UserProfile;
+        setProfile(userProfile);
+        // Set the initial selected organization to the user's own organization
+        if (userProfile?.organization_id) {
+            setSelectedOrganizationId(userProfile.organization_id);
+        }
       }
-      
-      const userProfile = data as UserProfile;
-      setProfile(userProfile);
-      if (userProfile?.organization_id) {
-          setSelectedOrganizationId(userProfile.organization_id);
-      }
-      return data;
     } catch (e) {
       console.error("Catastrophic error fetching profile:", e);
       setProfile(null);
-      return null;
+      setSelectedOrganizationId(null);
     }
   }, [supabase]);
 
@@ -60,36 +65,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setLoading(true)
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        await fetchUserProfile(session.user.id)
-      } else {
-        setProfile(null)
-        setSelectedOrganizationId(null)
-      }
-      setLoading(false)
-    })
+      setLoading(true);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      await fetchUserProfile(currentUser);
+      setLoading(false);
+    });
 
     return () => {
-      subscription.unsubscribe()
-    }
+      subscription.unsubscribe();
+    };
   }, [supabase, fetchUserProfile]);
 
 
   const login = async ({ email, password }: { email: string; password: string }) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     if (error) throw error;
-    // The onAuthStateChange listener will handle the redirect and profile fetching
-    return data;
+    // The onAuthStateChange listener will handle fetching the profile and updating state.
+    // The middleware will handle the redirect.
   };
 
   const logout = async () => {
     await supabase.auth.signOut();
+    // The onAuthStateChange listener will clear user/profile state.
+    // The middleware will handle the redirect.
     router.push('/');
+    router.refresh();
   };
   
   const value = {

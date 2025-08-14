@@ -1,59 +1,30 @@
-// middleware.ts
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createClient } from '@/utils/supabase/middleware'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(req: NextRequest) {
-  let res = NextResponse.next({
-    request: {
-      headers: req.headers,
-    },
-  })
+export async function middleware(request: NextRequest) {
+  const { supabase, response } = createClient(request)
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return req.cookies.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          // The `set` method was modifying the request cookies.
-          // It should modify the response cookies instead.
-          res.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-        },
-        remove(name: string, options: CookieOptions) {
-          // The `delete` method was modifying the request cookies.
-          // It should modify the response cookies instead.
-          res.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
-        },
-      },
-    }
-  )
+  // Refresh session if expired - required for Server Components
+  // https://supabase.com/docs/guides/auth/auth-helpers/nextjs#managing-session-with-middleware
+  const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: { session } } = await supabase.auth.getSession()
+  const { pathname } = request.nextUrl
 
-  const user = session?.user
-
-  // Jika pengguna mengakses route yang dilindungi (/dashboard) dan belum login
-  if (!user && req.nextUrl.pathname.startsWith('/dashboard')) {
-    return NextResponse.redirect(new URL('/', req.url))
+  // Jika pengguna tidak login dan mencoba mengakses area yang dilindungi
+  if (!user && pathname.startsWith('/dashboard')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/'
+    return NextResponse.redirect(url)
   }
 
-  // Jika pengguna sudah login tetapi mengakses root page, redirect ke dashboard
-  if (user && req.nextUrl.pathname === '/') {
-    return NextResponse.redirect(new URL('/dashboard', req.url))
+  // Jika pengguna sudah login dan mencoba mengakses halaman utama (login)
+  if (user && pathname === '/') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/dashboard'
+    return NextResponse.redirect(url)
   }
 
-  return res
+  return response
 }
 
 export const config = {
@@ -63,7 +34,7 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - api (API routes)
+     * - api (API routes are protected separately)
      */
     '/((?!_next/static|_next/image|favicon.ico|api).*)',
   ],
