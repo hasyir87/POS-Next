@@ -1,29 +1,20 @@
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   const { email, password, organization_name } = await req.json();
-  const cookieStore = cookies();
-
-  // Ini harus menggunakan instance Supabase dengan Service Role Key
-  const serviceRoleSupabase = createRouteHandlerClient({
-    cookies: cookieStore,
-    supabaseKey: process.env.SERVICE_ROLE_KEY_SUPABASE,
-  });
 
   // --- Langkah 1: Buat Pengguna di Supabase Auth ---
   const { data: userAuthData, error: authError } =
-    await serviceRoleSupabase.auth.admin.createUser({
+    await supabaseAdmin.auth.admin.createUser({
       email,
-
       password,
-      email_confirm: false, // Tidak perlu konfirmasi email untuk pendaftaran dari admin
+      email_confirm: true, // Sebaiknya tetap true untuk alur produksi, user bisa konfirmasi nanti
     });
 
   if (authError) {
     console.error("Error creating Supabase Auth user:", authError.message);
-    return NextResponse.json({ error: authError.message }, { status: 500 });
+    return NextResponse.json({ error: authError.message }, { status: 400 });
   }
 
   if (!userAuthData?.user) {
@@ -33,19 +24,19 @@ export async function POST(req: Request) {
     );
   }
 
-  // --- Langkah 2: Buat Organisasi Induk ---
-  // Hapus parent_organization_id karena skema baru tidak memilikinya
-  const { data: organization, error: orgError } = await serviceRoleSupabase // Gunakan serviceRoleSupabase
+  const userId = userAuthData.user.id;
 
+  // --- Langkah 2: Buat Organisasi Induk ---
+  const { data: organization, error: orgError } = await supabaseAdmin
     .from("organizations")
     .insert([{ name: organization_name }])
-    .select() // Penting untuk mendapatkan ID organisasi yang baru dibuat
+    .select()
     .single();
 
   if (orgError || !organization) {
     console.error("Error creating organization:", orgError?.message);
-    // Pertimbangkan untuk menghapus user di auth.users jika pembuatan organisasi gagal
-    await serviceRoleSupabase.auth.admin.deleteUser(userAuthData.user.id);
+    // Rollback: hapus user yang sudah dibuat di Auth jika pembuatan organisasi gagal
+    await supabaseAdmin.auth.admin.deleteUser(userId);
     return NextResponse.json(
       { error: orgError?.message || "Organization creation failed." },
       { status: 500 },
@@ -53,34 +44,37 @@ export async function POST(req: Request) {
   }
 
   // --- Langkah 3: Buat Profil Pengguna (Pemilik) dan Hubungkan ke Organisasi ---
-  const { data: userProfile, error: profileError } = await serviceRoleSupabase // Gunakan serviceRoleSupabase
-
+  const { error: profileError } = await supabaseAdmin
     .from("profiles")
     .insert([
       {
-        id: userAuthData.user.id, // ID dari Supabase Auth
-        full_name: "Pemilik " + organization_name, // Ganti 'name' menjadi 'full_name'
-        email: userAuthData.user.email, // Tambahkan email
+        id: userId, // ID dari Supabase Auth
+        full_name: "Owner", // Nama bisa diubah user nanti
+        email: email,
         role: "owner", // Tetapkan peran 'owner'
-        organization_id: organization.id, // Hubungkan ke organisasi yang baru dibuat
+        organization_id: organization.id,
       },
     ]);
 
   if (profileError) {
     console.error("Error creating user profile:", profileError.message);
-    // Pertimbangkan untuk menghapus user di auth.users dan organisasi jika pembuatan profil gagal
-    await serviceRoleSupabase.auth.admin.deleteUser(userAuthData.user.id);
-    await serviceRoleSupabase
+    // Rollback: hapus user di Auth dan organisasi jika pembuatan profil gagal
+    await supabaseAdmin.auth.admin.deleteUser(userId);
+    await supabaseAdmin
       .from("organizations")
       .delete()
-      .eq("id", organization.id); // Gunakan serviceRoleSupabase
+      .eq("id", organization.id);
 
     return NextResponse.json({ error: profileError.message }, { status: 500 });
   }
 
   // --- Berhasil ---
   return NextResponse.json(
-    { message: "Owner and organization created successfully!" },
+    {
+      message: "Owner and organization created successfully!",
+      user: userAuthData.user,
+      organization: organization,
+    },
     { status: 201 },
   );
 }

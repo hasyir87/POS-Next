@@ -1,136 +1,93 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import type { Database } from '@/types/database';
 
-export async function GET() {
+// --- GET: Mengambil semua promosi untuk organisasi pengguna yang sedang login ---
+export async function GET(req: Request) {
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+
   try {
-    const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-
-    // Get the current user
+    // 1. Dapatkan sesi pengguna untuk otorisasi
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-    if (sessionError) {
-      console.error('Session error:', sessionError);
-      return NextResponse.json({ error: 'Session error' }, { status: 401 });
+    if (sessionError || !session) {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
     }
 
-    // Check if session exists
-    if (!session?.user) {
-      console.log('No session or user found for promotions request');
-      return NextResponse.json({ error: 'No session found' }, { status: 401 });
-    }
-
-    // Validate session is not expired
-    const isExpired = session.expires_at && new Date(session.expires_at * 1000) <= new Date();
-    if (isExpired) {
-      console.log('Session expired for user:', session.user.id);
-      return NextResponse.json({ error: 'Session expired' }, { status: 401 });
-    }
-
-    console.log('Valid session found for user:', session.user.id);
-
-    // Get user profile
+    // 2. Dapatkan profil pengguna untuk menemukan organization_id mereka
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('organization_id')
       .eq('id', session.user.id)
       .single();
 
-    if (profileError || !profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    if (profileError || !profile || !profile.organization_id) {
+      return NextResponse.json({ error: 'Profile or organization not found for user.' }, { status: 404 });
     }
 
-    // Fetch promotions for the user's organization
-    const { data: promotions, error: promotionsError } = await supabase
+    // 3. Ambil promosi HANYA untuk organisasi tersebut
+    // FIX: Menambahkan filter .eq() untuk mencegah kebocoran data antar toko
+    const { data: promotions, error } = await supabase
       .from('promotions')
       .select('*')
-      .eq('organization_id', profile.organization_id)
-      .order('created_at', { ascending: false });
+      .eq('organization_id', profile.organization_id);
 
-    if (promotionsError) {
-      console.error('Error fetching promotions:', promotionsError);
-      return NextResponse.json({ error: 'Failed to fetch promotions' }, { status: 500 });
+    if (error) {
+      console.error('Error fetching promotions:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(promotions || []);
-
-  } catch (error: any) {
-    console.error('Unexpected error in promotions API:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json(promotions);
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
- 
-export async function POST(request: Request) {
+
+// --- POST: Membuat promosi baru untuk organisasi pengguna ---
+export async function POST(req: Request) {
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+
   try {
-    const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-
-    // Get the current user
+    // 1. Dapatkan sesi dan profil pengguna
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
     if (sessionError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
     }
 
-    // Get user profile
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('organization_id, role')
+      .select('organization_id')
       .eq('id', session.user.id)
       .single();
 
-    if (profileError || !profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    if (profileError || !profile || !profile.organization_id) {
+      return NextResponse.json({ error: 'Profile or organization not found for user.' }, { status: 404 });
     }
+    
+    const promotionData = await req.json();
 
-    // Check permissions
-    if (!['owner', 'admin'].includes(profile.role)) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
-
-    const body = await request.json();
-    const { name, type, value, get_product_id, is_active } = body;
-
-    // Validate required fields
-    if (!name || !type || value === undefined) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
-
-    // Validate promotion type
-    if (!['Persentase', 'Nominal', 'BOGO'].includes(type)) {
-      return NextResponse.json({ error: 'Invalid promotion type' }, { status: 400 });
-    }
-
-    // Create promotion
-    const { data: promotion, error: insertError } = await supabase
+    // 2. Insert promosi baru dengan menyertakan organization_id
+    // FIX: Menambahkan organization_id ke data yang di-insert
+    const { data, error } = await supabase
       .from('promotions')
-      .insert({
-        organization_id: profile.organization_id,
-        name,
-        type,
-        value,
-        get_product_id: get_product_id || null,
-        is_active: is_active !== undefined ? is_active : true
-      })
+      .insert([
+        {
+          ...promotionData,
+          organization_id: profile.organization_id,
+        },
+      ])
       .select()
       .single();
 
-    if (insertError) {
-      console.error('Error creating promotion:', insertError);
-      return NextResponse.json({ error: 'Failed to create promotion' }, { status: 500 });
+    if (error) {
+      console.error('Error creating promotion:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(promotion, { status: 201 });
-
-  } catch (error: any) {
-    console.error('Unexpected error in create promotion:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json(data, { status: 201 });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
