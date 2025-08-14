@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,12 +9,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tag, User, Languages, Key, Store, MoreHorizontal, PlusCircle, Package, Bell, Star } from "lucide-react";
+import { Tag, User, Languages, Key, Store, MoreHorizontal, PlusCircle, Package, Bell, Star, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/context/auth-context";
+import type { Grade } from '@/types/database';
+
 
 // SIMULASI DATA - Di aplikasi nyata, ini akan berasal dari database
 const productCatalogForSettings = [
@@ -71,6 +74,7 @@ const initialBrands: Attribute[] = [
 
 export default function SettingsPage() {
     const { toast } = useToast();
+    const { selectedOrganizationId, supabase, loading: authLoading } = useAuth();
 
     const [apiKeys, setApiKeys] = useState<ApiKey[]>(initialApiKeys);
     const [outlets, setOutlets] = useState<Outlet[]>(initialOutlets);
@@ -85,6 +89,11 @@ export default function SettingsPage() {
     const [isPromoDialogOpen, setPromoDialogOpen] = useState(false);
     const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
 
+    const [grades, setGrades] = useState<Grade[]>([]);
+    const [isGradeLoading, setIsGradeLoading] = useState(true);
+    const [isGradeDialogOpen, setGradeDialogOpen] = useState(false);
+    const [editingGrade, setEditingGrade] = useState<Partial<Grade> | null>(null);
+
     const [categories, setCategories] = useState<Attribute[]>(initialCategories);
     const [units, setUnits] = useState<Attribute[]>(initialUnits);
     const [brands, setBrands] = useState<Attribute[]>(initialBrands);
@@ -98,6 +107,32 @@ export default function SettingsPage() {
     const [loyaltyRewardValue, setLoyaltyRewardValue] = useState('50');
     const [loyaltyFreeProductId, setLoyaltyFreeProductId] = useState('PROD005');
 
+    const fetchGrades = useCallback(async () => {
+        if (!selectedOrganizationId || !supabase) {
+            setGrades([]);
+            setIsGradeLoading(false);
+            return;
+        }
+        setIsGradeLoading(true);
+        const { data, error } = await supabase
+            .from('grades')
+            .select('*')
+            .eq('organization_id', selectedOrganizationId);
+        
+        if (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Gagal memuat data grade.' });
+            setGrades([]);
+        } else {
+            setGrades(data);
+        }
+        setIsGradeLoading(false);
+    }, [selectedOrganizationId, supabase, toast]);
+
+    useEffect(() => {
+        if (!authLoading) {
+            fetchGrades();
+        }
+    }, [authLoading, fetchGrades]);
 
 
     const handleCreateKey = () => {
@@ -211,10 +246,66 @@ export default function SettingsPage() {
         toast({ title: "Sukses", description: `${type} berhasil dihapus.` });
     };
 
+    const handleOpenGradeDialog = (grade: Partial<Grade> | null = null) => {
+        setEditingGrade(grade ? { ...grade } : { name: "", price_multiplier: 1 });
+        setGradeDialogOpen(true);
+    };
+
+    const handleSaveGrade = async () => {
+        if (!editingGrade || !editingGrade.name || !supabase || !selectedOrganizationId) {
+            toast({ variant: "destructive", title: "Error", description: "Nama grade harus diisi." });
+            return;
+        }
+        
+        const gradeData = {
+            name: editingGrade.name,
+            price_multiplier: editingGrade.price_multiplier,
+            organization_id: selectedOrganizationId,
+        };
+
+        const { error } = editingGrade.id
+            ? await supabase.from('grades').update(gradeData).eq('id', editingGrade.id)
+            : await supabase.from('grades').insert([gradeData]);
+
+        if (error) {
+            toast({ variant: "destructive", title: "Error", description: `Gagal menyimpan grade: ${error.message}` });
+        } else {
+            toast({ title: "Sukses", description: "Grade berhasil disimpan." });
+            setGradeDialogOpen(false);
+            fetchGrades();
+        }
+    };
+
+    const handleDeleteGrade = async (id: string) => {
+        if (!supabase) return;
+        const { error } = await supabase.from('grades').delete().eq('id', id);
+        if (error) {
+            toast({ variant: "destructive", title: "Error", description: `Gagal menghapus grade: ${error.message}` });
+        } else {
+            toast({ title: "Sukses", description: "Grade berhasil dihapus." });
+            fetchGrades();
+        }
+    };
+
+
+    if (authLoading) {
+      return <div className="p-6 flex justify-center items-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
+    }
+
 
     return (
         <div className="flex flex-col gap-6">
             <h1 className="font-headline text-3xl font-bold">Pengaturan</h1>
+            {!selectedOrganizationId && (
+                <Card className="bg-yellow-50 border-yellow-200">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-yellow-600"/>Pilih Outlet</CardTitle>
+                        <CardDescription className="text-yellow-700">
+                            Silakan pilih outlet dari menu dropdown di atas untuk melihat dan mengelola pengaturan.
+                        </CardDescription>
+                    </CardHeader>
+                </Card>
+            )}
             <div className="grid gap-6">
                  <Card>
                     <CardHeader>
@@ -229,6 +320,7 @@ export default function SettingsPage() {
                                 type="number"
                                 value={lowStockThreshold}
                                 onChange={(e) => setLowStockThreshold(parseInt(e.target.value, 10) || 0)}
+                                disabled={!selectedOrganizationId}
                             />
                             <p className="text-sm text-muted-foreground">
                                 Dapatkan notifikasi di dasbor ketika kuantitas bahan berada di bawah angka ini.
@@ -246,12 +338,12 @@ export default function SettingsPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <Label htmlFor="loyalty-threshold">Ambang Batas Transaksi</Label>
-                                <Input id="loyalty-threshold" type="number" value={loyaltyThreshold} onChange={e => setLoyaltyThreshold(parseInt(e.target.value) || 0)} />
+                                <Input id="loyalty-threshold" type="number" value={loyaltyThreshold} onChange={e => setLoyaltyThreshold(parseInt(e.target.value) || 0)} disabled={!selectedOrganizationId}/>
                                 <p className="text-sm text-muted-foreground">Jumlah transaksi sebelum anggota mendapat hadiah.</p>
                             </div>
                             <div className="space-y-1.5">
                                 <Label htmlFor="loyalty-reward-type">Jenis Hadiah</Label>
-                                 <Select value={loyaltyRewardType} onValueChange={setLoyaltyRewardType}>
+                                 <Select value={loyaltyRewardType} onValueChange={setLoyaltyRewardType} disabled={!selectedOrganizationId}>
                                     <SelectTrigger id="loyalty-reward-type"><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="Discount">Diskon Persentase</SelectItem>
@@ -265,12 +357,12 @@ export default function SettingsPage() {
                              {loyaltyRewardType === 'Discount' ? (
                                 <div className="space-y-1.5">
                                     <Label htmlFor="loyalty-reward-value">Nilai Diskon (%)</Label>
-                                    <Input id="loyalty-reward-value" type="number" value={loyaltyRewardValue} onChange={e => setLoyaltyRewardValue(e.target.value)} />
+                                    <Input id="loyalty-reward-value" type="number" value={loyaltyRewardValue} onChange={e => setLoyaltyRewardValue(e.target.value)} disabled={!selectedOrganizationId}/>
                                 </div>
                             ) : (
                                 <div className="space-y-1.5">
                                     <Label htmlFor="loyalty-free-product">Produk Gratis</Label>
-                                    <Select value={loyaltyFreeProductId} onValueChange={setLoyaltyFreeProductId}>
+                                    <Select value={loyaltyFreeProductId} onValueChange={setLoyaltyFreeProductId} disabled={!selectedOrganizationId}>
                                         <SelectTrigger id="loyalty-free-product"><SelectValue /></SelectTrigger>
                                         <SelectContent>
                                             {productCatalogForSettings.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
@@ -284,16 +376,37 @@ export default function SettingsPage() {
 
                  <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" /> Atribut Inventaris</CardTitle>
-                        <CardDescription>Kelola atribut yang digunakan untuk item inventaris, seperti kategori dan unit pengukuran.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" /> Atribut Inventaris & Refill</CardTitle>
+                        <CardDescription>Kelola atribut yang digunakan untuk item inventaris dan sistem refill parfum kustom.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <Tabs defaultValue="categories">
-                            <TabsList className="grid w-full grid-cols-3">
+                        <Tabs defaultValue="grades">
+                            <TabsList className="grid w-full grid-cols-4">
+                                <TabsTrigger value="grades">Grade</TabsTrigger>
                                 <TabsTrigger value="categories">Kategori</TabsTrigger>
                                 <TabsTrigger value="units">Unit</TabsTrigger>
                                 <TabsTrigger value="brands">Brand</TabsTrigger>
                             </TabsList>
+                            {/* Grade Dialog */}
+                            <Dialog open={isGradeDialogOpen} onOpenChange={setGradeDialogOpen}>
+                                <DialogContent>
+                                    <DialogHeader><DialogTitle className="font-headline">
+                                        {editingGrade?.id ? `Ubah Grade` : `Tambah Grade Baru`}
+                                    </DialogTitle></DialogHeader>
+                                    <div className="grid gap-4 py-4">
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label htmlFor="grade-name" className="text-right">Nama Grade</Label>
+                                            <Input id="grade-name" value={editingGrade?.name || ''} onChange={e => setEditingGrade(prev => prev ? {...prev, name: e.target.value} : null)} className="col-span-3" />
+                                        </div>
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label htmlFor="grade-multiplier" className="text-right">Pengali Harga</Label>
+                                            <Input id="grade-multiplier" type="number" step="0.1" value={editingGrade?.price_multiplier || 1} onChange={e => setEditingGrade(prev => prev ? {...prev, price_multiplier: parseFloat(e.target.value)} : null)} className="col-span-3" />
+                                        </div>
+                                    </div>
+                                    <DialogFooter><Button onClick={handleSaveGrade}>Simpan</Button></DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                            {/* Attribute Dialog */}
                             <Dialog open={isAttrDialogOpen} onOpenChange={setAttrDialogOpen}>
                                 <DialogContent>
                                     <DialogHeader><DialogTitle className="font-headline">
@@ -308,9 +421,38 @@ export default function SettingsPage() {
                                     <DialogFooter><Button onClick={handleSaveAttr}>Simpan</Button></DialogFooter>
                                 </DialogContent>
                             </Dialog>
+                            <TabsContent value="grades" className="pt-4">
+                                <div className="flex justify-end mb-4">
+                                    <Button onClick={() => handleOpenGradeDialog(null)} disabled={!selectedOrganizationId}><PlusCircle className="mr-2" /> Tambah Grade</Button>
+                                </div>
+                                <div className="border rounded-md">
+                                <Table>
+                                    <TableHeader><TableRow><TableHead>Nama Grade</TableHead><TableHead>Pengali Harga</TableHead><TableHead className="w-[100px] text-right">Aksi</TableHead></TableRow></TableHeader>
+                                    <TableBody>
+                                        {isGradeLoading ? (
+                                            <TableRow><TableCell colSpan={3} className="text-center p-4"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></TableCell></TableRow>
+                                        ) : grades.map(grade => (
+                                            <TableRow key={grade.id}>
+                                                <TableCell>{grade.name}</TableCell>
+                                                <TableCell>{grade.price_multiplier}x</TableCell>
+                                                <TableCell className="text-right">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal /></Button></DropdownMenuTrigger>
+                                                        <DropdownMenuContent>
+                                                            <DropdownMenuItem onClick={() => handleOpenGradeDialog(grade)}>Ubah</DropdownMenuItem>
+                                                            <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteGrade(grade.id)}>Hapus</DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                                </div>
+                            </TabsContent>
                             <TabsContent value="categories" className="pt-4">
                                 <div className="flex justify-end mb-4">
-                                    <Button onClick={() => handleOpenAttrDialog(null, 'Kategori')}><PlusCircle className="mr-2" /> Tambah Kategori</Button>
+                                    <Button onClick={() => handleOpenAttrDialog(null, 'Kategori')} disabled={!selectedOrganizationId}><PlusCircle className="mr-2" /> Tambah Kategori</Button>
                                 </div>
                                 <div className="border rounded-md">
                                 <Table>
@@ -336,7 +478,7 @@ export default function SettingsPage() {
                             </TabsContent>
                             <TabsContent value="units" className="pt-4">
                                 <div className="flex justify-end mb-4">
-                                     <Button onClick={() => handleOpenAttrDialog(null, 'Unit')}><PlusCircle className="mr-2" /> Tambah Unit</Button>
+                                     <Button onClick={() => handleOpenAttrDialog(null, 'Unit')} disabled={!selectedOrganizationId}><PlusCircle className="mr-2" /> Tambah Unit</Button>
                                 </div>
                                 <div className="border rounded-md">
                                 <Table>
@@ -362,7 +504,7 @@ export default function SettingsPage() {
                             </TabsContent>
                              <TabsContent value="brands" className="pt-4">
                                 <div className="flex justify-end mb-4">
-                                     <Button onClick={() => handleOpenAttrDialog(null, 'Brand')}><PlusCircle className="mr-2" /> Tambah Brand</Button>
+                                     <Button onClick={() => handleOpenAttrDialog(null, 'Brand')} disabled={!selectedOrganizationId}><PlusCircle className="mr-2" /> Tambah Brand</Button>
                                 </div>
                                 <div className="border rounded-md">
                                 <Table>
@@ -398,7 +540,7 @@ export default function SettingsPage() {
                     <CardContent>
                          <div className="flex justify-end">
                             <Dialog open={isKeyDialogOpen} onOpenChange={setKeyDialogOpen}>
-                                <DialogTrigger asChild><Button>Buat Kunci Baru</Button></DialogTrigger>
+                                <DialogTrigger asChild><Button disabled={!selectedOrganizationId}>Buat Kunci Baru</Button></DialogTrigger>
                                 <DialogContent>
                                     <DialogHeader><DialogTitle className="font-headline">Buat Kunci API Baru</DialogTitle></DialogHeader>
                                     <div className="grid gap-4 py-4">
@@ -427,7 +569,7 @@ export default function SettingsPage() {
                                          <TableCell className="font-mono">{key.key}</TableCell>
                                          <TableCell>{key.created}</TableCell>
                                          <TableCell className="text-right">
-                                             <Button variant="destructive" size="sm" onClick={() => handleRevokeKey(key.id)}>Cabut</Button>
+                                             <Button variant="destructive" size="sm" onClick={() => handleRevokeKey(key.id)} disabled={!selectedOrganizationId}>Cabut</Button>
                                          </TableCell>
                                      </TableRow>
                                  ))}
@@ -444,7 +586,7 @@ export default function SettingsPage() {
                     <CardContent>
                          <div className="flex justify-end">
                              <Dialog open={isOutletDialogOpen} onOpenChange={setOutletDialogOpen}>
-                                <DialogTrigger asChild><Button onClick={() => handleOpenOutletDialog()}><PlusCircle className="mr-2" /> Tambah Outlet Baru</Button></DialogTrigger>
+                                <DialogTrigger asChild><Button onClick={() => handleOpenOutletDialog()} disabled={!selectedOrganizationId}><PlusCircle className="mr-2" /> Tambah Outlet Baru</Button></DialogTrigger>
                                 <DialogContent>
                                     <DialogHeader><DialogTitle className="font-headline">{editingOutlet?.id ? 'Ubah Outlet' : 'Tambah Outlet Baru'}</DialogTitle></DialogHeader>
                                     <div className="grid gap-4 py-4">
@@ -478,7 +620,7 @@ export default function SettingsPage() {
                                          <TableCell className="text-right">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Buka menu</span><MoreHorizontal className="h-4 w-4" /></Button>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0" disabled={!selectedOrganizationId}><span className="sr-only">Buka menu</span><MoreHorizontal className="h-4 w-4" /></Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuItem onClick={() => handleOpenOutletDialog(outlet)}>Ubah</DropdownMenuItem>
@@ -501,7 +643,7 @@ export default function SettingsPage() {
                     <CardContent>
                         <div className="flex justify-end">
                             <Dialog open={isPromoDialogOpen} onOpenChange={setPromoDialogOpen}>
-                                <DialogTrigger asChild><Button onClick={() => handleOpenPromoDialog()}><PlusCircle className="mr-2" /> Buat Promosi Baru</Button></DialogTrigger>
+                                <DialogTrigger asChild><Button onClick={() => handleOpenPromoDialog()} disabled={!selectedOrganizationId}><PlusCircle className="mr-2" /> Buat Promosi Baru</Button></DialogTrigger>
                                 <DialogContent>
                                     <DialogHeader><DialogTitle className="font-headline">{editingPromo?.id ? 'Ubah Promosi' : 'Buat Promosi Baru'}</DialogTitle></DialogHeader>
                                     <div className="grid gap-4 py-4">
@@ -568,7 +710,7 @@ export default function SettingsPage() {
                                         <TableCell className="text-right">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Buka menu</span><MoreHorizontal className="h-4 w-4" /></Button>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0" disabled={!selectedOrganizationId}><span className="sr-only">Buka menu</span><MoreHorizontal className="h-4 w-4" /></Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuItem onClick={() => handleOpenPromoDialog(promo)}>Ubah</DropdownMenuItem>
@@ -589,7 +731,7 @@ export default function SettingsPage() {
                         <CardDescription>Kelola akun staf dan peran mereka (Kasir, Admin, Pemilik).</CardDescription>
                     </CardHeader>
                     <CardContent className="flex gap-2">
-                         <Button>Tambah Pengguna Baru</Button>
+                         <Button disabled={!selectedOrganizationId}>Tambah Pengguna Baru</Button>
                          <Button variant="outline" asChild>
                             <Link href="/dashboard/settings/roles">Kelola Peran</Link>
                          </Button>
@@ -604,7 +746,7 @@ export default function SettingsPage() {
                     <CardContent className="space-y-4">
                         <div className="grid w-full max-w-sm items-center gap-1.5">
                             <Label htmlFor="language">Bahasa</Label>
-                            <Select defaultValue="id">
+                            <Select defaultValue="id" disabled={!selectedOrganizationId}>
                                 <SelectTrigger id="language">
                                     <SelectValue placeholder="Pilih bahasa" />
                                 </SelectTrigger>
