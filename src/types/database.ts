@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type UserRole = 'owner' | 'cashier' | 'admin' | 'superadmin'
-export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'e_wallet'
+export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'e_wallet' | 'qris' | 'debit'
 export type TransactionStatus = 'pending' | 'completed' | 'cancelled'
 export type PromotionType = 'Persentase' | 'Nominal' | 'BOGO'
 
@@ -158,6 +158,7 @@ export interface Recipe {
   grade_id: string
   aroma_id: string
   bottle_size_id: string
+  price: number
   instructions?: string | null
   created_at: string
   updated_at: string
