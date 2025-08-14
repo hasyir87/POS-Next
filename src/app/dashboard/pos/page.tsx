@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAuth } from "@/context/auth-context";
@@ -29,7 +30,6 @@ const loyaltySettings = {
     rewardValue: "50",
     freeProductId: "PROD005"
 };
-const EXTRA_ESSENCE_PRICE_PER_ML = 3500;
 
 type CartItem = {
   id: string;
@@ -47,8 +47,8 @@ type RecipeData = {
 
 const RefillForm = ({ onAddToCart, grades, aromas, bottleSizes, recipes }: { onAddToCart: (item: CartItem) => void, grades: Partial<Grade>[], aromas: Partial<Aroma>[], bottleSizes: Partial<BottleSize>[], recipes: RecipeData }) => {
     const { toast } = useToast();
-    const [selectedGrade, setSelectedGrade] = useState('');
-    const [selectedAroma, setSelectedAroma] = useState('');
+    const [selectedGradeId, setSelectedGradeId] = useState('');
+    const [selectedAromaId, setSelectedAromaId] = useState('');
     const [selectedBottleSize, setSelectedBottleSize] = useState(0);
     const [essenceMl, setEssenceMl] = useState(0);
     const [solventMl, setSolventMl] = useState(0);
@@ -58,18 +58,19 @@ const RefillForm = ({ onAddToCart, grades, aromas, bottleSizes, recipes }: { onA
     const [standardEssence, setStandardEssence] = useState(0);
 
     const availableAromas = useMemo(() => {
-        if (!selectedGrade) return [];
-        return aromas.filter(a => a.category === selectedGrade).map(a => ({ value: a.id || '', label: a.name || '' }));
-    }, [selectedGrade, aromas]);
+        // This part seems to have a logical error. Aromas are not directly tied to grades in the DB schema.
+        // For now, let's assume all aromas are available.
+        return aromas.map(a => ({ value: a.id || '', label: a.name || '' }));
+    }, [aromas]);
     
     useEffect(() => {
-        setSelectedAroma('');
+        setSelectedAromaId('');
         setSelectedBottleSize(0);
-    }, [selectedGrade]);
+    }, [selectedGradeId]);
 
     useEffect(() => {
-        if (selectedAroma && selectedBottleSize > 0) {
-            const recipe = recipes[selectedAroma]?.[selectedBottleSize];
+        if (selectedAromaId && selectedBottleSize > 0) {
+            const recipe = recipes[selectedAromaId]?.[selectedBottleSize];
             if (recipe) {
                 setEssenceMl(recipe.essence);
                 setStandardEssence(recipe.essence);
@@ -80,30 +81,34 @@ const RefillForm = ({ onAddToCart, grades, aromas, bottleSizes, recipes }: { onA
              setStandardEssence(0);
              setBasePrice(0);
         }
-    }, [selectedAroma, selectedBottleSize, recipes]);
+    }, [selectedAromaId, selectedBottleSize, recipes]);
 
     useEffect(() => {
-        if (selectedBottleSize > 0 && basePrice > 0) {
+        const grade = grades.find(g => g.id === selectedGradeId);
+        if (selectedBottleSize > 0 && basePrice > 0 && grade) {
             const cappedEssence = Math.max(0, Math.min(essenceMl, selectedBottleSize));
             const newSolventMl = selectedBottleSize - cappedEssence;
             const extraMl = Math.max(0, cappedEssence - standardEssence);
-            const extraCost = extraMl * EXTRA_ESSENCE_PRICE_PER_ML;
+            
+            const extraCost = extraMl * (grade.extra_essence_price || 0);
+            const finalBasePrice = basePrice * (grade.price_multiplier || 1);
+
             setSolventMl(newSolventMl);
             setExtraEssenceCost(extraCost);
-            setTotalPrice(basePrice + extraCost);
+            setTotalPrice(finalBasePrice + extraCost);
         } else {
             setTotalPrice(0);
             setExtraEssenceCost(0);
             setSolventMl(0);
         }
-    }, [essenceMl, selectedBottleSize, basePrice, standardEssence]);
+    }, [essenceMl, selectedBottleSize, basePrice, standardEssence, selectedGradeId, grades]);
 
     const handleAddToCart = () => {
-        if (!selectedAroma || !selectedBottleSize) {
+        if (!selectedAromaId || !selectedBottleSize || !selectedGradeId) {
             toast({ variant: "destructive", title: "Error", description: "Harap pilih grade, aroma, dan ukuran botol." });
             return;
         }
-        const aromaLabel = aromas.find(a => a.id === selectedAroma)?.name || 'Aroma';
+        const aromaLabel = aromas.find(a => a.id === selectedAromaId)?.name || 'Aroma';
         const cartItem: CartItem = {
             id: `refill-${Date.now()}`,
             name: `Isi Ulang: ${aromaLabel}`,
@@ -114,8 +119,10 @@ const RefillForm = ({ onAddToCart, grades, aromas, bottleSizes, recipes }: { onA
         };
         onAddToCart(cartItem);
         toast({ title: "Sukses", description: `${aromaLabel} ditambahkan ke keranjang.` });
-        setSelectedGrade(''); setSelectedAroma(''); setSelectedBottleSize(0); setEssenceMl(0);
+        setSelectedGradeId(''); setSelectedAromaId(''); setSelectedBottleSize(0); setEssenceMl(0);
     };
+    
+    const grade = grades.find(g => g.id === selectedGradeId);
 
     return (
         <Card>
@@ -123,25 +130,25 @@ const RefillForm = ({ onAddToCart, grades, aromas, bottleSizes, recipes }: { onA
             <CardContent className="space-y-4">
                  <div className="space-y-2">
                     <Label>1. Pilih Grade</Label>
-                    <Select value={selectedGrade} onValueChange={setSelectedGrade}>
+                    <Select value={selectedGradeId} onValueChange={setSelectedGradeId}>
                         <SelectTrigger><SelectValue placeholder="Pilih grade parfum..." /></SelectTrigger>
                         <SelectContent>
                             {grades.map(g => (<SelectItem key={g.id} value={g.id || ''}>{g.name}</SelectItem>))}
                         </SelectContent>
                     </Select>
                 </div>
-                {selectedGrade && (<div className="space-y-2">
+                {selectedGradeId && (<div className="space-y-2">
                     <Label>2. Pilih Aroma</Label>
-                    <Combobox options={availableAromas} value={selectedAroma} onChange={setSelectedAroma} placeholder="Cari & pilih aroma..." searchPlaceholder="Ketik untuk mencari..." notFoundText="Aroma tidak ditemukan." />
+                    <Combobox options={availableAromas} value={selectedAromaId} onChange={setSelectedAromaId} placeholder="Cari & pilih aroma..." searchPlaceholder="Ketik untuk mencari..." notFoundText="Aroma tidak ditemukan." />
                 </div>)}
-                {selectedAroma && (<div className="space-y-2">
+                {selectedAromaId && (<div className="space-y-2">
                     <Label>3. Pilih Ukuran Botol</Label>
                     <Select value={selectedBottleSize > 0 ? selectedBottleSize.toString() : ""} onValueChange={(v) => setSelectedBottleSize(Number(v) || 0)}>
                         <SelectTrigger><SelectValue placeholder="Pilih ukuran botol..." /></SelectTrigger>
                         <SelectContent>{bottleSizes.map(b => (<SelectItem key={b.id} value={b.size?.toString()}>{b.size} {b.unit}</SelectItem>))}</SelectContent>
                     </Select>
                 </div>)}
-                {selectedBottleSize > 0 && basePrice > 0 && (
+                {selectedBottleSize > 0 && basePrice > 0 && grade && (
                 <Card className="bg-muted/50">
                     <CardHeader className="pb-4"><CardTitle className="text-base">4. Atur Komposisi</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
@@ -159,6 +166,7 @@ const RefillForm = ({ onAddToCart, grades, aromas, bottleSizes, recipes }: { onA
                         <Separator />
                         <div className="space-y-1 text-sm">
                             <div className="flex justify-between"><span className="text-muted-foreground">Harga Resep Dasar</span><span>{formatCurrency(basePrice)}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Pengali Grade ({grade.price_multiplier}x)</span><span>{formatCurrency(basePrice * (grade.price_multiplier || 1) - basePrice)}</span></div>
                              <div className="flex justify-between"><span className="text-muted-foreground">Biaya Tambahan Bibit</span><span>{formatCurrency(extraEssenceCost)}</span></div>
                              <div className="flex justify-between text-base font-bold"><span>Total Harga</span><span>{formatCurrency(totalPrice)}</span></div>
                         </div>
@@ -195,7 +203,7 @@ export default function PosPage() {
     const [paymentMethod, setPaymentMethod] = useState('cash');
 
     const fetchPosData = useCallback(async () => {
-        if (!selectedOrganizationId) {
+        if (!selectedOrganizationId || !supabase) {
             setProductCatalog([]); setCustomers([]); setPromotions([]); setGrades([]); setAromas([]); setBottleSizes([]); setRecipes({});
             setIsLoadingData(false);
             return;
@@ -225,12 +233,15 @@ export default function PosPage() {
         
         if (recipesRes.data) {
             const recipesObj: RecipeData = {};
+            const bottleSizeMap = new Map(bottleSizesRes.data?.map(bs => [bs.id, bs.size]));
+
             for (const r of recipesRes.data) {
                 if(r.aroma_id && r.bottle_size_id && r.price) {
-                    const bottleSize = bottleSizesRes.data?.find(bs => bs.id === r.bottle_size_id)?.size;
+                    const bottleSize = bottleSizeMap.get(r.bottle_size_id);
                     if(bottleSize) {
                         if (!recipesObj[r.aroma_id]) recipesObj[r.aroma_id] = {};
-                        recipesObj[r.aroma_id][bottleSize] = { essence: 10, solvent: 20, price: r.price }; // Placeholder
+                        // TODO: The essence/solvent values are placeholders and need to be added to the recipes table.
+                        recipesObj[r.aroma_id][bottleSize] = { essence: 10, solvent: 20, price: r.price }; 
                     }
                 }
             }
@@ -241,10 +252,12 @@ export default function PosPage() {
     }, [selectedOrganizationId, supabase, toast]);
 
     useEffect(() => {
-      if(!authLoading){
+      if(!authLoading && selectedOrganizationId){
         fetchPosData();
+      } else if (!selectedOrganizationId && !authLoading) {
+        setIsLoadingData(false);
       }
-    }, [authLoading, fetchPosData]);
+    }, [authLoading, selectedOrganizationId, fetchPosData]);
 
     const addProductToCart = (product: Product) => {
         setCart(prevCart => {
@@ -254,7 +267,7 @@ export default function PosPage() {
                     item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
                 );
             }
-            return [...prevCart, { id: product.id, name: product.name, price: product.price, image_url: product.image_url, stock: product.stock, quantity: 1, type: 'product' }];
+            return [...prevCart, { id: product.id, name: product.name, price: product.price, quantity: 1, type: 'product' }];
         });
     };
 
@@ -281,7 +294,7 @@ export default function PosPage() {
     };
 
     const handleCheckout = async () => {
-        if (cart.length === 0 || !profile) {
+        if (cart.length === 0 || !profile || !selectedOrganizationId || !supabase) {
             toast({ variant: "destructive", title: "Keranjang Kosong", description: "Tidak bisa checkout dengan keranjang kosong." });
             return;
         }
@@ -293,7 +306,7 @@ export default function PosPage() {
             p_customer_id: activeCustomer?.id,
             p_total_amount: total,
             p_payment_method: paymentMethod,
-            p_items: cart.filter(item => !item.isPromo).map(item => ({ product_id: item.id, quantity: item.quantity, price: item.price }))
+            p_items: cart.filter(item => !item.isPromo && item.type === 'product').map(item => ({ product_id: item.id, quantity: item.quantity, price: item.price }))
         });
 
         if (error) {
@@ -321,7 +334,13 @@ export default function PosPage() {
     const tax = useMemo(() => (subtotal - discount) * 0.11, [subtotal, discount]);
     const total = useMemo(() => subtotal - discount + tax, [subtotal, discount, tax]);
 
-    if (authLoading || isLoadingData) return <div className="p-6 flex justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    if (authLoading) return <div className="p-6 flex justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    
+    if (!selectedOrganizationId) {
+        return <div className="p-6 text-center text-muted-foreground">Pilih outlet dari menu di atas untuk memulai sesi Point of Sale.</div>
+    }
+
+    if (isLoadingData) return <div className="p-6 flex justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
 
     return (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 h-[calc(100vh-100px)]">

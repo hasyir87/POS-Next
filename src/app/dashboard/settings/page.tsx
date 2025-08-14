@@ -129,10 +129,13 @@ export default function SettingsPage() {
     }, [selectedOrganizationId, supabase, toast]);
 
     useEffect(() => {
-        if (!authLoading) {
+        if (!authLoading && selectedOrganizationId) {
             fetchGrades();
+        } else if (!selectedOrganizationId && !authLoading) {
+            setIsGradeLoading(false);
+            setGrades([]);
         }
-    }, [authLoading, fetchGrades]);
+    }, [authLoading, selectedOrganizationId, fetchGrades]);
 
 
     const handleCreateKey = () => {
@@ -247,7 +250,7 @@ export default function SettingsPage() {
     };
 
     const handleOpenGradeDialog = (grade: Partial<Grade> | null = null) => {
-        setEditingGrade(grade ? { ...grade } : { name: "", price_multiplier: 1 });
+        setEditingGrade(grade ? { ...grade } : { name: "", price_multiplier: 1.0, extra_essence_price: 0 });
         setGradeDialogOpen(true);
     };
 
@@ -260,6 +263,7 @@ export default function SettingsPage() {
         const gradeData = {
             name: editingGrade.name,
             price_multiplier: editingGrade.price_multiplier,
+            extra_essence_price: editingGrade.extra_essence_price,
             organization_id: selectedOrganizationId,
         };
 
@@ -402,6 +406,10 @@ export default function SettingsPage() {
                                             <Label htmlFor="grade-multiplier" className="text-right">Pengali Harga</Label>
                                             <Input id="grade-multiplier" type="number" step="0.1" value={editingGrade?.price_multiplier || 1} onChange={e => setEditingGrade(prev => prev ? {...prev, price_multiplier: parseFloat(e.target.value)} : null)} className="col-span-3" />
                                         </div>
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label htmlFor="extra-essence-price" className="text-right">Harga Tambahan Bibit (per ml)</Label>
+                                            <Input id="extra-essence-price" type="number" step="100" value={editingGrade?.extra_essence_price || 0} onChange={e => setEditingGrade(prev => prev ? {...prev, extra_essence_price: parseFloat(e.target.value)} : null)} className="col-span-3" />
+                                        </div>
                                     </div>
                                     <DialogFooter><Button onClick={handleSaveGrade}>Simpan</Button></DialogFooter>
                                 </DialogContent>
@@ -427,14 +435,15 @@ export default function SettingsPage() {
                                 </div>
                                 <div className="border rounded-md">
                                 <Table>
-                                    <TableHeader><TableRow><TableHead>Nama Grade</TableHead><TableHead>Pengali Harga</TableHead><TableHead className="w-[100px] text-right">Aksi</TableHead></TableRow></TableHeader>
+                                    <TableHeader><TableRow><TableHead>Nama Grade</TableHead><TableHead>Pengali Harga</TableHead><TableHead>Harga Tambahan Bibit</TableHead><TableHead className="w-[100px] text-right">Aksi</TableHead></TableRow></TableHeader>
                                     <TableBody>
                                         {isGradeLoading ? (
-                                            <TableRow><TableCell colSpan={3} className="text-center p-4"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={4} className="text-center p-4"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></TableCell></TableRow>
                                         ) : grades.map(grade => (
                                             <TableRow key={grade.id}>
                                                 <TableCell>{grade.name}</TableCell>
                                                 <TableCell>{grade.price_multiplier}x</TableCell>
+                                                <TableCell>Rp {grade.extra_essence_price.toLocaleString('id-ID')} / ml</TableCell>
                                                 <TableCell className="text-right">
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal /></Button></DropdownMenuTrigger>
