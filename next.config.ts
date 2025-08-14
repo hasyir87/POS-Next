@@ -16,7 +16,14 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: "https",
+        hostname: "*.googleusercontent.com",
+      },
     ],
+  },
+   experimental: {
+    allowedDevOrigins: ["https://*.cloudworkstations.dev"],
   },
 };
 
