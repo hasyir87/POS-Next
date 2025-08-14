@@ -1,50 +1,93 @@
 
--- Helper function to execute SQL
-create or replace function exec_sql(sql text) returns void as $$
-begin
-  execute sql;
-end;
-$$ language plpgsql;
+-- Hapus fungsi yang ada jika ada (opsional, untuk idempotensi)
+DROP FUNCTION IF EXISTS public.get_user_role(uuid);
+DROP FUNCTION IF EXISTS public.get_users_in_organization(uuid);
 
--- Hapus kebijakan yang ada sebelum membuat ulang
-DO $$
+-- Fungsi untuk mendapatkan peran pengguna dari tabel profiles
+CREATE OR REPLACE FUNCTION public.get_user_role(p_user_id uuid)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
 BEGIN
-   IF EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow organization access based on profile' AND tablename = 'organizations') THEN
-      DROP POLICY "Allow organization access based on profile" ON public.organizations;
-   END IF;
-   IF EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow profile read access to their own organization' AND tablename = 'profiles') THEN
-      DROP POLICY "Allow profile read access to their own organization" ON public.profiles;
-   END IF;
-   IF EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow users to update their own profile' AND tablename = 'profiles') THEN
-      DROP POLICY "Allow users to update their own profile" ON public.profiles;
-   END IF;
-   IF EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Enable all for organization members' AND tablename = 'products') THEN
-      DROP POLICY "Enable all for organization members" ON public.products;
-   END IF;
-   IF EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Enable all for organization members' AND tablename = 'customers') THEN
-      DROP POLICY "Enable all for organization members" ON public.customers;
-   END IF;
-   IF EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Enable all for organization members' AND tablename = 'promotions') THEN
-      DROP POLICY "Enable all for organization members" ON public.promotions;
-   END IF;
-   IF EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Enable all for organization members' AND tablename = 'categories') THEN
-      DROP POLICY "Enable all for organization members" ON public.categories;
-   END IF;
-   IF EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Enable all for organization members' AND tablename = 'transactions') THEN
-      DROP POLICY "Enable all for organization members" ON public.transactions;
-   END IF;
-END
+  RETURN (
+    SELECT role
+    FROM public.profiles
+    WHERE id = p_user_id
+  );
+END;
 $$;
 
--- Enable RLS for all relevant tables
+
+-- Fungsi untuk mendapatkan semua ID pengguna dalam organisasi yang sama (atau semua jika superadmin)
+CREATE OR REPLACE FUNCTION public.get_users_in_organization(p_user_id uuid)
+RETURNS TABLE(user_id uuid)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_role TEXT;
+  v_organization_id uuid;
+BEGIN
+  -- Dapatkan peran dan ID organisasi dari pengguna yang meminta
+  SELECT role, organization_id INTO v_role, v_organization_id
+  FROM public.profiles
+  WHERE id = p_user_id;
+
+  -- Logika berdasarkan peran
+  IF v_role = 'superadmin' THEN
+    -- Superadmin dapat melihat semua pengguna
+    RETURN QUERY SELECT id FROM public.profiles;
+  ELSIF v_role IN ('owner', 'admin') THEN
+    -- Owner/Admin dapat melihat semua pengguna di organisasi mereka
+    RETURN QUERY 
+    SELECT id FROM public.profiles p
+    WHERE p.organization_id = v_organization_id;
+  ELSE
+    -- Peran lain (misalnya, kasir) tidak dapat melihat pengguna lain
+    RETURN;
+  END IF;
+END;
+$$;
+
+
+-- Buat tabel customers
+CREATE TABLE IF NOT EXISTS public.customers (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+    name character varying NOT NULL,
+    email character varying,
+    phone character varying,
+    loyalty_points integer NOT NULL DEFAULT 0,
+    transaction_count integer NOT NULL DEFAULT 0,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+-- Buat tabel raw_materials
+CREATE TABLE IF NOT EXISTS public.raw_materials (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+    name character varying NOT NULL,
+    brand character varying,
+    quantity double precision NOT NULL DEFAULT 0,
+    unit character varying NOT NULL,
+    category character varying,
+    purchase_price double precision NOT NULL DEFAULT 0,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+-- Aktifkan RLS untuk setiap tabel
 ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.promotions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transaction_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.promotions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.raw_materials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.grades ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.aromas ENABLE ROW LEVEL SECURITY;
@@ -53,271 +96,135 @@ ALTER TABLE public.recipes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 
--- Function to get a user's role from the public profiles table
-create or replace function public.get_user_role(p_user_id uuid)
-returns text
-language plpgsql
-security definer -- Important!
-set search_path = public
-as $$
-begin
-  return (
-    select role from public.profiles where id = p_user_id
-  );
-end;
-$$;
 
--- Function to get all users within an organization (including sub-outlets)
-create or replace function public.get_users_in_organization(organization_id uuid)
-returns table (user_id uuid)
-language sql
-security definer
-set search_path = public
-as $$
-  with recursive org_tree as (
-    select id from organizations where id = organization_id
-    union all
-    select o.id from organizations o
-    inner join org_tree ot on o.parent_organization_id = ot.id
+-- Hapus kebijakan yang ada sebelum membuat yang baru
+DROP POLICY IF EXISTS "Allow full access for superadmins on organizations" ON public.organizations;
+DROP POLICY IF EXISTS "Allow owner and admins to view their own organization" ON public.organizations;
+DROP POLICY IF EXISTS "Allow full access for superadmins on profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Allow users to view their own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Allow owner/admin to view users in their organization" ON public.profiles;
+DROP POLICY IF EXISTS "Allow all access to own organization data" ON public.products;
+DROP POLICY IF EXISTS "Allow all access to own organization data on customers" ON public.customers;
+DROP POLICY IF EXISTS "Allow all access to own organization data on transactions" ON public.transactions;
+DROP POLICY IF EXISTS "Allow all access based on transaction" ON public.transaction_items;
+
+
+-- Kebijakan untuk ORGANIZATIONS
+CREATE POLICY "Allow full access for superadmins on organizations"
+ON public.organizations FOR ALL
+TO authenticated
+USING (get_user_role(auth.uid()) = 'superadmin');
+
+CREATE POLICY "Allow owner and admins to view their own organization"
+ON public.organizations FOR SELECT
+TO authenticated
+USING (id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+
+
+-- Kebijakan untuk PROFILES
+CREATE POLICY "Allow full access for superadmins on profiles"
+ON public.profiles FOR ALL
+TO authenticated
+USING (get_user_role(auth.uid()) = 'superadmin')
+WITH CHECK (get_user_role(auth.uid()) = 'superadmin');
+
+CREATE POLICY "Allow users to view their own profile"
+ON public.profiles FOR SELECT
+TO authenticated
+USING (id = auth.uid());
+
+CREATE POLICY "Allow owner/admin to view users in their organization"
+ON public.profiles FOR SELECT
+TO authenticated
+USING (id IN (SELECT user_id FROM public.get_users_in_organization(auth.uid())));
+
+-- Kebijakan Umum untuk Sebagian Besar Tabel Data
+CREATE POLICY "Allow all access to own organization data"
+ON public.products FOR ALL
+TO authenticated
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Allow all access to own organization data on customers"
+ON public.customers FOR ALL
+TO authenticated
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Allow all access to own organization data on transactions"
+ON public.transactions FOR ALL
+TO authenticated
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Allow all access to own organization data on promotions"
+ON public.promotions FOR ALL
+TO authenticated
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Allow all access to own organization data on categories"
+ON public.categories FOR ALL
+TO authenticated
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Allow all access to own organization data on raw_materials"
+ON public.raw_materials FOR ALL
+TO authenticated
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Allow all access to own organization data on grades"
+ON public.grades FOR ALL
+TO authenticated
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Allow all access to own organization data on aromas"
+ON public.aromas FOR ALL
+TO authenticated
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Allow all access to own organization data on bottle_sizes"
+ON public.bottle_sizes FOR ALL
+TO authenticated
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Allow all access to own organization data on recipes"
+ON public.recipes FOR ALL
+TO authenticated
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Allow all access to own organization data on expenses"
+ON public.expenses FOR ALL
+TO authenticated
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Allow all access to own organization data on settings"
+ON public.settings FOR ALL
+TO authenticated
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+
+
+-- Kebijakan Khusus untuk TRANSACTION_ITEMS
+CREATE POLICY "Allow all access based on transaction"
+ON public.transaction_items FOR ALL
+TO authenticated
+USING (
+  transaction_id IN (
+    SELECT id FROM public.transactions
+    WHERE organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid())
   )
-  select id from profiles
-  where profiles.organization_id in (select id from org_tree);
-$$;
-
--- Policies for ORGANIZATIONS table
-CREATE POLICY "Allow organization access based on profile"
-ON public.organizations
-FOR SELECT
-USING (
-  id IN (
-    SELECT organization_id FROM public.profiles WHERE id = auth.uid()
+)
+WITH CHECK (
+  transaction_id IN (
+    SELECT id FROM public.transactions
+    WHERE organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid())
   )
-  OR
-  parent_organization_id IN (
-     SELECT organization_id FROM public.profiles WHERE id = auth.uid()
-  )
-  OR
-  'superadmin' = public.get_user_role(auth.uid())
 );
-
--- Policies for PROFILES table
-CREATE POLICY "Allow profile read access to their own organization"
-ON public.profiles
-FOR SELECT
-USING (
-  auth.uid() IN (SELECT user_id FROM public.get_users_in_organization(organization_id))
-  OR
-  'superadmin' = public.get_user_role(auth.uid())
-);
-
-CREATE POLICY "Allow users to update their own profile"
-ON public.profiles
-FOR UPDATE
-USING (auth.uid() = id);
-
-
--- Generic policies for data tables
-CREATE POLICY "Enable all for organization members"
-ON public.products
-USING (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-)
-WITH CHECK (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-);
-
-CREATE POLICY "Enable all for organization members"
-ON public.customers
-USING (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-)
-WITH CHECK (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-);
-
-CREATE POLICY "Enable all for organization members"
-ON public.promotions
-USING (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-)
-WITH CHECK (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-);
-
-CREATE POLICY "Enable all for organization members"
-ON public.categories
-USING (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-)
-WITH CHECK (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-);
-
-CREATE POLICY "Enable all for organization members"
-ON public.transactions
-USING (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-)
-WITH CHECK (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-);
-
-CREATE POLICY "Enable all for organization members"
-ON public.raw_materials
-USING (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-)
-WITH CHECK (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-);
-
-CREATE POLICY "Enable all for organization members"
-ON public.grades
-USING (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-)
-WITH CHECK (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-);
-
-CREATE POLICY "Enable all for organization members"
-ON public.aromas
-USING (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-)
-WITH CHECK (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-);
-
-CREATE POLICY "Enable all for organization members"
-ON public.bottle_sizes
-USING (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-)
-WITH CHECK (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-);
-
-CREATE POLICY "Enable all for organization members"
-ON public.recipes
-USING (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-)
-WITH CHECK (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-);
-
-CREATE POLICY "Enable all for organization members"
-ON public.expenses
-USING (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-)
-WITH CHECK (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-);
-
-CREATE POLICY "Enable all for organization members"
-ON public.settings
-USING (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-)
-WITH CHECK (
-    organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    'superadmin' = public.get_user_role(auth.uid())
-);
-
-CREATE POLICY "Enable all for organization members"
-ON public.transaction_items
-FOR ALL
-USING (
-  (SELECT organization_id FROM transactions WHERE id = transaction_id) = (SELECT organization_id FROM profiles WHERE id = auth.uid())
-  OR
-  'superadmin' = public.get_user_role(auth.uid())
-);
-
-
--- Function to handle new user creation
-create or replace function public.handle_new_user()
-returns trigger
-language plpgsql
-security definer set search_path = public
-as $$
-begin
-  insert into public.profiles (id, email, full_name, role)
-  values (new.id, new.email, new.raw_user_meta_data->>'full_name', 'cashier');
-  return new;
-end;
-$$;
-
--- Trigger to call the function when a new user signs up
-create or replace trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
-
--- PostgreSQL Function for processing checkout
-CREATE OR REPLACE FUNCTION public.process_checkout(
-    p_organization_id uuid,
-    p_cashier_id uuid,
-    p_customer_id uuid,
-    p_items jsonb,
-    p_total_amount numeric,
-    p_payment_method public.payment_method
-)
-RETURNS uuid
-LANGUAGE plpgsql
-AS $$
-DECLARE
-    v_transaction_id uuid;
-    item record;
-BEGIN
-    -- 1. Create a new transaction
-    INSERT INTO public.transactions (organization_id, cashier_id, customer_id, total_amount, payment_method, status)
-    VALUES (p_organization_id, p_cashier_id, p_customer_id, p_total_amount, p_payment_method, 'completed')
-    RETURNING id INTO v_transaction_id;
-
-    -- 2. Loop through items and insert into transaction_items
-    FOR item IN SELECT * FROM jsonb_to_recordset(p_items) AS x(product_id uuid, quantity int, price numeric)
-    LOOP
-        INSERT INTO public.transaction_items (transaction_id, product_id, quantity, price)
-        VALUES (v_transaction_id, item.product_id, item.quantity, item.price);
-
-        -- 3. Update stock for the product
-        UPDATE public.products
-        SET stock = stock - item.quantity
-        WHERE id = item.product_id;
-    END LOOP;
-
-    -- 4. Update customer transaction count if a customer is linked
-    IF p_customer_id IS NOT NULL THEN
-        UPDATE public.customers
-        SET transaction_count = transaction_count + 1
-        WHERE id = p_customer_id;
-    END IF;
-
-    -- 5. Return the new transaction ID
-    RETURN v_transaction_id;
-END;
-$$;
