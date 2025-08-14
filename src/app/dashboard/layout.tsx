@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -21,15 +20,15 @@ type NavItem = {
 };
 
 const allNavItems: NavItem[] = [
-  { href: "/dashboard", label: "Dasbor", icon: Home, requiredRoles: ["owner", "admin"] },
-  { href: "/dashboard/pos", label: "Point of Sale", icon: Store, requiredRoles: ["owner", "admin", "cashier"] },
-  { href: "/dashboard/products", label: "Produk", icon: SprayCan, requiredRoles: ["owner", "admin"] },
-  { href: "/dashboard/inventory", label: "Inventaris", icon: PackageSearch, requiredRoles: ["owner", "admin"] },
-  { href: "/dashboard/members", label: "Anggota", icon: Users, requiredRoles: ["owner", "admin", "cashier"] },
-  { href: "/dashboard/users", label: "Pengguna", icon: Users, requiredRoles: ["owner", "admin"] },
-  { href: "/dashboard/organizations", label: "Outlet", icon: Store, requiredRoles: ["owner", "admin"] },
-  { href: "/dashboard/reports", label: "Laporan", icon: BarChart3, requiredRoles: ["owner", "admin"] },
-  { href: "/dashboard/settings", label: "Pengaturan", icon: Settings, requiredRoles: ["owner"] },
+  { href: "/dashboard", label: "Dasbor", icon: Home, requiredRoles: ["owner", "admin", "superadmin"] },
+  { href: "/dashboard/pos", label: "Point of Sale", icon: Store, requiredRoles: ["owner", "admin", "cashier", "superadmin"] },
+  { href: "/dashboard/products", label: "Produk", icon: SprayCan, requiredRoles: ["owner", "admin", "superadmin"] },
+  { href: "/dashboard/inventory", label: "Inventaris", icon: PackageSearch, requiredRoles: ["owner", "admin", "superadmin"] },
+  { href: "/dashboard/members", label: "Anggota", icon: Users, requiredRoles: ["owner", "admin", "cashier", "superadmin"] },
+  { href: "/dashboard/users", label: "Pengguna", icon: Users, requiredRoles: ["owner", "admin", "superadmin"] },
+  { href: "/dashboard/organizations", label: "Outlet", icon: Store, requiredRoles: ["owner", "superadmin"] },
+  { href: "/dashboard/reports", label: "Laporan", icon: BarChart3, requiredRoles: ["owner", "admin", "superadmin"] },
+  { href: "/dashboard/settings", label: "Pengaturan", icon: Settings, requiredRoles: ["owner", "superadmin"] },
 ];
 
 export default function DashboardLayout({
@@ -53,6 +52,11 @@ export default function DashboardLayout({
     const fetchOrganizations = async () => {
       if (!profile || (profile.role !== 'owner' && profile.role !== 'superadmin')) {
           setIsLoadingOrgs(false);
+          // For non-owners, just show their own organization
+          if (profile?.organization_id) {
+            const { data, error } = await supabase.from('organizations').select('*').eq('id', profile.organization_id).single();
+            if (data) setOrganizations([data]);
+          }
           return;
       };
 
@@ -96,7 +100,6 @@ export default function DashboardLayout({
   };
   
   const selectedOrganization = organizations.find(org => org.id === selectedOrganizationId);
-
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">

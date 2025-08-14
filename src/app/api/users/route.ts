@@ -1,13 +1,13 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+
+import { createClient } from '../../../utils/supabase/server';
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
 import type { Database } from '@/types/database';
 
 // --- GET: Fetch a list of users for the LOGGED-IN USER's organization ---
 export async function GET(request: NextRequest) {
   const cookieStore = cookies();
-  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+  const supabase = createClient(cookieStore);
 
   try {
     // 1. Get the session and profile of the user making the request
@@ -29,15 +29,15 @@ export async function GET(request: NextRequest) {
     // 2. Query profiles ONLY for that user's organization
     const { data: profiles, error } = await supabase
       .from('profiles')
-      .select(`
+      .select(\`
         id,
         email,
         full_name,
         avatar_url,
         organization_id,
         role
-      `)
-      .eq('organization_id', profile.organization_id); // FIX: Using organization_id from the session, not the URL
+      \`)
+      .eq('organization_id', profile.organization_id);
 
     if (error) {
       console.error('Error fetching profiles:', error);
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
   const { email, password, full_name, role } = await req.json();
   
   const cookieStore = cookies();
-  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+  const supabase = createClient(cookieStore);
 
   try {
     // 1. Get the profile and permissions of the user making the request
@@ -82,11 +82,11 @@ export async function POST(req: Request) {
 
     const allowedRoles = ['cashier', 'admin'];
     if (!allowedRoles.includes(role)) {
-      return NextResponse.json({ error: `Forbidden: Cannot assign role "${role}".` }, { status: 403 });
+      return NextResponse.json({ error: \`Forbidden: Cannot assign role "\${role}".\` }, { status: 403 });
     }
 
     // 3. Create the new user in Supabase Auth (requires admin privileges)
-    const { data: userAuthData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    const { data: userAuthData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
@@ -102,7 +102,7 @@ export async function POST(req: Request) {
     }
 
     // 4. Create the user profile and link it to the CORRECT organization
-    const { data: newUserProfile, error: insertProfileError } = await supabaseAdmin
+    const { data: newUserProfile, error: insertProfileError } = await supabase
       .from('profiles')
       .insert([
         {
@@ -110,7 +110,7 @@ export async function POST(req: Request) {
           full_name,
           email,
           role,
-          organization_id: requestingProfile.organization_id, // FIX: Force use of organization_id from the creating admin/owner
+          organization_id: requestingProfile.organization_id,
         },
       ])
       .select()
@@ -118,15 +118,13 @@ export async function POST(req: Request) {
 
     if (insertProfileError) {
       console.error('Error creating user profile:', insertProfileError.message);
-      // Rollback: Delete the user from Auth if profile creation fails
-      await supabaseAdmin.auth.admin.deleteUser(userAuthData.user.id);
+      await supabase.auth.admin.deleteUser(userAuthData.user.id);
       return NextResponse.json({ error: insertProfileError.message }, { status: 500 });
     }
 
     return NextResponse.json(newUserProfile, { status: 201 });
 
   } catch (error: any) {
-    // Handle error if user already exists (duplicate key)
     if (error.code === '23505') { 
         return NextResponse.json({ error: 'User with this email already exists.' }, { status: 409 });
     }

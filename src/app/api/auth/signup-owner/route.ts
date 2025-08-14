@@ -1,15 +1,19 @@
-import { supabaseAdmin } from "@/lib/supabase-admin";
+
+import { createClient } from '../../../../utils/supabase/server';
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
+  const cookieStore = cookies();
+  const supabase = createClient(cookieStore);
   const { email, password, organization_name } = await req.json();
 
   // --- Langkah 1: Buat Pengguna di Supabase Auth ---
   const { data: userAuthData, error: authError } =
-    await supabaseAdmin.auth.admin.createUser({
+    await supabase.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Sebaiknya tetap true untuk alur produksi, user bisa konfirmasi nanti
+      email_confirm: true,
     });
 
   if (authError) {
@@ -27,7 +31,7 @@ export async function POST(req: Request) {
   const userId = userAuthData.user.id;
 
   // --- Langkah 2: Buat Organisasi Induk ---
-  const { data: organization, error: orgError } = await supabaseAdmin
+  const { data: organization, error: orgError } = await supabase
     .from("organizations")
     .insert([{ name: organization_name }])
     .select()
@@ -36,7 +40,7 @@ export async function POST(req: Request) {
   if (orgError || !organization) {
     console.error("Error creating organization:", orgError?.message);
     // Rollback: hapus user yang sudah dibuat di Auth jika pembuatan organisasi gagal
-    await supabaseAdmin.auth.admin.deleteUser(userId);
+    await supabase.auth.admin.deleteUser(userId);
     return NextResponse.json(
       { error: orgError?.message || "Organization creation failed." },
       { status: 500 },
@@ -44,14 +48,14 @@ export async function POST(req: Request) {
   }
 
   // --- Langkah 3: Buat Profil Pengguna (Pemilik) dan Hubungkan ke Organisasi ---
-  const { error: profileError } = await supabaseAdmin
+  const { error: profileError } = await supabase
     .from("profiles")
     .insert([
       {
-        id: userId, // ID dari Supabase Auth
-        full_name: "Owner", // Nama bisa diubah user nanti
+        id: userId,
+        full_name: "Owner",
         email: email,
-        role: "owner", // Tetapkan peran 'owner'
+        role: "owner",
         organization_id: organization.id,
       },
     ]);
@@ -59,8 +63,8 @@ export async function POST(req: Request) {
   if (profileError) {
     console.error("Error creating user profile:", profileError.message);
     // Rollback: hapus user di Auth dan organisasi jika pembuatan profil gagal
-    await supabaseAdmin.auth.admin.deleteUser(userId);
-    await supabaseAdmin
+    await supabase.auth.admin.deleteUser(userId);
+    await supabase
       .from("organizations")
       .delete()
       .eq("id", organization.id);

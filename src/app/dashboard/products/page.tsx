@@ -1,9 +1,7 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/auth-context";
-import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,18 +12,7 @@ import { PlusCircle, MoreHorizontal, SprayCan } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
-
-// This type now reflects the 'products' table in Supabase
-type Product = {
-    id: string;
-    name: string;
-    cogs: number; // Cost of Goods Sold
-    price: number;
-    stock: number;
-    image_url: string;
-    organization_id: string;
-    created_at: string;
-};
+import type { Product } from "@/types/database";
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
@@ -33,14 +20,14 @@ const formatCurrency = (amount: number) => {
 
 export default function ProductsPage() {
     const { toast } = useToast();
-    const { selectedOrganizationId, loading: authLoading } = useAuth();
+    const { selectedOrganizationId, loading: authLoading, supabase } = useAuth();
     
     const [products, setProducts] = useState<Product[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isDialogOpen, setDialogOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
 
-    const emptyProduct: Partial<Product> = { name: "", price: 0, cogs: 0, stock: 0, image_url: "https://placehold.co/150x150.png" };
+    const emptyProduct: Partial<Product> = { name: "", price: 0, stock: 0, image_url: "https://placehold.co/150x150.png" };
     
     const fetchProducts = async () => {
         if (!selectedOrganizationId) return;
@@ -63,8 +50,10 @@ export default function ProductsPage() {
     };
 
     useEffect(() => {
-        fetchProducts();
-    }, [selectedOrganizationId]);
+        if (!authLoading && selectedOrganizationId) {
+            fetchProducts();
+        }
+    }, [selectedOrganizationId, authLoading]);
 
     const handleOpenDialog = (product: Partial<Product> | null = null) => {
         setEditingProduct(product ? { ...product } : emptyProduct);
@@ -83,23 +72,21 @@ export default function ProductsPage() {
 
         const productData = {
             name: editingProduct.name,
-            cogs: editingProduct.cogs || 0,
             price: editingProduct.price,
             stock: editingProduct.stock || 0,
             image_url: editingProduct.image_url,
             organization_id: selectedOrganizationId,
+            description: editingProduct.description
         };
 
         let error;
 
         if (editingProduct.id) {
-            // Update existing product
             ({ error } = await supabase
                 .from('products')
                 .update(productData)
                 .eq('id', editingProduct.id));
         } else {
-            // Create new product
             ({ error } = await supabase
                 .from('products')
                 .insert([productData]));
@@ -126,7 +113,7 @@ export default function ProductsPage() {
             toast({ variant: "destructive", title: "Error", description: `Gagal menghapus produk: ${error.message}` });
         } else {
             toast({ title: "Sukses", description: "Produk berhasil dihapus." });
-            fetchProducts(); // Refetch data
+            fetchProducts();
         }
     };
 
@@ -152,10 +139,6 @@ export default function ProductsPage() {
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="name" className="text-right">Nama</Label>
                                 <Input id="name" placeholder="Nama produk" className="col-span-3" value={editingProduct?.name || ''} onChange={(e) => setEditingProduct(prev => prev ? {...prev, name: e.target.value} : null)} />
-                            </div>
-                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="cogs" className="text-right">HPP</Label>
-                                <Input id="cogs" type="number" placeholder="Rp 0" className="col-span-3" value={editingProduct?.cogs || ''} onChange={(e) => setEditingProduct(prev => prev ? {...prev, cogs: parseFloat(e.target.value) || 0} : null)} />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="price" className="text-right">Harga Jual</Label>
@@ -185,7 +168,6 @@ export default function ProductsPage() {
                                 <TableHead className="w-[80px]">Gambar</TableHead>
                                 <TableHead>Nama Produk</TableHead>
                                 <TableHead>Stok</TableHead>
-                                <TableHead className="text-right">HPP</TableHead>
                                 <TableHead className="text-right">Harga Jual</TableHead>
                                 <TableHead className="w-[50px]"></TableHead>
                             </TableRow>
@@ -194,14 +176,13 @@ export default function ProductsPage() {
                             {products.length > 0 ? products.map((product) => (
                                 <TableRow key={product.id}>
                                     <TableCell>
-                                        <Image src={product.image_url || "https://placehold.co/50x50.png"} alt={product.name} width={50} height={50} className="rounded-md aspect-square object-cover" />
+                                        <Image src={product.image_url || "https://placehold.co/50x50.png"} alt={product.name} width={50} height={50} className="rounded-md aspect-square object-cover" data-ai-hint="perfume bottle" />
                                     </TableCell>
                                     <TableCell>
                                         <div className="font-medium">{product.name}</div>
                                         <div className="text-sm text-muted-foreground">{product.id}</div>
                                     </TableCell>
                                     <TableCell>{product.stock} pcs</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(product.cogs)}</TableCell>
                                     <TableCell className="text-right">{formatCurrency(product.price)}</TableCell>
                                     <TableCell>
                                        <DropdownMenu>

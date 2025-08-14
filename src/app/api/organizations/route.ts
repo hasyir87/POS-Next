@@ -1,14 +1,16 @@
 
+import { createClient } from '../../../utils/supabase/server';
+import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { Database } from '@/types/database'
 
-type Organization = Database['public']['Tables']['organizations']['Row']
 type OrganizationInsert = Database['public']['Tables']['organizations']['Insert']
 
 export async function GET(request: NextRequest) {
+  const cookieStore = cookies();
+  const supabase = createClient(cookieStore);
   try {
-    const { data: organizations, error } = await supabaseAdmin
+    const { data: organizations, error } = await supabase
       .from('organizations')
       .select('*')
       .order('created_at', { ascending: false })
@@ -21,7 +23,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({ organizations })
+    return NextResponse.json(organizations)
   } catch (error) {
     console.error('Unexpected error:', error)
     return NextResponse.json(
@@ -32,10 +34,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const cookieStore = cookies();
+  const supabase = createClient(cookieStore);
   try {
     const body: OrganizationInsert = await request.json()
 
-    const { data: organization, error } = await supabaseAdmin
+    const { data: organization, error } = await supabase
       .from('organizations')
       .insert([body])
       .select()
@@ -49,7 +53,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({ organization }, { status: 201 })
+    return NextResponse.json(organization, { status: 201 })
   } catch (error) {
     console.error('Unexpected error:', error)
     return NextResponse.json(

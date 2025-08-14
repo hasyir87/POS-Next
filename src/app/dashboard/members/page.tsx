@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -56,7 +55,7 @@ export default function MembersPage() {
     };
 
     useEffect(() => {
-        if (!authLoading) {
+        if (!authLoading && selectedOrganizationId) {
             fetchMembers();
         }
     }, [selectedOrganizationId, authLoading]);
@@ -140,8 +139,8 @@ export default function MembersPage() {
                                 <Input id="phone" type="tel" placeholder="08123456xxxx" className="col-span-3" value={editingMember?.phone || ''} onChange={(e) => setEditingMember(prev => prev ? {...prev, phone: e.target.value} : null)} />
                             </div>
                              <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="transactionCount" className="text-right">Jml Transaksi</Label>
-                                <Input id="transactionCount" type="number" className="col-span-3" value={editingMember?.transaction_count || '0'} onChange={(e) => setEditingMember(prev => prev ? {...prev, transaction_count: parseInt(e.target.value) || 0} : null)} />
+                                <Label htmlFor="transaction_count" className="text-right">Jml Transaksi</Label>
+                                <Input id="transaction_count" type="number" className="col-span-3" value={editingMember?.transaction_count || '0'} onChange={(e) => setEditingMember(prev => prev ? {...prev, transaction_count: parseInt(e.target.value) || 0} : null)} />
                             </div>
                         </div>
                         <DialogFooter>

@@ -1,9 +1,7 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/auth-context";
-import { supabase } from "@/lib/supabase";
 import { InventoryTool } from "@/components/inventory-tool";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,19 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-
-// This type now reflects the 'raw_materials' table in Supabase
-type Material = {
-  id: string;
-  name: string;
-  brand: string;
-  quantity: number;
-  unit: string;
-  category: string;
-  purchasePrice: number;
-  organization_id: string;
-  created_at: string;
-};
+import type { RawMaterial } from "@/types/database";
 
 // These can eventually be fetched from a dedicated 'settings' or 'options' table
 const initialCategories = [
@@ -60,20 +46,19 @@ const formatCurrency = (amount: number) => {
 
 export default function InventoryPage() {
   const { toast } = useToast();
-  const { selectedOrganizationId, loading: authLoading } = useAuth();
+  const { selectedOrganizationId, loading: authLoading, supabase } = useAuth();
 
-  const [materials, setMaterials] = useState<Material[]>([]);
+  const [materials, setMaterials] = useState<RawMaterial[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setDialogOpen] = useState(false);
-  const [editingMaterial, setEditingMaterial] = useState<Partial<Material> | null>(null);
+  const [editingMaterial, setEditingMaterial] = useState<Partial<RawMaterial> | null>(null);
 
-  // In a real app, these would come from the settings page or a global state management solution
   const [categories, setCategories] = useState(initialCategories);
   const [units, setUnits] = useState(initialUnits);
   const [brands, setBrands] = useState(initialBrands);
   const [lowStockThreshold, setLowStockThreshold] = useState(200);
 
-  const emptyMaterial: Partial<Material> = { name: "", brand: "", quantity: 0, unit: "", category: "", purchasePrice: 0 };
+  const emptyMaterial: Partial<RawMaterial> = { name: "", brand: "", quantity: 0, unit: "", category: "", purchase_price: 0 };
 
   const fetchMaterials = async () => {
     if (!selectedOrganizationId) return;
@@ -90,16 +75,18 @@ export default function InventoryPage() {
       toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data inventaris." });
       setMaterials([]);
     } else {
-      setMaterials(data as Material[]);
+      setMaterials(data as RawMaterial[]);
     }
     setIsLoading(false);
   };
 
   useEffect(() => {
-    fetchMaterials();
-  }, [selectedOrganizationId]);
+    if(!authLoading && selectedOrganizationId) {
+      fetchMaterials();
+    }
+  }, [selectedOrganizationId, authLoading]);
 
-  const handleOpenDialog = (material: Partial<Material> | null = null) => {
+  const handleOpenDialog = (material: Partial<RawMaterial> | null = null) => {
     setEditingMaterial(material ? { ...material } : emptyMaterial);
     setDialogOpen(true);
   };
@@ -124,7 +111,7 @@ export default function InventoryPage() {
           quantity: editingMaterial.quantity,
           unit: editingMaterial.unit,
           category: editingMaterial.category,
-          purchasePrice: editingMaterial.purchasePrice,
+          purchase_price: editingMaterial.purchase_price,
         })
         .eq('id', editingMaterial.id);
 
@@ -170,13 +157,13 @@ export default function InventoryPage() {
   };
   
   const groupedMaterials = materials.reduce((acc, material) => {
-    const categoryLabel = categories.find(c => c.value === material.category)?.label || material.category;
+    const categoryLabel = categories.find(c => c.value === material.category)?.label || material.category || 'Lainnya';
     if (!acc[categoryLabel]) {
       acc[categoryLabel] = [];
     }
     acc[categoryLabel].push(material);
     return acc;
-  }, {} as Record<string, Material[]>);
+  }, {} as Record<string, RawMaterial[]>);
 
   if (authLoading || isLoading) {
     return <div className="p-6">Loading inventory...</div>
@@ -204,7 +191,6 @@ export default function InventoryPage() {
                             <DialogTitle className="font-headline">{editingMaterial?.id ? 'Ubah Bahan' : 'Tambah Bahan Baru'}</DialogTitle>
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
-                            {/* Form fields remain mostly the same */}
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="name" className="text-right">Nama</Label>
                                 <Input id="name" className="col-span-3" value={editingMaterial?.name || ''} onChange={(e) => setEditingMaterial(prev => prev ? {...prev, name: e.target.value} : null)} />
@@ -247,8 +233,8 @@ export default function InventoryPage() {
                                 </Select>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="purchasePrice" className="text-right">Harga Beli</Label>
-                                <Input id="purchasePrice" type="number" placeholder="Rp 0" className="col-span-3" value={editingMaterial?.purchasePrice || ''} onChange={(e) => setEditingMaterial(prev => prev ? {...prev, purchasePrice: parseFloat(e.target.value) || 0} : null)} />
+                                <Label htmlFor="purchase_price" className="text-right">Harga Beli</Label>
+                                <Input id="purchase_price" type="number" placeholder="Rp 0" className="col-span-3" value={editingMaterial?.purchase_price || ''} onChange={(e) => setEditingMaterial(prev => prev ? {...prev, purchase_price: parseFloat(e.target.value) || 0} : null)} />
                             </div>
                         </div>
                         <DialogFooter>
@@ -282,7 +268,7 @@ export default function InventoryPage() {
                                         <TableRow key={material.id}>
                                             <TableCell className="font-medium">{material.name}</TableCell>
                                             <TableCell>{material.brand}</TableCell>
-                                            <TableCell>{formatCurrency(material.purchasePrice)}</TableCell>
+                                            <TableCell>{formatCurrency(material.purchase_price)}</TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                      {(isLowStock || isOutOfStock) && (
@@ -294,7 +280,7 @@ export default function InventoryPage() {
                                                     {material.quantity.toLocaleString('id-ID')} {material.unit}
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="text-right font-semibold">{formatCurrency(material.quantity * material.purchasePrice)}</TableCell>
+                                            <TableCell className="text-right font-semibold">{formatCurrency(material.quantity * material.purchase_price)}</TableCell>
                                             <TableCell>
                                               <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>

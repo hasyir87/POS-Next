@@ -1,8 +1,8 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+
+import { createClient } from '../../../utils/supabase/server';
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
 import type { Database } from '@/types/database';
-import { supabaseAdmin } from '@/lib/supabase-admin';
 
 type TransactionInsert = Database['public']['Tables']['transactions']['Insert'];
 type TransactionItemInsert = Database['public']['Tables']['transaction_items']['Insert'];
@@ -10,10 +10,9 @@ type TransactionItemInsert = Database['public']['Tables']['transaction_items']['
 // --- GET: Mengambil transaksi untuk organisasi pengguna yang sedang login ---
 export async function GET(request: NextRequest) {
   const cookieStore = cookies();
-  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+  const supabase = createClient(cookieStore);
 
   try {
-    // 1. Dapatkan sesi dan profil pengguna yang terpercaya
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !session) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
@@ -21,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('organization_id, role') // Ambil juga role untuk kemungkinan validasi
+      .select('organization_id, role')
       .eq('id', session.user.id)
       .single();
 
@@ -33,10 +32,9 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const limit = searchParams.get('limit');
 
-    // 2. Query transaksi dengan MEMAKSA organization_id dari profil pengguna
     let query = supabase
       .from('transactions')
-      .select(`
+      .select(\`
         id,
         organization_id,
         cashier_id,
@@ -52,8 +50,8 @@ export async function GET(request: NextRequest) {
           price,
           products (id, name, description)
         )
-      `)
-      .eq('organization_id', profile.organization_id); // FIX: Menggunakan organization_id dari sesi, BUKAN dari URL
+      \`)
+      .eq('organization_id', profile.organization_id);
 
     if (status) {
       query = query.eq('status', status);
@@ -80,7 +78,7 @@ export async function GET(request: NextRequest) {
 // --- POST: Membuat transaksi baru untuk organisasi pengguna ---
 export async function POST(request: NextRequest) {
   const cookieStore = cookies();
-  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+  const supabase = createClient(cookieStore);
 
   try {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -104,7 +102,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields or items' }, { status: 400 });
     }
 
-    // FIX: organization_id dan cashier_id diambil dari sesi, bukan dari body request
     const transactionToInsert: TransactionInsert = {
       ...body,
       organization_id: profile.organization_id,
@@ -131,7 +128,7 @@ export async function POST(request: NextRequest) {
     const { data: items, error: itemsError } = await supabase
       .from('transaction_items')
       .insert(transactionItems)
-      .select(`*`);
+      .select(\`*\`);
 
     if (itemsError) {
       console.error('Error creating transaction items:', itemsError);
@@ -139,17 +136,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create transaction items' }, { status: 500 });
     }
 
-    // Menggunakan supabaseAdmin HANYA untuk memanggil RPC yang mungkin butuh privilese lebih tinggi
     for (const item of body.items) {
-      const { error: stockError } = await supabaseAdmin.rpc('update_product_stock', {
-        p_product_id: item.product_id, // pastikan nama parameter sesuai dengan di fungsi RPC
-        p_quantity_sold: item.quantity,
-      });
+        if (item.product_id) {
+            const { error: stockError } = await supabase.rpc('update_product_stock', {
+                p_product_id: item.product_id,
+                p_quantity_sold: item.quantity,
+            });
 
-      if (stockError) {
-        console.error('Error updating product stock:', stockError);
-        // Implementasi rollback yang lebih baik mungkin diperlukan di produksi
-      }
+            if (stockError) {
+                console.error('Error updating product stock:', stockError);
+            }
+        }
     }
 
     return NextResponse.json({
