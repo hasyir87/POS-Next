@@ -25,6 +25,7 @@ const allNavItems: NavItem[] = [
   { href: "/dashboard/pos", label: "Point of Sale", icon: Store, requiredRoles: ["owner", "admin", "cashier"] },
   { href: "/dashboard/products", label: "Produk", icon: SprayCan, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/inventory", label: "Inventaris", icon: PackageSearch, requiredRoles: ["owner", "admin"] },
+  { href: "/dashboard/members", label: "Anggota", icon: Users, requiredRoles: ["owner", "admin", "cashier"] },
   { href: "/dashboard/users", label: "Pengguna", icon: Users, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/organizations", label: "Outlet", icon: Store, requiredRoles: ["owner", "admin"] },
   { href: "/dashboard/reports", label: "Laporan", icon: BarChart3, requiredRoles: ["owner", "admin"] },
@@ -65,7 +66,7 @@ export default function DashboardLayout({
         console.error("Error fetching organizations:", error);
         setOrganizations([]);
       } else if (data) {
-        setOrganizations(data);
+        setOrganizations(Array.isArray(data) ? data : []);
       }
       setIsLoadingOrgs(false);
     };
@@ -76,20 +77,11 @@ export default function DashboardLayout({
   }, [profile, supabase]);
 
 
-  if (loading) {
+  if (loading || !profile) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
-    );
-  }
-
-  if (!profile) {
-    // This can happen briefly. Or if there's a serious issue.
-    return (
-        <div className="flex h-screen w-full items-center justify-center">
-            <p>Mencari profil pengguna...</p>
-        </div>
     );
   }
 
