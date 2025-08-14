@@ -39,3 +39,18 @@ USING (
     WHERE id = auth.uid()
   )
 );
+
+-- Enable RLS on the organizations table
+ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Allow users to view their own organization
+CREATE POLICY "Allow users to view their own organization" ON public.organizations
+FOR SELECT
+TO authenticated
+USING (
+  id IN (
+    SELECT organization_id
+    FROM public.profiles
+    WHERE id = auth.uid()
+  )
+);

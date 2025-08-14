@@ -1,14 +1,11 @@
 {
-  "name": "AI Codespaces Turbo",
-  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "name": "AI Workspace - deepseek-coder",
+  "postCreateCommand": "bash .devcontainer/post-start.sh",
   "customizations": {
-    "codespaces": { "editorVersion": "next" },
     "vscode": {
-      "extensions": [
-        "Continue.continue",
-        "TabNine.tabnine-vscode"
-      ]
+      "settings": {
+        "terminal.integrated.shell.linux": "/bin/bash"
+      }
     }
-  },
-  "postCreateCommand": "bash /workspaces/codespaces-ai/scripts/post-setup.sh"
+  }
 }

@@ -4,13 +4,13 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import type { Database } from '@/types/database';
 
-// --- GET: Mengambil daftar pengguna untuk organisasi PENGGUNA YANG LOGIN ---
+// --- GET: Fetch a list of users for the LOGGED-IN USER's organization ---
 export async function GET(request: NextRequest) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
   try {
-    // 1. Dapatkan sesi dan profil pengguna yang melakukan request
+    // 1. Get the session and profile of the user making the request
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !session) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Profile or organization not found.' }, { status: 404 });
     }
 
-    // 2. Query profil HANYA untuk organisasi pengguna tersebut
+    // 2. Query profiles ONLY for that user's organization
     const { data: profiles, error } = await supabase
       .from('profiles')
       .select(`
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
         organization_id,
         role
       `)
-      .eq('organization_id', profile.organization_id); // FIX: Menggunakan organization_id dari sesi, bukan URL
+      .eq('organization_id', profile.organization_id); // FIX: Using organization_id from the session, not the URL
 
     if (error) {
       console.error('Error fetching profiles:', error);
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// --- POST: Mengundang atau membuat pengguna baru dalam organisasi PENGGUNA YANG LOGIN ---
+// --- POST: Invite or create a new user within the LOGGED-IN USER's organization ---
 export async function POST(req: Request) {
   const { email, password, full_name, role } = await req.json();
   
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
   const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
   try {
-    // 1. Dapatkan profil dan izin dari pengguna yang melakukan request
+    // 1. Get the profile and permissions of the user making the request
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !session) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Requesting user profile not found.' }, { status: 404 });
     }
     
-    // 2. Pemeriksaan Izin
+    // 2. Permission Check
     if (requestingProfile.role !== 'owner' && requestingProfile.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden: Only owners or admins can add users.' }, { status: 403 });
     }
@@ -85,7 +85,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Forbidden: Cannot assign role "${role}".` }, { status: 403 });
     }
 
-    // 3. Buat pengguna baru di Supabase Auth (memerlukan hak admin)
+    // 3. Create the new user in Supabase Auth (requires admin privileges)
     const { data: userAuthData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -101,7 +101,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Supabase Auth user creation failed.' }, { status: 500 });
     }
 
-    // 4. Buat profil pengguna dan hubungkan ke organisasi yang BENAR
+    // 4. Create the user profile and link it to the CORRECT organization
     const { data: newUserProfile, error: insertProfileError } = await supabaseAdmin
       .from('profiles')
       .insert([
@@ -110,7 +110,7 @@ export async function POST(req: Request) {
           full_name,
           email,
           role,
-          organization_id: requestingProfile.organization_id, // FIX: Paksa menggunakan organization_id dari admin/owner yang membuat
+          organization_id: requestingProfile.organization_id, // FIX: Force use of organization_id from the creating admin/owner
         },
       ])
       .select()
@@ -118,7 +118,7 @@ export async function POST(req: Request) {
 
     if (insertProfileError) {
       console.error('Error creating user profile:', insertProfileError.message);
-      // Rollback: Hapus user dari Auth jika pembuatan profil gagal
+      // Rollback: Delete the user from Auth if profile creation fails
       await supabaseAdmin.auth.admin.deleteUser(userAuthData.user.id);
       return NextResponse.json({ error: insertProfileError.message }, { status: 500 });
     }
@@ -126,7 +126,7 @@ export async function POST(req: Request) {
     return NextResponse.json(newUserProfile, { status: 201 });
 
   } catch (error: any) {
-    // Tangani error jika user sudah ada (duplicate key)
+    // Handle error if user already exists (duplicate key)
     if (error.code === '23505') { 
         return NextResponse.json({ error: 'User with this email already exists.' }, { status: 409 });
     }
