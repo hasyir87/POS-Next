@@ -1,9 +1,14 @@
+
 // middleware.ts
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
+  let res = NextResponse.next({
+    request: {
+      headers: req.headers,
+    },
+  })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,10 +19,22 @@ export async function middleware(req: NextRequest) {
           return req.cookies.get(name)?.value
         },
         set(name: string, value: string, options: CookieOptions) {
-          req.cookies.set({ name, value, ...options })
+          // The `set` method was modifying the request cookies.
+          // It should modify the response cookies instead.
+          res.cookies.set({
+            name,
+            value,
+            ...options,
+          })
         },
         remove(name: string, options: CookieOptions) {
-          req.cookies.set({ name, value: '', ...options })
+          // The `delete` method was modifying the request cookies.
+          // It should modify the response cookies instead.
+          res.cookies.set({
+            name,
+            value: '',
+            ...options,
+          })
         },
       },
     }
@@ -36,9 +53,6 @@ export async function middleware(req: NextRequest) {
   if (user && req.nextUrl.pathname === '/') {
     return NextResponse.redirect(new URL('/dashboard', req.url))
   }
-
-  // Refresh session if expired
-  await supabase.auth.getSession()
 
   return res
 }
