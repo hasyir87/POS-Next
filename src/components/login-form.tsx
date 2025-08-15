@@ -1,4 +1,5 @@
 
+
 "use client";
 import React from "react";
 
@@ -22,6 +23,7 @@ import { useAuth } from "@/context/auth-context";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { AlertCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 const formSchema = z.object({
   email: z.string().email({
@@ -34,6 +36,7 @@ const formSchema = z.object({
 
 export function LoginForm() {
   const { login } = useAuth();
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -52,7 +55,8 @@ export function LoginForm() {
     
     try {
       await login({ email: values.email, password: values.password });
-      // Middleware akan menangani redirect on success
+      // Redirect will be handled by middleware/page logic
+      router.push('/dashboard');
     } catch (error: any) {
       let msg = "Login gagal. Silakan coba lagi.";
       if (error?.message?.toLowerCase().includes("invalid login credentials")) {

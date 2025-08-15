@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { LoginForm } from '@/components/login-form';
@@ -28,7 +29,7 @@ export default function Home() {
       <div className="mx-auto w-full max-w-sm space-y-6">
         <div className="space-y-2 text-center">
           <MPerfumeAmalLogo className="mx-auto h-12 w-12 text-primary" />
-          <h1 className="text-3xl font-bold text-foreground font-headline">M Perfume Amal</h1>
+          <h1 className="text-3xl font-bold text-foreground font-headline">ScentPOS</h1>
           <p className="text-muted-foreground">Masuk ke sistem manajemen toko</p>
         </div>
         <LoginForm />

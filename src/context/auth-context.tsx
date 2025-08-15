@@ -3,17 +3,18 @@
 
 import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback } from 'react';
 import { type SupabaseClient, type User as SupabaseUser } from '@supabase/supabase-js';
-import { type Database, type UserProfile } from '@/types/database';
 import { createClient } from '@/utils/supabase/client';
+import type { UserProfile } from '@/types/database';
+import { useRouter } from 'next/navigation';
 
 interface AuthContextType {
-  supabase: SupabaseClient<Database>;
+  supabase: SupabaseClient;
   user: SupabaseUser | null;
   profile: UserProfile | null;
   loading: boolean;
   selectedOrganizationId: string | null;
   setSelectedOrganizationId: (orgId: string | null) => void;
-  login: ({ email, password }: { email: string; password: string }) => Promise<any>;
+  login: ({ email, password }: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -21,16 +22,31 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const supabase = createClient();
+  const router = useRouter();
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null);
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('selectedOrgId');
+    }
+    return null;
+  });
+
+  const handleSetSelectedOrg = (orgId: string | null) => {
+    if (orgId) {
+      localStorage.setItem('selectedOrgId', orgId);
+    } else {
+      localStorage.removeItem('selectedOrgId');
+    }
+    setSelectedOrganizationId(orgId);
+  }
 
   const fetchUserProfile = useCallback(async (user: SupabaseUser | null) => {
     if (!user) {
       setProfile(null);
-      setSelectedOrganizationId(null);
-      return;
+      handleSetSelectedOrg(null);
+      return null;
     }
 
     try {
@@ -41,29 +57,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .single();
       
       if (error) {
-        console.error("Error fetching profile:", error);
-        setProfile(null);
-        setSelectedOrganizationId(null);
-      } else {
-        const userProfile = data as UserProfile;
-        setProfile(userProfile);
-        // Set the initial selected organization to the user's own organization
-        if (userProfile?.organization_id) {
-            setSelectedOrganizationId(userProfile.organization_id);
-        }
+        throw error;
       }
+      
+      const userProfile = data as UserProfile;
+      setProfile(userProfile);
+      
+      // Initialize selected organization
+      const storedOrgId = localStorage.getItem('selectedOrgId');
+      if (storedOrgId) {
+          setSelectedOrganizationId(storedOrgId);
+      } else if (userProfile?.organization_id) {
+          handleSetSelectedOrg(userProfile.organization_id);
+      }
+
+      return userProfile;
     } catch (e) {
-      console.error("Catastrophic error fetching profile:", e);
+      console.error("Error fetching profile:", e);
       setProfile(null);
-      setSelectedOrganizationId(null);
+      handleSetSelectedOrg(null);
+      return null;
     }
   }, [supabase]);
 
   useEffect(() => {
-    setLoading(true);
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setLoading(true);
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       await fetchUserProfile(currentUser);
@@ -82,14 +103,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       password,
     });
     if (error) throw error;
-    // The onAuthStateChange listener will handle fetching the profile and updating state.
-    // The middleware will handle the redirect.
+    // onAuthStateChange will handle the rest
   };
 
   const logout = async () => {
     await supabase.auth.signOut();
-    // The onAuthStateChange listener will clear user/profile state.
-    // The middleware will handle the redirect.
+    handleSetSelectedOrg(null);
+    router.push('/');
   };
   
   const value = {
@@ -98,7 +118,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     profile,
     loading,
     selectedOrganizationId,
-    setSelectedOrganizationId,
+    setSelectedOrganizationId: handleSetSelectedOrg,
     login,
     logout,
   };
