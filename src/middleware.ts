@@ -1,4 +1,3 @@
-// middleware.ts
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
@@ -18,33 +17,37 @@ export async function middleware(req: NextRequest) {
           return req.cookies.get(name)?.value
         },
         set(name: string, value: string, options: CookieOptions) {
-          res.cookies.set({
-            name,
-            value,
-            ...options,
+          // If the cookie is set, update the request and response cookies.
+          req.cookies.set({ name, value, ...options })
+          res = NextResponse.next({
+            request: { headers: req.headers },
           })
+          res.cookies.set({ name, value, ...options })
         },
         remove(name: string, options: CookieOptions) {
-          res.cookies.set({
-            name,
-            value: '',
-            ...options,
+          // If the cookie is removed, update the request and response cookies.
+          req.cookies.set({ name, value: '', ...options })
+          res = NextResponse.next({
+            request: { headers: req.headers },
           })
+          res.cookies.set({ name, value: '', ...options })
         },
       },
     }
   )
 
-  // Menggunakan getUser() untuk verifikasi sesi yang aman
+  // Refresh session if expired - required for Server Components
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Jika pengguna mengakses route yang dilindungi (/dashboard) dan belum login
-  if (!user && req.nextUrl.pathname.startsWith('/dashboard')) {
+  const { pathname } = req.nextUrl
+
+  // if user is not logged in and is trying to access a protected route, redirect to login
+  if (!user && pathname.startsWith('/dashboard')) {
     return NextResponse.redirect(new URL('/', req.url))
   }
 
-  // Jika pengguna sudah login tetapi mengakses root page, redirect ke dashboard
-  if (user && req.nextUrl.pathname === '/') {
+  // if user is logged in and is trying to access the login page, redirect to dashboard
+  if (user && pathname === '/') {
     return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
@@ -58,7 +61,7 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - api (API routes)
+     * Feel free to add more paths here that should not be authenticated.
      */
     '/((?!_next/static|_next/image|favicon.ico|api).*)',
   ],

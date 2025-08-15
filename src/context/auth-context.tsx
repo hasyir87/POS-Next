@@ -4,7 +4,6 @@
 import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback } from 'react';
 import { type SupabaseClient, type User as SupabaseUser } from '@supabase/supabase-js';
 import { type Database, type UserProfile } from '@/types/database';
-import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 
 interface AuthContextType {
@@ -21,7 +20,6 @@ interface AuthContextType {
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const router = useRouter();
   const supabase = createClient();
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -62,10 +60,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [supabase]);
 
   useEffect(() => {
+    setLoading(true);
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setLoading(true);
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       await fetchUserProfile(currentUser);
@@ -92,8 +90,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await supabase.auth.signOut();
     // The onAuthStateChange listener will clear user/profile state.
     // The middleware will handle the redirect.
-    router.push('/');
-    router.refresh();
   };
   
   const value = {
