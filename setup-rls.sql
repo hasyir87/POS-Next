@@ -1,216 +1,227 @@
--- Nonaktifkan RLS untuk sementara agar bisa membuat tabel
-ALTER TABLE IF EXISTS public.aromas DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.bottle_sizes DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.categories DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.customers DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.expenses DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.grades DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.organizations DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.products DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.profiles DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.promotions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.raw_materials DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.recipes DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.settings DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.transaction_items DISABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.transactions DISABLE ROW LEVEL SECURITY;
 
--- 1. Definisikan Fungsi untuk Menjalankan SQL Dinamis
--- Drop fungsi jika sudah ada untuk menghindari error saat pembuatan ulang
-DROP FUNCTION IF EXISTS public.exec_sql(text);
-CREATE OR REPLACE FUNCTION public.exec_sql(sql text)
-RETURNS text AS $$
+-- ### Fungsi Helper untuk Keamanan ###
+
+-- Fungsi untuk mendapatkan organization_id pengguna
+CREATE OR REPLACE FUNCTION public.get_my_organization_id()
+RETURNS UUID AS $$
+DECLARE
+    org_id UUID;
 BEGIN
-  EXECUTE sql;
-  RETURN 'Command executed successfully';
+    SELECT organization_id INTO org_id
+    FROM public.profiles
+    WHERE id = auth.uid();
+    RETURN org_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Fungsi untuk mendapatkan peran pengguna
+CREATE OR REPLACE FUNCTION public.get_my_role()
+RETURNS TEXT AS $$
+DECLARE
+    user_role TEXT;
+BEGIN
+    SELECT role INTO user_role
+    FROM public.profiles
+    WHERE id = auth.uid();
+    RETURN user_role;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Fungsi untuk mengeksekusi SQL sebagai superuser (untuk setup)
+CREATE OR REPLACE FUNCTION exec_sql(sql TEXT) RETURNS VOID AS $$
+BEGIN
+    EXECUTE sql;
 END;
 $$ LANGUAGE plpgsql;
 
--- 2. Buat Tabel-Tabel
+
+-- ### Pembuatan Tabel ###
+
+-- Tabel Organisasi
 CREATE TABLE IF NOT EXISTS public.organizations (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  name text NOT NULL,
-  address text,
-  phone text,
-  logo_url text,
-  parent_organization_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL,
-  created_at timestamptz DEFAULT now() NOT NULL,
-  updated_at timestamptz DEFAULT now() NOT NULL
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    name TEXT NOT NULL,
+    address TEXT,
+    phone TEXT,
+    logo_url TEXT,
+    parent_organization_id UUID REFERENCES public.organizations(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
 );
 
+-- Tabel Profil Pengguna (menghubungkan ke Auth)
 CREATE TABLE IF NOT EXISTS public.profiles (
-  id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  email text UNIQUE,
-  full_name text,
-  avatar_url text,
-  organization_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL,
-  role text CHECK (role IN ('owner', 'admin', 'cashier', 'superadmin')),
-  created_at timestamptz DEFAULT now() NOT NULL,
-  updated_at timestamptz DEFAULT now() NOT NULL
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email TEXT UNIQUE,
+    full_name TEXT,
+    avatar_url TEXT,
+    organization_id UUID REFERENCES public.organizations(id) ON DELETE SET NULL,
+    role public.user_role NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
 );
 
+-- Tabel Kategori Produk
 CREATE TABLE IF NOT EXISTS public.categories (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-  name text NOT NULL,
-  created_at timestamptz DEFAULT now() NOT NULL,
-  updated_at timestamptz DEFAULT now() NOT NULL
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
 );
 
+-- Tabel Produk Jadi
 CREATE TABLE IF NOT EXISTS public.products (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-  name text NOT NULL,
-  description text,
-  price numeric(10, 2) NOT NULL,
-  stock integer NOT NULL DEFAULT 0,
-  category_id uuid REFERENCES public.categories(id) ON DELETE SET NULL,
-  image_url text,
-  created_at timestamptz DEFAULT now() NOT NULL,
-  updated_at timestamptz DEFAULT now() NOT NULL
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    price NUMERIC(10, 2) NOT NULL DEFAULT 0,
+    stock INT NOT NULL DEFAULT 0,
+    category_id UUID REFERENCES public.categories(id) ON DELETE SET NULL,
+    image_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
 );
 
+-- Tabel Bahan Baku
 CREATE TABLE IF NOT EXISTS public.raw_materials (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    name text NOT NULL,
-    brand text,
-    quantity numeric(10, 2) NOT NULL,
-    unit text NOT NULL,
-    category text,
-    purchase_price numeric(10, 2) NOT NULL,
-    created_at timestamptz DEFAULT now() NOT NULL,
-    updated_at timestamptz DEFAULT now() NOT NULL
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL,
+    brand TEXT,
+    quantity NUMERIC(10, 2) NOT NULL DEFAULT 0,
+    unit TEXT NOT NULL,
+    category TEXT,
+    purchase_price NUMERIC(10, 2) NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
 );
 
+-- Tabel Pelanggan/Member
 CREATE TABLE IF NOT EXISTS public.customers (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    name text NOT NULL,
-    email text,
-    phone text,
-    loyalty_points integer DEFAULT 0 NOT NULL,
-    transaction_count integer DEFAULT 0 NOT NULL,
-    created_at timestamptz DEFAULT now() NOT NULL,
-    updated_at timestamptz DEFAULT now() NOT NULL
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    loyalty_points INT NOT NULL DEFAULT 0,
+    transaction_count INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS public.grades (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    name text NOT NULL,
-    price_multiplier numeric(4, 2) DEFAULT 1.0 NOT NULL,
-    extra_essence_price numeric(10, 2) DEFAULT 0 NOT NULL,
-    created_at timestamptz DEFAULT now() NOT NULL,
-    updated_at timestamptz DEFAULT now() NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS public.aromas (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    name text NOT NULL,
-    category text,
-    description text,
-    created_at timestamptz DEFAULT now() NOT NULL,
-    updated_at timestamptz DEFAULT now() NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS public.bottle_sizes (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    size integer NOT NULL,
-    unit text NOT NULL,
-    price numeric(10, 2) NOT NULL,
-    created_at timestamptz DEFAULT now() NOT NULL,
-    updated_at timestamptz DEFAULT now() NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS public.recipes (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    name text NOT NULL,
-    grade_id uuid REFERENCES public.grades(id) ON DELETE SET NULL,
-    aroma_id uuid REFERENCES public.aromas(id) ON DELETE SET NULL,
-    bottle_size_id uuid REFERENCES public.bottle_sizes(id) ON DELETE SET NULL,
-    price numeric(10, 2) NOT NULL,
-    instructions text,
-    created_at timestamptz DEFAULT now() NOT NULL,
-    updated_at timestamptz DEFAULT now() NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS public.expenses (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    date date NOT NULL,
-    category text NOT NULL,
-    description text NOT NULL,
-    amount numeric(10, 2) NOT NULL,
-    created_at timestamptz DEFAULT now() NOT NULL,
-    updated_at timestamptz DEFAULT now() NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS public.settings (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    key text NOT NULL,
-    value text NOT NULL,
-    created_at timestamptz DEFAULT now() NOT NULL,
-    updated_at timestamptz DEFAULT now() NOT NULL,
-    UNIQUE (organization_id, key)
-);
-
+-- Tabel Transaksi
 CREATE TABLE IF NOT EXISTS public.transactions (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    cashier_id uuid REFERENCES public.profiles(id),
-    customer_id uuid REFERENCES public.customers(id),
-    total_amount numeric(10, 2) NOT NULL,
-    payment_method text NOT NULL,
-    status text DEFAULT 'completed'::text NOT NULL,
-    created_at timestamptz DEFAULT now() NOT NULL,
-    updated_at timestamptz DEFAULT now() NOT NULL
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
+    cashier_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
+    total_amount NUMERIC(10, 2) NOT NULL,
+    payment_method public.payment_method NOT NULL,
+    status public.transaction_status NOT NULL DEFAULT 'completed',
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
 );
 
+-- Tabel Item Transaksi
 CREATE TABLE IF NOT EXISTS public.transaction_items (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    transaction_id uuid NOT NULL REFERENCES public.transactions(id) ON DELETE CASCADE,
-    product_id uuid REFERENCES public.products(id),
-    raw_material_id uuid REFERENCES public.raw_materials(id),
-    quantity integer NOT NULL,
-    price numeric(10, 2) NOT NULL,
-    created_at timestamptz DEFAULT now() NOT NULL
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    transaction_id UUID REFERENCES public.transactions(id) ON DELETE CASCADE NOT NULL,
+    product_id UUID REFERENCES public.products(id),
+    raw_material_id UUID REFERENCES public.raw_materials(id),
+    quantity INT NOT NULL,
+    price NUMERIC(10, 2) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
 );
 
+-- Tabel Promosi
 CREATE TABLE IF NOT EXISTS public.promotions (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    name text NOT NULL,
-    type text NOT NULL,
-    value numeric(10, 2) NOT NULL,
-    get_product_id uuid REFERENCES public.products(id),
-    is_active boolean DEFAULT true NOT NULL,
-    created_at timestamptz DEFAULT now() NOT NULL,
-    updated_at timestamptz DEFAULT now() NOT NULL
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL,
+    type public.promotion_type NOT NULL,
+    value NUMERIC(10, 2) NOT NULL,
+    get_product_id UUID REFERENCES public.products(id),
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
 );
 
--- 3. Definisikan Fungsi Helper untuk RLS
-CREATE OR REPLACE FUNCTION public.get_user_role()
-RETURNS text AS $$
-BEGIN
-  RETURN (
-    SELECT role FROM public.profiles WHERE id = auth.uid()
-  );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- Tabel Grade Parfum
+CREATE TABLE IF NOT EXISTS public.grades (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL,
+    price_multiplier NUMERIC(5, 2) NOT NULL DEFAULT 1.0,
+    extra_essence_price NUMERIC(10, 2) NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
+);
 
-CREATE OR REPLACE FUNCTION public.get_users_in_organization(org_id uuid)
-RETURNS SETOF uuid AS $$
-BEGIN
-  RETURN QUERY SELECT id FROM public.profiles WHERE organization_id = org_id;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- Tabel Aroma Parfum
+CREATE TABLE IF NOT EXISTS public.aromas (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL,
+    category TEXT,
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
+);
 
--- 4. Aktifkan RLS pada Semua Tabel
+-- Tabel Ukuran Botol
+CREATE TABLE IF NOT EXISTS public.bottle_sizes (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
+    size INT NOT NULL,
+    unit TEXT NOT NULL,
+    price NUMERIC(10, 2) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
+);
+
+-- Tabel Resep
+CREATE TABLE IF NOT EXISTS public.recipes (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL,
+    grade_id UUID REFERENCES public.grades(id) ON DELETE CASCADE,
+    aroma_id UUID REFERENCES public.aromas(id) ON DELETE CASCADE,
+    bottle_size_id UUID REFERENCES public.bottle_sizes(id) ON DELETE CASCADE,
+    price NUMERIC(10, 2) NOT NULL,
+    instructions TEXT,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
+);
+
+-- Tabel Beban
+CREATE TABLE IF NOT EXISTS public.expenses (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
+    date DATE NOT NULL,
+    category TEXT NOT NULL,
+    description TEXT,
+    amount NUMERIC(10, 2) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
+);
+
+-- Tabel Pengaturan
+CREATE TABLE IF NOT EXISTS public.settings (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    UNIQUE(organization_id, key),
+    created_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc', now()) NOT NULL
+);
+
+
+-- ### Kebijakan RLS (Row-Level Security) ###
+
+-- Mengaktifkan RLS untuk semua tabel
 ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
@@ -227,86 +238,126 @@ ALTER TABLE public.recipes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 
--- 5. Buat Kebijakan RLS (Hapus yang lama jika ada)
-DROP POLICY IF EXISTS "Allow individual access" ON public.profiles;
-CREATE POLICY "Allow individual access" ON public.profiles FOR SELECT USING (auth.uid() = id);
+-- Menghapus kebijakan yang mungkin sudah ada
+DROP POLICY IF EXISTS "Allow full access to own organization" ON public.organizations;
+DROP POLICY IF EXISTS "Allow full access to own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Allow organization access based on profile" ON public.products;
+DROP POLICY IF EXISTS "Allow organization access based on profile" ON public.raw_materials;
+DROP POLICY IF EXISTS "Allow organization access based on profile" ON public.customers;
+DROP POLICY IF EXISTS "Allow organization access based on profile" ON public.transactions;
+DROP POLICY IF EXISTS "Allow access based on parent transaction" ON public.transaction_items;
+DROP POLICY IF EXISTS "Allow organization access based on profile" ON public.promotions;
+DROP POLICY IF EXISTS "Allow organization access based on profile" ON public.categories;
+DROP POLICY IF EXISTS "Allow organization access based on profile" ON public.grades;
+DROP POLICY IF EXISTS "Allow organization access based on profile" ON public.aromas;
+DROP POLICY IF EXISTS "Allow organization access based on profile" ON public.bottle_sizes;
+DROP POLICY IF EXISTS "Allow organization access based on profile" ON public.recipes;
+DROP POLICY IF EXISTS "Allow organization access based on profile" ON public.expenses;
+DROP POLICY IF EXISTS "Allow organization access based on profile" ON public.settings;
 
-DROP POLICY IF EXISTS "Allow owner and admin to manage organization users" ON public.profiles;
-CREATE POLICY "Allow owner and admin to manage organization users" ON public.profiles FOR ALL
-USING (
-    (get_user_role() = 'owner' OR get_user_role() = 'admin') AND
-    organization_id IN (
-        SELECT id FROM public.organizations WHERE id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid())
-    )
+-- Kebijakan untuk Organizations
+CREATE POLICY "Allow full access to own organization" ON public.organizations
+FOR ALL USING (id = public.get_my_organization_id());
+
+-- Kebijakan untuk Profiles
+CREATE POLICY "Allow full access to own profile" ON public.profiles
+FOR ALL USING (id = auth.uid());
+
+-- Kebijakan Generik untuk Tabel Data (berdasarkan organization_id)
+CREATE POLICY "Allow organization access based on profile" ON public.products
+FOR ALL USING (organization_id = public.get_my_organization_id());
+
+CREATE POLICY "Allow organization access based on profile" ON public.raw_materials
+FOR ALL USING (organization_id = public.get_my_organization_id());
+
+CREATE POLICY "Allow organization access based on profile" ON public.customers
+FOR ALL USING (organization_id = public.get_my_organization_id());
+
+CREATE POLICY "Allow organization access based on profile" ON public.transactions
+FOR ALL USING (organization_id = public.get_my_organization_id());
+
+CREATE POLICY "Allow organization access based on profile" ON public.promotions
+FOR ALL USING (organization_id = public.get_my_organization_id());
+
+CREATE POLICY "Allow organization access based on profile" ON public.categories
+FOR ALL USING (organization_id = public.get_my_organization_id());
+
+CREATE POLICY "Allow organization access based on profile" ON public.grades
+FOR ALL USING (organization_id = public.get_my_organization_id());
+
+CREATE POLICY "Allow organization access based on profile" ON public.aromas
+FOR ALL USING (organization_id = public.get_my_organization_id());
+
+CREATE POLICY "Allow organization access based on profile" ON public.bottle_sizes
+FOR ALL USING (organization_id = public.get_my_organization_id());
+
+CREATE POLICY "Allow organization access based on profile" ON public.recipes
+FOR ALL USING (organization_id = public.get_my_organization_id());
+
+CREATE POLICY "Allow organization access based on profile" ON public.expenses
+FOR ALL USING (organization_id = public.get_my_organization_id());
+
+CREATE POLICY "Allow organization access based on profile" ON public.settings
+FOR ALL USING (organization_id = public.get_my_organization_id());
+
+
+-- Kebijakan KHUSUS untuk Transaction Items
+CREATE POLICY "Allow access based on parent transaction" ON public.transaction_items
+FOR ALL USING (
+    (
+        SELECT t.organization_id
+        FROM public.transactions t
+        WHERE t.id = transaction_id
+    ) = public.get_my_organization_id()
 );
 
--- Buat kebijakan umum untuk tabel data
-DO $$
-DECLARE
-    t_name text;
-BEGIN
-    FOR t_name IN
-        SELECT table_name FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name NOT IN ('profiles', 'organizations')
-    LOOP
-        EXECUTE format('DROP POLICY IF EXISTS "Allow full access based on organization" ON public.%I;', t_name);
-        EXECUTE format('
-            CREATE POLICY "Allow full access based on organization" ON public.%I FOR ALL
-            USING (
-                organization_id IN (
-                    SELECT id FROM public.organizations WHERE id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid())
-                )
-            )
-            WITH CHECK (
-                organization_id IN (
-                    SELECT id FROM public.organizations WHERE id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid())
-                )
-            );
-        ', t_name);
-    END LOOP;
-END;
-$$;
 
--- 6. Fungsi untuk Proses Checkout
+-- ### Fungsi Checkout ###
+
 CREATE OR REPLACE FUNCTION public.process_checkout(
-    p_organization_id uuid,
-    p_cashier_id uuid,
-    p_customer_id uuid,
-    p_items jsonb,
-    p_total_amount numeric,
-    p_payment_method text
-) RETURNS text AS $$
+    p_organization_id UUID,
+    p_cashier_id UUID,
+    p_customer_id UUID,
+    p_items JSONB,
+    p_total_amount NUMERIC,
+    p_payment_method public.payment_method
+) RETURNS UUID AS $$
 DECLARE
-    v_transaction_id uuid;
-    item jsonb;
+    new_transaction_id UUID;
+    item JSONB;
+    product_id_val UUID;
+    quantity_val INT;
+    price_val NUMERIC;
 BEGIN
-    -- Buat record transaksi baru
+    -- 1. Buat record transaksi baru
     INSERT INTO public.transactions (organization_id, cashier_id, customer_id, total_amount, payment_method, status)
     VALUES (p_organization_id, p_cashier_id, p_customer_id, p_total_amount, p_payment_method, 'completed')
-    RETURNING id INTO v_transaction_id;
+    RETURNING id INTO new_transaction_id;
 
-    -- Loop melalui setiap item dalam pesanan
+    -- 2. Loop melalui item dan masukkan ke transaction_items & update stok
     FOR item IN SELECT * FROM jsonb_array_elements(p_items)
     LOOP
-        -- Masukkan item ke transaction_items
-        INSERT INTO public.transaction_items (transaction_id, product_id, quantity, price)
-        VALUES (v_transaction_id, (item->>'product_id')::uuid, (item->>'quantity')::int, (item->>'price')::numeric);
+        product_id_val := (item->>'product_id')::UUID;
+        quantity_val := (item->>'quantity')::INT;
+        price_val := (item->>'price')::NUMERIC;
 
-        -- Perbarui stok produk
+        -- Masukkan ke transaction_items
+        INSERT INTO public.transaction_items (transaction_id, product_id, quantity, price)
+        VALUES (new_transaction_id, product_id_val, quantity_val, price_val);
+
+        -- Update stok di tabel products
         UPDATE public.products
-        SET stock = stock - (item->>'quantity')::int
-        WHERE id = (item->>'product_id')::uuid
-          AND products.organization_id = p_organization_id; -- Kualifikasi eksplisit
+        SET stock = stock - quantity_val
+        WHERE id = product_id_val AND organization_id = p_organization_id; -- Pastikan update di org yang benar
     END LOOP;
 
-    -- Perbarui jumlah transaksi pelanggan jika ada
+    -- 3. Update transaction_count untuk customer jika ada
     IF p_customer_id IS NOT NULL THEN
         UPDATE public.customers
         SET transaction_count = transaction_count + 1
-        WHERE id = p_customer_id
-          AND customers.organization_id = p_organization_id; -- Kualifikasi eksplisit
+        WHERE id = p_customer_id AND organization_id = p_organization_id; -- Pastikan update di org yang benar
     END IF;
 
-    RETURN v_transaction_id::text;
+    RETURN new_transaction_id;
 END;
 $$ LANGUAGE plpgsql;
