@@ -1,68 +1,36 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+// src/middleware.ts
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse, type NextRequest } from 'next/server'
+import { getProfile } from '@/lib/api' // Sesuaikan dengan path yang ada
 
-export async function middleware(req: NextRequest) {
-  let res = NextResponse.next({
-    request: {
-      headers: req.headers,
-    },
-  })
+export async function middleware(request: NextRequest) {
+  const res = NextResponse.next()
+  const supabase = createMiddlewareClient({ req: request, res })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return req.cookies.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          // If the cookie is set, update the request and response cookies.
-          req.cookies.set({ name, value, ...options })
-          res = NextResponse.next({
-            request: { headers: req.headers },
-          })
-          res.cookies.set({ name, value, ...options })
-        },
-        remove(name: string, options: CookieOptions) {
-          // If the cookie is removed, update the request and response cookies.
-          req.cookies.set({ name, value: '', ...options })
-          res = NextResponse.next({
-            request: { headers: req.headers },
-          })
-          res.cookies.set({ name, value: '', ...options })
-        },
-      },
-    }
-  )
-
-  // Refresh session if expired - required for Server Components
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const { pathname } = req.nextUrl
-
-  // if user is not logged in and is trying to access a protected route, redirect to login
-  if (!user && pathname.startsWith('/dashboard')) {
-    return NextResponse.redirect(new URL('/', req.url))
+  // 1. Check session
+  const { data: { session } } = await supabase.auth.getSession()
+  
+  if (!session) {
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // if user is logged in and is trying to access the login page, redirect to dashboard
-  if (user && pathname === '/') {
-    return NextResponse.redirect(new URL('/dashboard', req.url))
+  // 2. Check role untuk route admin
+  if (request.nextUrl.pathname.startsWith('/admin')) {
+    const profile = await getProfile(session.user.id) // Fungsi yang sudah ada di lib/api
+    
+    if (profile?.role !== 'admin') {
+      return NextResponse.redirect(new URL('/unauthorized', request.url))
+    }
   }
 
   return res
 }
 
+// Konfigurasi matcher (sesuaikan dengan route Anda)
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * Feel free to add more paths here that should not be authenticated.
-     */
-    '/((?!_next/static|_next/image|favicon.ico|api).*)',
-  ],
+    '/dashboard/:path*',
+    '/admin/:path*',
+    '/transactions/:path*'
+  ]
 }
