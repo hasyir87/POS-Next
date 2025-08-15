@@ -22,10 +22,10 @@ export function handleSupabaseError(error: SupabaseError | null): string | null 
 }
 
 // Contoh penggunaan di komponen:
-import { handleSupabaseError } from '@/lib/utils/error'
-
-const { data, error } = await supabase.from('products').insert(...)
-if (error) {
-  const errorMessage = handleSupabaseError(error)
-  toast.error(errorMessage)
-}
+// import { handleSupabaseError } from '@/lib/utils/error'
+//
+// const { data, error } = await supabase.from('products').insert(...)
+// if (error) {
+//   const errorMessage = handleSupabaseError(error)
+//   toast.error(errorMessage)
+// }
