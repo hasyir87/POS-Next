@@ -1,5 +1,10 @@
 import type {NextConfig} from 'next';
-
+const nextConfig = {
+  // ... konfigurasi existing Anda ...
+  experimental: {
+    allowedDevOrigins: ["localhost", "0.0.0.0"] // Hanya untuk development lokal
+  }
+}
 const nextConfig: NextConfig = {
   /* config options here */
   typescript: {
