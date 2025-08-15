@@ -1,5 +1,5 @@
 // src/app/api/users/[id]/route.ts
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { handleSupabaseError } from '@/lib/utils/error';
@@ -10,7 +10,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     const { name, role, organization_id } = await req.json(); // Data yang akan diperbarui
 
     const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: cookieStore });
+    const supabase = createClient(cookieStore);
 
     // --- Pemeriksaan Izin Pengguna yang Request ---
      const { data: { user: requestingUser }, error: requestingUserError } = await supabase.auth.getUser();
@@ -92,13 +92,20 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 // API Route untuk menghapus pengguna
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
     const userId = params.id; // ID pengguna yang akan dihapus
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
 
     // Perlu Service Role Key untuk menghapus user di auth.users
-    const serviceRoleSupabase = createRouteHandlerClient({ cookies: cookies(), supabaseKey: process.env.SERVICE_ROLE_KEY_SUPABASE });
+    const serviceRoleSupabase = createClient(cookies(), {
+        auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+        },
+        cookies: {},
+        supabaseKey: process.env.SERVICE_ROLE_KEY_SUPABASE
+    });
 
     // --- Pemeriksaan Izin Pengguna yang Request ---
-     const cookieStore = cookies();
-     const supabase = createRouteHandlerClient({ cookies: cookieStore });
      const { data: { user: requestingUser }, error: requestingUserError } = await supabase.auth.getUser();
 
      if (requestingUserError || !requestingUser) {

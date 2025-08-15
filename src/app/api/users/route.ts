@@ -1,4 +1,4 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
 import type { Database } from '@/types/database';
@@ -6,7 +6,7 @@ import { handleSupabaseError } from '@/lib/utils/error';
 
 export async function GET(request: NextRequest) {
   const cookieStore = cookies();
-  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+  const supabase = createClient(cookieStore);
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
   const { email, password, full_name, role } = await req.json();
   
   const cookieStore = cookies();
-  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+  const supabase = createClient(cookieStore);
 
   try {
     const { data: { user: requestingUser }, error: userError } = await supabase.auth.getUser();
@@ -79,7 +79,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Forbidden: Cannot assign role "${role}".` }, { status: 403 });
     }
 
-    const { data: userAuthData, error: authError } = await supabase.auth.admin.createUser({
+    const supabaseAdmin = createClient(cookieStore, {
+        auth: {
+            autoRefreshToken: false,
+            persistSession: false
+        },
+        cookies: {},
+        supabaseKey: process.env.SERVICE_ROLE_KEY_SUPABASE
+    });
+
+    const { data: userAuthData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
@@ -110,7 +119,7 @@ export async function POST(req: Request) {
 
     if (insertProfileError) {
       console.error('Error creating user profile:', insertProfileError);
-      await supabase.auth.admin.deleteUser(userAuthData.user.id);
+      await supabaseAdmin.auth.admin.deleteUser(userAuthData.user.id);
       return NextResponse.json({ error: handleSupabaseError(insertProfileError) }, { status: 500 });
     }
 
