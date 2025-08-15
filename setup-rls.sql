@@ -1,4 +1,3 @@
-
 -- Hapus semua kebijakan yang ada untuk menghindari konflik dependensi
 DO $$
 DECLARE
@@ -239,11 +238,8 @@ ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow superadmin full access" ON public.organizations FOR ALL
 USING (get_user_role(auth.uid()) = 'superadmin');
 
-CREATE POLICY "Allow owner and admin to view their own and child orgs" ON public.organizations FOR SELECT
-USING (
-    id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) OR
-    parent_organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid())
-);
+CREATE POLICY "Allow owner and admin to view their own org" ON public.organizations FOR SELECT
+USING (id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
 
 -- 2. Profiles
 CREATE POLICY "Allow users to view their own profile" ON public.profiles FOR SELECT
@@ -287,6 +283,7 @@ USING (
         SELECT 1
         FROM public.transactions t
         WHERE t.id = transaction_id
+        AND t.organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid())
     )
 );
 
