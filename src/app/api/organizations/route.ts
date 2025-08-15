@@ -3,6 +3,7 @@ import { createClient } from '../../../utils/supabase/server';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server'
 import type { Database } from '@/types/database'
+import { handleSupabaseError } from '@/lib/utils/error';
 
 type OrganizationInsert = Database['public']['Tables']['organizations']['Insert']
 
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('Error fetching organizations:', error)
       return NextResponse.json(
-        { error: 'Failed to fetch organizations' },
+        { error: handleSupabaseError(error) },
         { status: 500 }
       )
     }
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Error creating organization:', error)
       return NextResponse.json(
-        { error: 'Failed to create organization' },
+        { error: handleSupabaseError(error) },
         { status: 500 }
       )
     }

@@ -2,6 +2,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
 import type { Database } from '@/types/database';
+import { handleSupabaseError } from '@/lib/utils/error';
 
 type TransactionInsert = Database['public']['Tables']['transactions']['Insert'];
 type TransactionItemInsert = Database['public']['Tables']['transaction_items']['Insert'];
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching transactions:', error);
-      return NextResponse.json({ error: 'Failed to fetch transactions' }, { status: 500 });
+      return NextResponse.json({ error: handleSupabaseError(error) }, { status: 500 });
     }
 
     return NextResponse.json({ transactions });
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
 
     if (transactionError) {
       console.error('Error creating transaction:', transactionError);
-      return NextResponse.json({ error: 'Failed to create transaction' }, { status: 500 });
+      return NextResponse.json({ error: handleSupabaseError(transactionError) }, { status: 500 });
     }
 
     const transactionItems = body.items.map(item => ({
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest) {
     if (itemsError) {
       console.error('Error creating transaction items:', itemsError);
       await supabase.from('transactions').delete().eq('id', transaction.id);
-      return NextResponse.json({ error: 'Failed to create transaction items' }, { status: 500 });
+      return NextResponse.json({ error: handleSupabaseError(itemsError) }, { status: 500 });
     }
 
     for (const item of body.items) {

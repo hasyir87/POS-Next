@@ -2,6 +2,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { Database } from '@/types/database';
+import { handleSupabaseError } from '@/lib/utils/error';
 
 export async function GET(req: Request) {
   const cookieStore = cookies();
@@ -33,7 +34,7 @@ export async function GET(req: Request) {
 
     if (error) {
       console.error('Error fetching products:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: handleSupabaseError(error) }, { status: 500 });
     }
 
     return NextResponse.json(products);
@@ -77,7 +78,7 @@ export async function POST(req: Request) {
 
     if (error) {
       console.error('Error creating product:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: handleSupabaseError(error) }, { status: 500 });
     }
 
     return NextResponse.json(data, { status: 201 });

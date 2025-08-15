@@ -2,6 +2,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
 import type { Database } from '@/types/database';
+import { handleSupabaseError } from '@/lib/utils/error';
 
 export async function GET(request: NextRequest) {
   const cookieStore = cookies();
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching profiles:', error);
-      return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
+      return NextResponse.json({ error: handleSupabaseError(error) }, { status: 500 });
     }
 
     return NextResponse.json({ users: profiles });
@@ -85,8 +86,8 @@ export async function POST(req: Request) {
     });
     
     if (authError) {
-      console.error('Error creating Supabase Auth user:', authError.message);
-      return NextResponse.json({ error: authError.message }, { status: 400 });
+      console.error('Error creating Supabase Auth user:', authError);
+      return NextResponse.json({ error: handleSupabaseError(authError) }, { status: 400 });
     }
 
     if (!userAuthData?.user) {
@@ -108,9 +109,9 @@ export async function POST(req: Request) {
       .single();
 
     if (insertProfileError) {
-      console.error('Error creating user profile:', insertProfileError.message);
+      console.error('Error creating user profile:', insertProfileError);
       await supabase.auth.admin.deleteUser(userAuthData.user.id);
-      return NextResponse.json({ error: insertProfileError.message }, { status: 500 });
+      return NextResponse.json({ error: handleSupabaseError(insertProfileError) }, { status: 500 });
     }
 
     return NextResponse.json(newUserProfile, { status: 201 });

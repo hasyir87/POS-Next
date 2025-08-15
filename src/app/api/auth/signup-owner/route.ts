@@ -2,6 +2,7 @@
 import { createClient } from '../../../../utils/supabase/server';
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { handleSupabaseError } from '@/lib/utils/error';
 
 export async function POST(req: Request) {
   const cookieStore = cookies();
@@ -17,8 +18,8 @@ export async function POST(req: Request) {
     });
 
   if (authError) {
-    console.error("Error creating Supabase Auth user:", authError.message);
-    return NextResponse.json({ error: authError.message }, { status: 400 });
+    console.error("Error creating Supabase Auth user:", authError);
+    return NextResponse.json({ error: handleSupabaseError(authError) }, { status: 400 });
   }
 
   if (!userAuthData?.user) {
@@ -38,11 +39,11 @@ export async function POST(req: Request) {
     .single();
 
   if (orgError || !organization) {
-    console.error("Error creating organization:", orgError?.message);
+    console.error("Error creating organization:", orgError);
     // Rollback: hapus user yang sudah dibuat di Auth jika pembuatan organisasi gagal
     await supabase.auth.admin.deleteUser(userId);
     return NextResponse.json(
-      { error: orgError?.message || "Organization creation failed." },
+      { error: handleSupabaseError(orgError) || "Organization creation failed." },
       { status: 500 },
     );
   }
@@ -61,7 +62,7 @@ export async function POST(req: Request) {
     ]);
 
   if (profileError) {
-    console.error("Error creating user profile:", profileError.message);
+    console.error("Error creating user profile:", profileError);
     // Rollback: hapus user di Auth dan organisasi jika pembuatan profil gagal
     await supabase.auth.admin.deleteUser(userId);
     await supabase
@@ -69,7 +70,7 @@ export async function POST(req: Request) {
       .delete()
       .eq("id", organization.id);
 
-    return NextResponse.json({ error: profileError.message }, { status: 500 });
+    return NextResponse.json({ error: handleSupabaseError(profileError) }, { status: 500 });
   }
 
   // --- Berhasil ---

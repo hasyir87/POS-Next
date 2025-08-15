@@ -2,6 +2,7 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { handleSupabaseError } from '@/lib/utils/error';
 
 // API Route untuk memperbarui detail pengguna (misalnya, peran atau nama)
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
@@ -79,8 +80,8 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         .single();
 
     if (updateError) {
-        console.error('Error updating user profile:', updateError.message);
-        return NextResponse.json({ error: updateError.message }, { status: 500 });
+        console.error('Error updating user profile:', updateError);
+        return NextResponse.json({ error: handleSupabaseError(updateError) }, { status: 500 });
     }
 
     // --- Berhasil ---
@@ -152,8 +153,8 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     const { data: deletedUserAuth, error: deleteAuthError } = await serviceRoleSupabase.auth.admin.deleteUser(userId);
 
     if (deleteAuthError) {
-        console.error('Error deleting Supabase Auth user:', deleteAuthError.message);
-        return NextResponse.json({ error: deleteAuthError.message }, { status: 500 });
+        console.error('Error deleting Supabase Auth user:', deleteAuthError);
+        return NextResponse.json({ error: handleSupabaseError(deleteAuthError) }, { status: 500 });
     }
 
     // --- Berhasil ---
