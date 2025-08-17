@@ -34,13 +34,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
 
   const handleSetSelectedOrg = (orgId: string | null) => {
-    if (orgId) {
-      localStorage.setItem('selectedOrgId', orgId);
-    } else {
-      localStorage.removeItem('selectedOrgId');
+    if (typeof window !== 'undefined') {
+        if (orgId) {
+            localStorage.setItem('selectedOrgId', orgId);
+        } else {
+            localStorage.removeItem('selectedOrgId');
+        }
     }
     setSelectedOrganizationId(orgId);
   }
+
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
+    handleSetSelectedOrg(null);
+    setProfile(null);
+    setUser(null);
+    router.refresh();
+  }, [supabase, router]);
 
   const fetchUserProfile = useCallback(async (user: SupabaseUser | null): Promise<UserProfile | null> => {
     if (!user) {
@@ -55,11 +65,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .select('*')
         .eq('id', user.id)
         .limit(1)
-        .maybeSingle();
+        .single();
       
-      if (error) {
-        throw new Error(error.message);
-      }
+      if (error) throw error;
       
       const userProfile = data as UserProfile | null;
       setProfile(userProfile);
@@ -79,12 +87,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (e) {
       const error = e as Error;
       console.error("Error fetching profile:", error.message);
-      setProfile(null);
-      handleSetSelectedOrg(null);
-      // Re-throw the error with a clear message to be caught by the caller
-      throw new Error(`Error fetching profile: ${error.message}`);
+      // Force logout if profile cannot be fetched to prevent being stuck.
+      await logout();
+      return null;
     }
-  }, [supabase]);
+  }, [supabase, logout]);
 
   useEffect(() => {
     const {
@@ -93,10 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(true);
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      await fetchUserProfile(currentUser).catch(async (e) => {
-        console.error("Session load error:", e);
-        await logout(); // Force logout if profile can't be fetched
-      });
+      await fetchUserProfile(currentUser);
       setLoading(false);
     });
 
@@ -115,14 +119,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (error) {
         throw new Error(error.message);
     }
-  };
-
-  const logout = async () => {
-    await supabase.auth.signOut();
-    handleSetSelectedOrg(null);
-    setProfile(null);
-    setUser(null);
-    router.refresh();
   };
   
   const value = {
