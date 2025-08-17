@@ -64,8 +64,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .limit(1)
-        .single();
+        .maybeSingle(); // Menggunakan maybeSingle() untuk menghindari error jika 0 baris ditemukan
       
       if (error) throw error;
       
@@ -87,7 +86,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (e) {
       const error = e as Error;
       console.error("Error fetching profile:", error.message);
-      // Force logout if profile cannot be fetched to prevent being stuck.
+      // Force logout jika profil tidak dapat diambil untuk mencegah terjebak.
       await logout();
       return null;
     }
@@ -115,7 +114,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       email,
       password,
     });
-    // The onAuthStateChange listener will handle success/failure after this
+    // Listener onAuthStateChange akan menangani keberhasilan/kegagalan setelah ini
     if (error) {
         throw new Error(error.message);
     }
