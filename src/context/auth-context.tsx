@@ -52,11 +52,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     router.refresh();
   }, [supabase, router]);
 
-  const fetchUserProfile = useCallback(async (user: SupabaseUser | null): Promise<UserProfile | null> => {
+  const fetchUserProfile = useCallback(async (user: SupabaseUser | null) => {
     if (!user) {
       setProfile(null);
       handleSetSelectedOrg(null);
-      return null;
+      return;
     }
 
     try {
@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .maybeSingle(); // Menggunakan maybeSingle() untuk menghindari error jika 0 baris ditemukan
+        .maybeSingle();
       
       if (error) throw error;
       
@@ -81,16 +81,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
          handleSetSelectedOrg(null);
       }
-
-      return userProfile;
     } catch (e) {
       const error = e as Error;
       console.error("Error fetching profile:", error.message);
-      // Force logout jika profil tidak dapat diambil untuk mencegah terjebak.
-      await logout();
-      return null;
+      // Alih-alih logout, kita pastikan state dibersihkan dan loading berhenti.
+      // Middleware akan menangani pengalihan jika pengguna tidak seharusnya berada di halaman yang dilindungi.
+      setProfile(null);
+      handleSetSelectedOrg(null);
     }
-  }, [supabase, logout]);
+  }, [supabase]);
 
   useEffect(() => {
     const {
