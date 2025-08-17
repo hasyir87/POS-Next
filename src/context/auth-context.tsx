@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const fetchSession = async () => {
-      // 1. Dapatkan sesi saat ini
+      setLoading(true);
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
@@ -62,30 +62,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
 
-      // 2. Jika ada user, ambil profilnya
       if (currentUser) {
         const { data: userProfile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', currentUser.id)
-          .single();
+          .maybeSingle();
 
         if (profileError) {
           console.error("Error fetching profile:", profileError.message);
-          // Jika gagal ambil profil (misalnya RLS), paksa logout agar tidak stuck
           await logout();
-          setLoading(false);
-          return;
-        }
-
-        setProfile(userProfile);
-
-        // 3. Atur organisasi yang dipilih
-        const storedOrgId = localStorage.getItem('selectedOrgId');
-        if (storedOrgId) {
-          setSelectedOrganizationId(storedOrgId);
-        } else if (userProfile.organization_id) {
-          handleSetSelectedOrg(userProfile.organization_id);
+        } else if (userProfile) {
+          setProfile(userProfile);
+          const storedOrgId = localStorage.getItem('selectedOrgId');
+          if (storedOrgId) {
+            setSelectedOrganizationId(storedOrgId);
+          } else if (userProfile.organization_id) {
+            handleSetSelectedOrg(userProfile.organization_id);
+          }
+        } else {
+            console.warn(`No profile found for user ${currentUser.id}. Logging out.`);
+            await logout();
         }
       }
 
@@ -94,33 +91,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     fetchSession();
 
-    // 4. Dengarkan perubahan status otentikasi
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-        // Jika sign out, bersihkan state
         if (event === 'SIGNED_OUT') {
             setUser(null);
             setProfile(null);
             handleSetSelectedOrg(null);
             router.push('/');
-        } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
-            // Jika ada event login atau update, ambil ulang sesi & profil
-            fetchSession();
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            if(session?.user && session.user.id !== user?.id){
+                 fetchSession();
+            }
         }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, []); // <-- Hook ini hanya berjalan sekali saat komponen dimuat
+  }, []);
 
   const login = async ({ email, password }: { email: string; password: string }) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       throw new Error(error.message);
     }
-    // `onAuthStateChange` akan menangani sisanya
   };
   
   const value = {
