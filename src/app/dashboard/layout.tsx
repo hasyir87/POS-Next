@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -27,7 +27,6 @@ const allNavItems: NavItem[] = [
   { href: "/dashboard/inventory", label: "Inventaris", icon: PackageSearch, requiredRoles: ["owner", "admin", "superadmin"] },
   { href: "/dashboard/members", label: "Anggota", icon: Users, requiredRoles: ["owner", "admin", "cashier", "superadmin"] },
   { href: "/dashboard/users", label: "Pengguna", icon: Users, requiredRoles: ["owner", "admin", "superadmin"] },
-  { href: "/dashboard/organizations", label: "Outlet", icon: Store, requiredRoles: ["owner", "superadmin"] },
   { href: "/dashboard/reports", label: "Laporan", icon: BarChart3, requiredRoles: ["owner", "admin", "superadmin"] },
   { href: "/dashboard/settings", label: "Pengaturan", icon: Settings, requiredRoles: ["owner", "superadmin"] },
 ];
@@ -43,6 +42,26 @@ export default function DashboardLayout({
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoadingOrgs, setIsLoadingOrgs] = useState(true);
 
+  const fetchOrganizations = useCallback(async () => {
+    if (!profile || !supabase) {
+      setIsLoadingOrgs(false);
+      setOrganizations([]);
+      return;
+    }
+
+    setIsLoadingOrgs(true);
+    const { data, error } = await supabase.from('organizations').select('*');
+    
+    if (error) {
+      console.error("Error fetching organizations:", error.message);
+      setOrganizations([]);
+    } else {
+      setOrganizations(data || []);
+    }
+    setIsLoadingOrgs(false);
+  }, [profile, supabase]);
+
+
   useEffect(() => {
     if (!loading && !user) {
       router.push('/');
@@ -50,41 +69,10 @@ export default function DashboardLayout({
   }, [user, loading, router]);
   
   useEffect(() => {
-    const fetchOrganizations = async () => {
-      if (!profile || !supabase) {
-        setIsLoadingOrgs(false);
-        return;
-      }
-      setIsLoadingOrgs(true);
-
-      let query;
-      // Superadmin dan Owner bisa melihat semua organisasi
-      if (profile.role === 'superadmin' || profile.role === 'owner') {
-        query = supabase.from('organizations').select('*');
-      } else if (profile.organization_id) {
-        // Role lain (admin, cashier) hanya melihat organisasi mereka sendiri
-        query = supabase.from('organizations').select('*').eq('id', profile.organization_id);
-      } else {
-        setOrganizations([]);
-        setIsLoadingOrgs(false);
-        return;
-      }
-
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error("Error fetching organizations:", error);
-        setOrganizations([]);
-      } else if (data) {
-        setOrganizations(Array.isArray(data) ? data : []);
-      }
-      setIsLoadingOrgs(false);
-    };
-
     if (profile) {
-        fetchOrganizations();
+      fetchOrganizations();
     }
-  }, [profile, supabase]);
+  }, [profile, fetchOrganizations]);
 
 
   if (loading || !profile) {
@@ -162,7 +150,7 @@ export default function DashboardLayout({
             </SheetContent>
           </Sheet>
           <div className="w-full flex-1">
-            {(profile.role === 'owner' || profile.role === 'superadmin') && (
+            {(profile.role === 'owner' || profile.role === 'superadmin' || profile.role === 'admin') && (
               <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                       <Button variant="outline" className="w-full max-w-xs">
