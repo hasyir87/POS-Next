@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { BarChart3, Clock, Home, LogOut, Menu, Settings, DollarSign, BookUser, Store, ChevronsUpDown, Users, PackageSearch, SprayCan, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { MPerfumeAmalLogo } from "@/components/m-perfume-amal-logo";
@@ -82,18 +82,12 @@ export default function DashboardLayout({
   }, [loading, user, fetchOrganizations]);
 
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
-  }
-
-  // After loading, if there's still no user, something is wrong, or they logged out.
-  // The context and middleware should handle the redirect, but this is a fallback.
-  if (!user) {
-      return null;
   }
 
   const navItems = profile ? allNavItems.filter(item => profile.role && item.requiredRoles.includes(profile.role)) : [];
@@ -144,6 +138,9 @@ export default function DashboardLayout({
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col">
+              <SheetHeader>
+                <SheetTitle className="sr-only">Navigasi Utama</SheetTitle>
+              </SheetHeader>
               <nav className="grid gap-2 text-lg font-medium">
                 <Link href="#" className="flex items-center gap-2 text-lg font-semibold mb-4">
                   <MPerfumeAmalLogo className="h-6 w-6 text-primary" />
@@ -218,3 +215,5 @@ export default function DashboardLayout({
     </div>
   );
 }
+
+    
