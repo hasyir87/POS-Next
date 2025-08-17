@@ -61,6 +61,8 @@ export function LoginForm() {
       let msg = "Login gagal. Silakan coba lagi.";
       if (error?.message?.toLowerCase().includes("invalid login credentials")) {
         msg = "Email atau password salah.";
+      } else if (error?.message) {
+        msg = error.message;
       }
       setLoginError(msg);
     } finally {

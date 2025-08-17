@@ -57,7 +57,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .single();
       
       if (error) {
-        throw error;
+        // Melempar Error baru dengan pesan dari Supabase
+        throw new Error(error.message);
       }
       
       const userProfile = data as UserProfile;
@@ -72,11 +73,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       return userProfile;
-    } catch (e) {
-      console.error("Error fetching profile:", e);
+    } catch (e: any) {
+      // Sekarang 'e' akan memiliki pesan error yang jelas
+      console.error("Error fetching profile:", e.message);
       setProfile(null);
       handleSetSelectedOrg(null);
-      return null;
+      // Melempar kembali error agar bisa ditangani oleh pemanggil fungsi
+      throw e;
     }
   }, [supabase]);
 
@@ -87,7 +90,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(true);
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      await fetchUserProfile(currentUser);
+      await fetchUserProfile(currentUser).catch(() => {
+        // Jika pengambilan profil gagal (misalnya, RLS gagal), logout pengguna
+        // untuk mencegah keadaan tidak konsisten.
+        logout();
+      });
       setLoading(false);
     });
 
