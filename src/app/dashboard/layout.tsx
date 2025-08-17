@@ -75,7 +75,7 @@ export default function DashboardLayout({
   }, [profile, fetchOrganizations]);
 
 
-  if (loading || !profile) {
+  if (loading || !user) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -83,7 +83,7 @@ export default function DashboardLayout({
     );
   }
 
-  const navItems = allNavItems.filter(item => item.requiredRoles.includes(profile.role));
+  const navItems = profile ? allNavItems.filter(item => item.requiredRoles.includes(profile.role)) : [];
 
   const handleLogout = async () => {
     await logout();
@@ -150,7 +150,7 @@ export default function DashboardLayout({
             </SheetContent>
           </Sheet>
           <div className="w-full flex-1">
-            {(profile.role === 'owner' || profile.role === 'superadmin' || profile.role === 'admin') && (
+            {profile && (profile.role === 'owner' || profile.role === 'superadmin' || profile.role === 'admin') && (
               <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                       <Button variant="outline" className="w-full max-w-xs">
@@ -179,14 +179,14 @@ export default function DashboardLayout({
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">
                 <Avatar>
-                  <AvatarImage src={profile.avatar_url || "https://placehold.co/40x40"} alt={profile.full_name || 'Avatar'} data-ai-hint="avatar" />
-                  <AvatarFallback>{profile.full_name?.substring(0, 2).toUpperCase() || 'U'}</AvatarFallback>
+                  <AvatarImage src={profile?.avatar_url || "https://placehold.co/40x40"} alt={profile?.full_name || 'Avatar'} data-ai-hint="avatar" />
+                  <AvatarFallback>{profile?.full_name?.substring(0, 2).toUpperCase() || user.email?.substring(0,2).toUpperCase() || 'U'}</AvatarFallback>
                 </Avatar>
                 <span className="sr-only">Buka menu pengguna</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>{profile.full_name || profile.email}</DropdownMenuLabel>
+              <DropdownMenuLabel>{profile?.full_name || user.email}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>Profil</DropdownMenuItem>
               <DropdownMenuItem>Dukungan</DropdownMenuItem>

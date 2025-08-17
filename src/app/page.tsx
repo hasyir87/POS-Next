@@ -1,14 +1,22 @@
 
-
 'use client';
 
 import { LoginForm } from '@/components/login-form';
 import { MPerfumeAmalLogo } from '@/components/m-perfume-amal-logo';
 import { useAuth } from '@/context/auth-context';
 import { Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function Home() {
   const { loading, user } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.push('/dashboard');
+    }
+  }, [loading, user, router]);
 
   // Show a loading indicator while the auth state is being determined
   // or if the user is logged in and a redirect is imminent.
