@@ -1,12 +1,6 @@
-import type {NextConfig} from 'next';
-const nextConfig = {
-  // ... konfigurasi existing Anda ...
-  experimental: {
-    allowedDevOrigins: ["localhost", "0.0.0.0"] // Hanya untuk development lokal
-  }
-}
+import type { NextConfig } from 'next';
+
 const nextConfig: NextConfig = {
-  /* config options here */
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -22,9 +16,15 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
       {
-        protocol: "https",
-        hostname: "*.googleusercontent.com",
+        protocol: 'https',
+        hostname: '*.googleusercontent.com',
       },
+    ],
+  },
+  experimental: {
+    // This is needed to allow the Next.js dev server to work correctly in the cloud workspace.
+    allowedDevOrigins: [
+      '*.cloudworkstations.dev',
     ],
   },
 };
