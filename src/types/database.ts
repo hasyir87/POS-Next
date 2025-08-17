@@ -1,3 +1,4 @@
+
 export type Json =
   | string
   | number
@@ -127,6 +128,7 @@ export interface Grade {
   organization_id: string
   name: string
   price_multiplier: number
+  extra_essence_price: number
   created_at: string
   updated_at: string
 }
@@ -310,3 +312,5 @@ export interface Database {
     }
   }
 }
+
+    

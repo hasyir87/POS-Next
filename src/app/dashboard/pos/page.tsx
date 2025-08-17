@@ -58,8 +58,6 @@ const RefillForm = ({ onAddToCart, grades, aromas, bottleSizes, recipes }: { onA
     const [standardEssence, setStandardEssence] = useState(0);
 
     const availableAromas = useMemo(() => {
-        // This part seems to have a logical error. Aromas are not directly tied to grades in the DB schema.
-        // For now, let's assume all aromas are available.
         return aromas.map(a => ({ value: a.id || '', label: a.name || '' }));
     }, [aromas]);
     
@@ -467,3 +465,5 @@ export default function PosPage() {
         </div>
     );
 }
+
+    
