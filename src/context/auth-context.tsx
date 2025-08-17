@@ -71,7 +71,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (profileError) {
           console.error("Error fetching profile:", profileError.message);
-          await logout();
+          // Do not log out here, as it might be a temporary network issue
+          // or RLS issue during setup. Let the UI handle the null profile state.
+          setProfile(null);
         } else if (userProfile) {
           setProfile(userProfile);
           const storedOrgId = localStorage.getItem('selectedOrgId');
@@ -81,8 +83,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             handleSetSelectedOrg(userProfile.organization_id);
           }
         } else {
-            console.warn(`No profile found for user ${currentUser.id}. Logging out.`);
-            await logout();
+            // It's possible the profile is not created yet due to trigger delay.
+            // Do not log out. The user is authenticated. Let the app handle the null profile.
+            console.warn(`No profile found for user ${currentUser.id}. The user is authenticated but has no profile entry.`);
+            setProfile(null);
         }
       }
 
@@ -116,6 +120,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (error) {
       throw new Error(error.message);
     }
+    // onAuthStateChange will handle the rest
   };
   
   const value = {
