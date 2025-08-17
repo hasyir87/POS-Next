@@ -12,14 +12,15 @@ export default function Home() {
   const { loading, user } = useAuth();
   const router = useRouter();
 
+  // This effect will run on the client side after the AuthContext has determined the auth state.
   useEffect(() => {
     if (!loading && user) {
       router.push('/dashboard');
     }
   }, [loading, user, router]);
 
-  // Show a loading indicator while the auth state is being determined
-  // or if the user is logged in and a redirect is imminent.
+  // While the context is loading, or if the user is logged in (and about to be redirected),
+  // show a loading state. This prevents the login form from flashing briefly for logged-in users.
   if (loading || user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -31,7 +32,7 @@ export default function Home() {
     );
   }
 
-  // Only show the login form if not loading and no user is present.
+  // Only render the login form if we are done loading and there is no user.
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="mx-auto w-full max-w-sm space-y-6">

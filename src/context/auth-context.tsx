@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback } from 'react';
-import { type SupabaseClient, type User as SupabaseUser } from '@supabase/supabase-js';
+import { type SupabaseClient, type Session, type User as SupabaseUser } from '@supabase/supabase-js';
 import { createClient } from '@/utils/supabase/client';
 import type { UserProfile } from '@/types/database';
 import { useRouter } from 'next/navigation';
@@ -40,87 +40,76 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const logout = useCallback(async () => {
+    setLoading(true);
     await supabase.auth.signOut();
-    handleSetSelectedOrg(null);
-    setProfile(null);
     setUser(null);
-    router.push('/'); 
-    router.refresh();
+    setProfile(null);
+    handleSetSelectedOrg(null);
+    router.push('/');
+    setLoading(false);
   }, [supabase, router]);
 
   useEffect(() => {
-    const fetchSession = async () => {
-      setLoading(true);
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    // This effect runs once on mount to fetch the initial session and set up the listener.
+    const getInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
       
-      if (sessionError) {
-        console.error("Session Error:", sessionError.message);
-        setLoading(false);
-        return;
-      }
-      
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-
-      if (currentUser) {
-        const { data: userProfile, error: profileError } = await supabase
+      if (session?.user) {
+        const { data: userProfile } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', currentUser.id)
+          .eq('id', session.user.id)
           .maybeSingle();
-
-        if (profileError) {
-          console.error("Error fetching profile:", profileError.message);
-          // Do not log out here, as it might be a temporary network issue
-          // or RLS issue during setup. Let the UI handle the null profile state.
-          setProfile(null);
-        } else if (userProfile) {
-          setProfile(userProfile);
-          const storedOrgId = localStorage.getItem('selectedOrgId');
-          if (storedOrgId) {
-            setSelectedOrganizationId(storedOrgId);
-          } else if (userProfile.organization_id) {
-            handleSetSelectedOrg(userProfile.organization_id);
-          }
-        } else {
-            // It's possible the profile is not created yet due to trigger delay.
-            // Do not log out. The user is authenticated. Let the app handle the null profile.
-            console.warn(`No profile found for user ${currentUser.id}. The user is authenticated but has no profile entry.`);
-            setProfile(null);
+        setProfile(userProfile);
+        
+        const storedOrgId = localStorage.getItem('selectedOrgId');
+        if (storedOrgId) {
+          setSelectedOrganizationId(storedOrgId);
+        } else if (userProfile?.organization_id) {
+          handleSetSelectedOrg(userProfile.organization_id);
         }
       }
-
       setLoading(false);
     };
 
-    fetchSession();
+    getInitialSession();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_OUT') {
-            setUser(null);
-            setProfile(null);
-            handleSetSelectedOrg(null);
-            router.push('/');
-        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-            if(session?.user && session.user.id !== user?.id){
-                 fetchSession();
-            }
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setLoading(true);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .maybeSingle();
+          setProfile(userProfile ?? null);
+          if(!selectedOrganizationId && userProfile?.organization_id) {
+             handleSetSelectedOrg(userProfile.organization_id);
+          }
+        } else {
+          setProfile(null);
+          handleSetSelectedOrg(null);
         }
-    });
+        setLoading(false);
+      }
+    );
 
     return () => {
-      subscription.unsubscribe();
+      authListener?.subscription.unsubscribe();
     };
-  }, []);
+  }, [supabase]);
+
 
   const login = async ({ email, password }: { email: string; password: string }) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       throw new Error(error.message);
     }
-    // onAuthStateChange will handle the rest
+    // The onAuthStateChange listener will handle the session and profile update.
   };
   
   const value = {

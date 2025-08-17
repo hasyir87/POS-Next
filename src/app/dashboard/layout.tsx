@@ -50,7 +50,14 @@ export default function DashboardLayout({
     }
 
     setIsLoadingOrgs(true);
-    const { data, error } = await supabase.from('organizations').select('*');
+    let query = supabase.from('organizations').select('*');
+
+    // If user is not superadmin, they can only see their own organization and its children
+    if (profile.role !== 'superadmin' && profile.organization_id) {
+       query = query.or(`id.eq.${profile.organization_id},parent_organization_id.eq.${profile.organization_id}`)
+    }
+    
+    const { data, error } = await query;
     
     if (error) {
       console.error("Error fetching organizations:", error.message);
@@ -69,13 +76,13 @@ export default function DashboardLayout({
   }, [user, loading, router]);
   
   useEffect(() => {
-    if (profile) {
+    if (!loading && user) {
       fetchOrganizations();
     }
-  }, [profile, fetchOrganizations]);
+  }, [loading, user, fetchOrganizations]);
 
 
-  if (loading || !user) {
+  if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -83,7 +90,13 @@ export default function DashboardLayout({
     );
   }
 
-  const navItems = profile ? allNavItems.filter(item => item.requiredRoles.includes(profile.role)) : [];
+  // After loading, if there's still no user, something is wrong, or they logged out.
+  // The context and middleware should handle the redirect, but this is a fallback.
+  if (!user) {
+      return null;
+  }
+
+  const navItems = profile ? allNavItems.filter(item => profile.role && item.requiredRoles.includes(profile.role)) : [];
 
   const handleLogout = async () => {
     await logout();
@@ -199,7 +212,7 @@ export default function DashboardLayout({
           </DropdownMenu>
         </header>
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-background">
-          {children}
+          {profile ? children : <div className="text-center text-muted-foreground">Memuat data profil...</div>}
         </main>
       </div>
     </div>
