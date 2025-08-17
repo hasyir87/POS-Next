@@ -54,31 +54,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .limit(1)
+        .maybeSingle();
       
       if (error) {
-        // Melempar Error baru dengan pesan dari Supabase
         throw new Error(error.message);
       }
       
       const userProfile = data as UserProfile;
       setProfile(userProfile);
       
-      // Initialize selected organization
-      const storedOrgId = localStorage.getItem('selectedOrgId');
-      if (storedOrgId) {
-          setSelectedOrganizationId(storedOrgId);
-      } else if (userProfile?.organization_id) {
-          handleSetSelectedOrg(userProfile.organization_id);
+      if (userProfile) {
+        const storedOrgId = localStorage.getItem('selectedOrgId');
+        if (storedOrgId) {
+            setSelectedOrganizationId(storedOrgId);
+        } else if (userProfile.organization_id) {
+            handleSetSelectedOrg(userProfile.organization_id);
+        }
+      } else {
+         handleSetSelectedOrg(null);
       }
 
       return userProfile;
     } catch (e: any) {
-      // Sekarang 'e' akan memiliki pesan error yang jelas
       console.error("Error fetching profile:", e.message);
       setProfile(null);
       handleSetSelectedOrg(null);
-      // Melempar kembali error agar bisa ditangani oleh pemanggil fungsi
       throw e;
     }
   }, [supabase]);
@@ -91,8 +92,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       await fetchUserProfile(currentUser).catch(() => {
-        // Jika pengambilan profil gagal (misalnya, RLS gagal), logout pengguna
-        // untuk mencegah keadaan tidak konsisten.
         logout();
       });
       setLoading(false);
@@ -110,7 +109,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       password,
     });
     if (error) throw error;
-    // onAuthStateChange will handle the rest
   };
 
   const logout = async () => {

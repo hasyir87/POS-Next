@@ -14,7 +14,6 @@ DROP FUNCTION IF EXISTS public.exec_sql(text);
 DROP FUNCTION IF EXISTS public.get_users_in_organization(uuid);
 DROP FUNCTION IF EXISTS public.process_checkout(uuid, uuid, uuid, jsonb, numeric, text);
 DROP FUNCTION IF EXISTS public.update_product_stock(uuid, integer);
-DROP FUNCTION IF EXISTS public.get_org_id_for_user(uuid);
 
 -- 1. Tabel Organisasi
 CREATE TABLE IF NOT EXISTS public.organizations (
@@ -198,28 +197,12 @@ CREATE TABLE IF NOT EXISTS public.settings (
 );
 
 -- Fungsi Helper untuk Keamanan
-CREATE OR REPLACE FUNCTION public.get_user_role(p_user_id uuid)
+CREATE OR REPLACE FUNCTION public.get_user_role()
 RETURNS text AS $$
 BEGIN
-  RETURN (
-    SELECT raw_app_meta_data->>'role'
-    FROM auth.users
-    WHERE id = p_user_id
-  );
+  RETURN auth.jwt()->>'user_role';
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-
-CREATE OR REPLACE FUNCTION public.get_org_id_for_user(p_user_id uuid)
-RETURNS uuid AS $$
-BEGIN
-  RETURN (
-    SELECT organization_id
-    FROM public.profiles
-    WHERE id = p_user_id
-  );
-END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
 
 
 -- Fungsi untuk mengeksekusi SQL dinamis (digunakan oleh script setup)
@@ -251,46 +234,50 @@ ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 
 -- 1. Organizations
 CREATE POLICY "Allow superadmin full access" ON public.organizations FOR ALL
-USING ((auth.jwt()->>'role') = 'superadmin');
+USING ((get_user_role() = 'superadmin'));
 
 CREATE POLICY "Allow owner and admin to view their own org" ON public.organizations FOR SELECT
-USING (id = get_org_id_for_user(auth.uid()));
+USING (id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
 
 -- 2. Profiles
-CREATE POLICY "Allow users to view their own profile" ON public.profiles FOR SELECT
+CREATE POLICY "Allow users to view their own profile only" ON public.profiles FOR SELECT
 USING (id = auth.uid());
 
-CREATE POLICY "Allow superadmin full access on profiles" ON public.profiles FOR ALL
-USING ((auth.jwt()->>'role') = 'superadmin');
+CREATE POLICY "Allow superadmin full access" ON public.profiles FOR ALL
+USING ((get_user_role() = 'superadmin'));
 
-CREATE POLICY "Allow owner/admin to view/manage users in their organization" ON public.profiles FOR ALL
-USING (organization_id = get_org_id_for_user(auth.uid()));
+CREATE POLICY "Allow owner/admin to view users in their own org" ON public.profiles FOR SELECT
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Allow owner/admin to update users in their own org" ON public.profiles FOR UPDATE
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
 
 
 -- 3. Products
 CREATE POLICY "Allow access based on organization" ON public.products FOR ALL
-USING (organization_id = get_org_id_for_user(auth.uid()))
-WITH CHECK (organization_id = get_org_id_for_user(auth.uid()));
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
 
 -- 4. Categories
 CREATE POLICY "Allow access based on organization" ON public.categories FOR ALL
-USING (organization_id = get_org_id_for_user(auth.uid()))
-WITH CHECK (organization_id = get_org_id_for_user(auth.uid()));
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
 
 -- 5. Raw Materials
 CREATE POLICY "Allow access based on organization" ON public.raw_materials FOR ALL
-USING (organization_id = get_org_id_for_user(auth.uid()))
-WITH CHECK (organization_id = get_org_id_for_user(auth.uid()));
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
 
 -- 6. Customers
 CREATE POLICY "Allow access based on organization" ON public.customers FOR ALL
-USING (organization_id = get_org_id_for_user(auth.uid()))
-WITH CHECK (organization_id = get_org_id_for_user(auth.uid()));
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
 
 -- 7. Transactions
 CREATE POLICY "Allow access based on organization" ON public.transactions FOR ALL
-USING (organization_id = get_org_id_for_user(auth.uid()))
-WITH CHECK (organization_id = get_org_id_for_user(auth.uid()));
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
 
 -- 8. Transaction Items
 CREATE POLICY "Allow access based on parent transaction" ON public.transaction_items FOR ALL
@@ -299,41 +286,41 @@ USING (
         SELECT 1
         FROM public.transactions t
         WHERE t.id = transaction_id
-        AND t.organization_id = get_org_id_for_user(auth.uid())
+        AND t.organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid())
     )
 );
 
 -- 9. Promotions
 CREATE POLICY "Allow access based on organization" ON public.promotions FOR ALL
-USING (organization_id = get_org_id_for_user(auth.uid()))
-WITH CHECK (organization_id = get_org_id_for_user(auth.uid()));
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
 
 -- 10. Grades
 CREATE POLICY "Allow access based on organization" ON public.grades FOR ALL
-USING (organization_id = get_org_id_for_user(auth.uid()))
-WITH CHECK (organization_id = get_org_id_for_user(auth.uid()));
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
 
 -- 11. Aromas
 CREATE POLICY "Allow access based on organization" ON public.aromas FOR ALL
-USING (organization_id = get_org_id_for_user(auth.uid()))
-WITH CHECK (organization_id = get_org_id_for_user(auth.uid()));
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
 
 -- 12. Bottle Sizes
 CREATE POLICY "Allow access based on organization" ON public.bottle_sizes FOR ALL
-USING (organization_id = get_org_id_for_user(auth.uid()))
-WITH CHECK (organization_id = get_org_id_for_user(auth.uid()));
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
 
 -- 13. Recipes
 CREATE POLICY "Allow access based on organization" ON public.recipes FOR ALL
-USING (organization_id = get_org_id_for_user(auth.uid()))
-WITH CHECK (organization_id = get_org_id_for_user(auth.uid()));
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
 
 -- 14. Expenses
 CREATE POLICY "Allow access based on organization" ON public.expenses FOR ALL
-USING (organization_id = get_org_id_for_user(auth.uid()))
-WITH CHECK (organization_id = get_org_id_for_user(auth.uid()));
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
 
 -- 15. Settings
 CREATE POLICY "Allow access based on organization" ON public.settings FOR ALL
-USING (organization_id = get_org_id_for_user(auth.uid()))
-WITH CHECK (organization_id = get_org_id_for_user(auth.uid()));
+USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()))
+WITH CHECK (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()));
