@@ -45,19 +45,17 @@ export default function DashboardLayout({
   const fetchOrganizations = useCallback(async () => {
     if (!profile || !supabase) {
       setIsLoadingOrgs(false);
-      setOrganizations([]);
       return;
     }
 
     setIsLoadingOrgs(true);
     let query = supabase.from('organizations').select('*');
 
-    // If user is not superadmin, they can only see their own organization and its children
     if (profile.role !== 'superadmin' && profile.organization_id) {
-       query = query.or(`id.eq.${profile.organization_id},parent_organization_id.eq.${profile.organization_id}`)
+       query = query.or(`id.eq.${profile.organization_id},parent_organization_id.eq.${profile.organization_id}`);
     }
     
-    const { data, error } = await query;
+    const { data, error } = await query.order('created_at', { ascending: false });
     
     if (error) {
       console.error("Error fetching organizations:", error.message);
@@ -73,16 +71,13 @@ export default function DashboardLayout({
     if (!loading && !user) {
       router.push('/');
     }
-  }, [user, loading, router]);
-  
-  useEffect(() => {
     if (!loading && user) {
       fetchOrganizations();
     }
-  }, [loading, user, fetchOrganizations]);
+  }, [user, loading, router, fetchOrganizations]);
 
 
-  if (loading || !user) {
+  if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -90,6 +85,10 @@ export default function DashboardLayout({
     );
   }
 
+  if (!user) {
+    return null; // or a redirect, but middleware should handle it.
+  }
+  
   const navItems = profile ? allNavItems.filter(item => profile.role && item.requiredRoles.includes(profile.role)) : [];
 
   const handleLogout = async () => {
@@ -209,11 +208,9 @@ export default function DashboardLayout({
           </DropdownMenu>
         </header>
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-background">
-          {profile ? children : <div className="text-center text-muted-foreground">Memuat data profil...</div>}
+          {children}
         </main>
       </div>
     </div>
   );
 }
-
-    

@@ -1,253 +1,225 @@
-// src/app/dashboard/users/page.tsx
+
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '../../../context/auth-context';
-import { useRouter } from 'next/navigation';
-
-// Definisikan tipe untuk Profil Pengguna
-interface UserProfile {
-    id: string;
-    name: string | null;
-    email: string | null;
-    role: string | null;
-    organization_id: string | null;
-}
-
-// Definisikan tipe untuk Organisasi
-interface Organization {
-    id: string;
-    name: string;
-}
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@/context/auth-context';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PlusCircle, MoreHorizontal, Users, Loader2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import type { UserProfile, Organization } from '@/types/database';
+import { Badge } from '@/components/ui/badge';
 
 export default function UsersPage() {
-    const { user, loading } = useAuth();
-    const router = useRouter();
+    const { toast } = useToast();
+    const { profile: currentProfile, loading: authLoading, supabase } = useAuth();
+
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [organizations, setOrganizations] = useState<Organization[]>([]);
-    const [isLoadingData, setIsLoadingData] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    // State untuk form tambah/edit pengguna
-    const [showForm, setShowForm] = useState(false);
-    const [isEditing, setIsEditing] = useState(false);
-    const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-    const [formState, setFormState] = useState({
-        name: '',
-        email: '',
-        password: '', // Hanya untuk pengguna baru
-        role: 'cashier',
-        organization_id: ''
-    });
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [formError, setFormError] = useState<string | null>(null);
-
-    // Efek untuk memuat data awal
-    useEffect(() => {
-        if (!loading && !user) {
-            router.push('/login');
-        }
-        if (user) {
-            fetchData();
-        }
-    }, [user, loading, router]);
-
-    const fetchData = async () => {
-        setIsLoadingData(true);
-        setError(null);
-        try {
-            const [usersResponse, orgsResponse] = await Promise.all([
-                fetch('/api/users'),
-                fetch('/api/organizations')
-            ]);
-
-            if (!usersResponse.ok) {
-                const usersData = await usersResponse.json();
-                throw new Error(usersData.error || 'Failed to fetch users.');
-            }
-             if (!orgsResponse.ok) {
-                const orgsData = await orgsResponse.json();
-                throw new Error(orgsData.error || 'Failed to fetch organizations.');
-            }
-
-            const usersData = await usersResponse.json();
-            const orgsData = await orgsResponse.json();
-            
-            setUsers(usersData);
-            setOrganizations(orgsData);
-
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setIsLoadingData(false);
-        }
-    };
-
-    const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setFormState(prevState => ({ ...prevState, [name]: value }));
-    };
+    const [isLoading, setIsLoading] = useState(true);
     
-    const openAddForm = () => {
-        setIsEditing(false);
-        setCurrentUser(null);
-        setFormState({ name: '', email: '', password: '', role: 'cashier', organization_id: organizations[0]?.id || '' });
-        setShowForm(true);
-        setFormError(null);
+    const [isDialogOpen, setDialogOpen] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [editingUser, setEditingUser] = useState<Partial<UserProfile> | null>(null);
+
+    const emptyUser: Partial<UserProfile> = { full_name: '', email: '', role: 'cashier', organization_id: currentProfile?.organization_id || '' };
+
+    const fetchUsersAndOrgs = useCallback(async () => {
+        if (!supabase) return;
+        setIsLoading(true);
+
+        try {
+            const usersPromise = supabase.from('profiles').select('*, organizations(id, name)');
+            const orgsPromise = supabase.from('organizations').select('*');
+
+            const [usersRes, orgsRes] = await Promise.all([usersPromise, orgsPromise]);
+
+            if (usersRes.error) throw usersRes.error;
+            if (orgsRes.error) throw orgsRes.error;
+
+            setUsers(usersRes.data || []);
+            setOrganizations(orgsRes.data || []);
+
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Error', description: `Gagal memuat data: ${error.message}` });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [supabase, toast]);
+
+    useEffect(() => {
+        if (!authLoading && currentProfile) {
+            fetchUsersAndOrgs();
+        }
+    }, [authLoading, currentProfile, fetchUsersAndOrgs]);
+
+    const handleOpenDialog = (user: Partial<UserProfile> | null = null) => {
+        setEditingUser(user ? { ...user } : { ...emptyUser, organization_id: currentProfile?.organization_id || '' });
+        setDialogOpen(true);
     };
 
-    const openEditForm = (userProfile: UserProfile) => {
-        setIsEditing(true);
-        setCurrentUser(userProfile);
-        setFormState({
-            name: userProfile.name || '',
-            email: userProfile.email || '',
-            password: '',
-            role: userProfile.role || 'cashier',
-            organization_id: userProfile.organization_id || ''
-        });
-        setShowForm(true);
-        setFormError(null);
-    };
-
-    const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
+    const handleSaveUser = async () => {
+        if (!editingUser || !editingUser.full_name || !editingUser.email || !editingUser.role || !editingUser.organization_id) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Semua field harus diisi.' });
+            return;
+        }
         setIsSubmitting(true);
-        setFormError(null);
 
-        const url = isEditing ? `/api/users/${currentUser?.id}` : '/api/users';
-        const method = isEditing ? 'PUT' : 'POST';
+        const url = editingUser.id ? `/api/users/${editingUser.id}` : '/api/users';
+        const method = editingUser.id ? 'PUT' : 'POST';
+        const body = editingUser.id
+            ? { name: editingUser.full_name, role: editingUser.role, organization_id: editingUser.organization_id }
+            : { ...editingUser, password: 'password' }; // Password sementara, pengguna harus mengubahnya
         
-        const body = isEditing 
-            ? { name: formState.name, role: formState.role, organization_id: formState.organization_id }
-            : formState;
-
         try {
             const response = await fetch(url, {
-                method,
+                method: method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
+                body: JSON.stringify(body),
             });
             const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Submission failed.');
-            
-            setShowForm(false);
-            fetchData();
-            
-        } catch (err: any) {
-            setFormError(err.message);
+            if (!response.ok) throw new Error(data.error || 'Gagal menyimpan pengguna.');
+
+            toast({ title: 'Sukses', description: `Pengguna berhasil ${editingUser.id ? 'diperbarui' : 'ditambahkan'}.` });
+            setDialogOpen(false);
+            fetchUsersAndOrgs();
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Error', description: error.message });
         } finally {
             setIsSubmitting(false);
         }
     };
-    
-    const handleDeleteUser = async (userId: string) => {
-        if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-            return;
-        }
 
+    const handleDeleteUser = async (userId: string) => {
+        if (!confirm('Apakah Anda yakin ingin menghapus pengguna ini?')) return;
+        
         try {
             const response = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Failed to delete user.');
-
-            fetchData();
-        } catch (err: any) {
-            setError(err.message);
+            if (!response.ok) {
+                 const data = await response.json();
+                 throw new Error(data.error || 'Gagal menghapus pengguna.');
+            }
+            toast({ title: 'Sukses', description: 'Pengguna berhasil dihapus.' });
+            fetchUsersAndOrgs();
+        } catch (error: any) {
+             toast({ variant: 'destructive', title: 'Error', description: error.message });
         }
     };
-
-
-    if (loading || isLoadingData) {
-        return <div className="p-6">Loading...</div>;
+    
+    if (authLoading || isLoading) {
+        return <div className="p-6 flex justify-center items-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
     }
 
     return (
-        <div className="p-6">
-            <h1 className="text-2xl font-bold mb-4">Manage Users</h1>
-            {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">{error}</div>}
-
-            {!showForm && (
-                 <button
-                    onClick={openAddForm}
-                    className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mb-4"
-                >
-                    Add New User
-                </button>
-            )}
-
-            {showForm && (
-                <div className="mb-6 p-4 border rounded shadow bg-gray-50">
-                    <h3 className="text-xl font-semibold mb-3">{isEditing ? 'Edit User' : 'Add New User'}</h3>
-                    <form onSubmit={handleFormSubmit}>
-                        <div className="mb-4">
-                            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="name">Full Name</label>
-                            <input type="text" id="name" name="name" value={formState.name} onChange={handleFormChange} className="shadow appearance-none border rounded w-full py-2 px-3" required />
-                        </div>
-                        <div className="mb-4">
-                            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">Email</label>
-                            <input type="email" id="email" name="email" value={formState.email} onChange={handleFormChange} className="shadow appearance-none border rounded w-full py-2 px-3 bg-gray-200" required disabled={isEditing} />
-                        </div>
-                        {!isEditing && (
-                            <div className="mb-4">
-                                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">Password</label>
-                                <input type="password" id="password" name="password" value={formState.password} onChange={handleFormChange} className="shadow appearance-none border rounded w-full py-2 px-3" placeholder="Leave blank to send invite" />
-                                <p className="text-xs text-gray-600 mt-1">If password is blank, an invitation link will be sent.</p>
+        <div className="flex flex-col gap-6">
+            <div className="flex items-center justify-between">
+                <h1 className="font-headline text-3xl font-bold flex items-center gap-2"><Users className="h-8 w-8" /> Manajemen Pengguna</h1>
+                <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button onClick={() => handleOpenDialog()} disabled={!currentProfile}>
+                            <PlusCircle className="mr-2 h-4 w-4" /> Tambah Pengguna
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="font-headline">{editingUser?.id ? 'Ubah Pengguna' : 'Tambah Pengguna Baru'}</DialogTitle>
+                            <DialogDescription>
+                                {editingUser?.id ? 'Ubah detail pengguna yang sudah ada.' : 'Buat akun baru untuk staf Anda.'}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="full_name" className="text-right">Nama</Label>
+                                <Input id="full_name" value={editingUser?.full_name || ''} onChange={(e) => setEditingUser(p => p ? {...p, full_name: e.target.value} : null)} className="col-span-3" />
                             </div>
-                        )}
-                        <div className="mb-4">
-                            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="role">Role</label>
-                            <select id="role" name="role" value={formState.role} onChange={handleFormChange} className="shadow border rounded w-full py-2 px-3">
-                                <option value="cashier">Cashier</option>
-                                <option value="admin">Admin</option>
-                            </select>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="email" className="text-right">Email</Label>
+                                <Input id="email" type="email" value={editingUser?.email || ''} onChange={(e) => setEditingUser(p => p ? {...p, email: e.target.value} : null)} className="col-span-3" disabled={!!editingUser?.id} />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="role" className="text-right">Peran</Label>
+                                <Select value={editingUser?.role || ''} onValueChange={(value: UserProfile['role']) => setEditingUser(p => p ? {...p, role: value} : null)}>
+                                    <SelectTrigger id="role" className="col-span-3"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="admin">Admin</SelectItem>
+                                        <SelectItem value="cashier">Kasir</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="organization_id" className="text-right">Outlet</Label>
+                                <Select value={editingUser?.organization_id || ''} onValueChange={(value) => setEditingUser(p => p ? {...p, organization_id: value} : null)} disabled={currentProfile?.role !== 'superadmin'}>
+                                    <SelectTrigger id="organization_id" className="col-span-3"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        {organizations.map(org => <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
-                        <div className="mb-4">
-                             <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="organization_id">Organization/Outlet</label>
-                            <select id="organization_id" name="organization_id" value={formState.organization_id} onChange={handleFormChange} className="shadow border rounded w-full py-2 px-3" required>
-                                {organizations.map(org => (
-                                    <option key={org.id} value={org.id}>{org.name}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {formError && <p className="text-red-500 text-xs italic mb-4">{formError}</p>}
-                        <div className="flex items-center gap-4">
-                            <button type="submit" disabled={isSubmitting} className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
-                                {isSubmitting ? 'Saving...' : 'Save User'}
-                            </button>
-                            <button type="button" onClick={() => setShowForm(false)} className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-
-            <div className="overflow-x-auto bg-white rounded shadow">
-                <table className="min-w-full">
-                    <thead className="bg-gray-200">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                        {users.map(userProfile => (
-                            <tr key={userProfile.id}>
-                                <td className="px-6 py-4 whitespace-nowrap">{userProfile.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">{userProfile.role}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                    <button onClick={() => openEditForm(userProfile)} className="text-indigo-600 hover:text-indigo-900 mr-4">Edit</button>
-                                    <button onClick={() => handleDeleteUser(userProfile.id)} className="text-red-600 hover:text-red-900">Delete</button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        <DialogFooter>
+                            <Button onClick={handleSaveUser} type="submit" disabled={isSubmitting}>
+                                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Simpan
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Daftar Pengguna</CardTitle>
+                    <CardDescription>Kelola akun staf Anda dan peran mereka di berbagai outlet.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="border rounded-md">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Nama Pengguna</TableHead>
+                                    <TableHead>Email</TableHead>
+                                    <TableHead>Outlet</TableHead>
+                                    <TableHead className="text-center">Peran</TableHead>
+                                    <TableHead className="w-[50px]"></TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {isLoading ? (
+                                    <TableRow><TableCell colSpan={5} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                                ) : users.map((user) => (
+                                    <TableRow key={user.id}>
+                                        <TableCell className="font-medium">{user.full_name || 'N/A'}</TableCell>
+                                        <TableCell>{user.email}</TableCell>
+                                        <TableCell>{(user.organizations as Organization)?.name || 'N/A'}</TableCell>
+                                        <TableCell className="text-center">
+                                            <Badge variant="secondary">{user.role}</Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                           <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0" disabled={user.id === currentProfile?.id}>
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => handleOpenDialog(user)}>Ubah</DropdownMenuItem>
+                                                    <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteUser(user.id)}>Hapus</DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }
