@@ -1,4 +1,3 @@
-
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
@@ -6,14 +5,10 @@ import { handleSupabaseError } from '@/lib/utils/error';
 
 // PENTING: Gunakan service_role key untuk operasi admin
 const getSupabaseAdmin = () => {
-    const cookieStore = cookies();
-    // Pastikan Anda telah mengatur SERVICE_ROLE_KEY_SUPABASE di environment variables Anda
-    const serviceRoleKey = process.env.SERVICE_ROLE_KEY_SUPABASE;
-    if (!serviceRoleKey) {
-        throw new Error("SERVICE_ROLE_KEY_SUPABASE is not set in environment variables.");
-    }
-    return createRouteHandlerClient({ cookies: () => cookieStore }, {
-      supabaseKey: serviceRoleKey
+    // Karena route handler ini dipanggil dari client-side, kita perlu cookies()
+    // untuk menginisialisasi client, meskipun kita akan menggunakan service key.
+    return createRouteHandlerClient({ cookies }, {
+      supabaseKey: process.env.SERVICE_ROLE_KEY_SUPABASE
     });
 };
 
@@ -21,6 +16,22 @@ const getSupabaseAdmin = () => {
 export async function POST(req: Request) {
   const supabaseAdmin = getSupabaseAdmin();
   const { email, password, organization_name } = await req.json();
+
+  // --- Langkah 0: Validasi Input & Keunikan Nama Organisasi ---
+  if (!email || !password || !organization_name) {
+    return NextResponse.json({ error: "Email, password, dan nama organisasi harus diisi." }, { status: 400 });
+  }
+
+  const { data: existingOrg, error: existingOrgError } = await supabaseAdmin
+    .from('organizations')
+    .select('id')
+    .eq('name', organization_name)
+    .single();
+
+  if (existingOrg) {
+    return NextResponse.json({ error: "Nama organisasi ini sudah digunakan. Silakan pilih nama lain." }, { status: 409 }); // 409 Conflict
+  }
+
 
   // --- Langkah 1: Buat Pengguna di Supabase Auth ---
   const { data: userAuthData, error: authError } =
