@@ -7,6 +7,7 @@ import { useAuth } from '@/context/auth-context';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import Link from 'next/link';
 
 export default function Home() {
   const { loading, user } = useAuth();
@@ -14,6 +15,8 @@ export default function Home() {
 
   // This effect will run on the client side after the AuthContext has determined the auth state.
   useEffect(() => {
+    // Let the middleware handle the initial redirect. 
+    // This effect is a fallback for client-side navigation.
     if (!loading && user) {
       router.push('/dashboard');
     }
@@ -42,6 +45,12 @@ export default function Home() {
           <p className="text-muted-foreground">Masuk ke sistem manajemen toko</p>
         </div>
         <LoginForm />
+         <div className="mt-4 text-center text-sm">
+            Belum punya akun?{" "}
+            <Link href="/signup" className="underline">
+                Daftar sekarang
+            </Link>
+        </div>
       </div>
     </div>
   );

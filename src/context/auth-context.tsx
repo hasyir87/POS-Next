@@ -103,7 +103,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(null);
           setProfile(null);
           setSelectedOrganizationId(null);
-          router.push('/');
+          // router.push('/'); // THIS WAS THE PROBLEM: DO NOT REDIRECT GLOBALLY
         }
         setLoading(false);
       }
