@@ -10,15 +10,21 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Redirect to login if user is not authenticated and trying to access a protected route
-  if (!session && pathname.startsWith('/dashboard')) {
+  // Define public routes that don't require authentication
+  const publicRoutes = ['/', '/login', '/signup'];
+
+  // Check if the current route is public
+  const isPublicRoute = publicRoutes.includes(pathname);
+
+  // If user is not authenticated and is trying to access a protected route, redirect to login
+  if (!session && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
   }
 
-  // Redirect to dashboard if user is authenticated and trying to access the login page
-  if (session && (pathname === '/' || pathname === '/login')) {
+  // If user is authenticated and is trying to access a public route (like login/signup), redirect to dashboard
+  if (session && isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
