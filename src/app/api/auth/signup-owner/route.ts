@@ -1,3 +1,4 @@
+
 import { NextResponse } from "next/server";
 import { handleSupabaseError } from '@/lib/utils/error';
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -37,6 +38,9 @@ export async function POST(req: Request) {
 
   if (authError) {
     console.error("Error creating Supabase Auth user:", authError);
+    if (authError.message.includes('Email address already in use')) {
+        return NextResponse.json({ error: 'Pengguna dengan email ini sudah ada.' }, { status: 409 });
+    }
     return NextResponse.json({ error: handleSupabaseError(authError) || authError.message }, { status: 400 });
   }
 
