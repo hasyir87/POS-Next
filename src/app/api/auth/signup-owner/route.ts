@@ -21,13 +21,13 @@ export async function POST(req: Request) {
   }
 
   // Call the RPC function to handle the entire signup process securely
+  // Explicitly name the parameters to match the SQL function definition
   const { error } = await supabase.rpc('signup_owner', {
-    email,
-    password,
-    full_name,
-    organization_name
+    p_email: email,
+    p_password: password,
+    p_full_name: full_name,
+    p_organization_name: organization_name
   });
-
 
   if (error) {
     console.error("Signup RPC error:", error);

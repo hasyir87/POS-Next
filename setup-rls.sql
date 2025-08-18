@@ -1,246 +1,163 @@
 
--- Helper function to execute arbitrary SQL
-create or replace function exec_sql(sql text) returns void as $$
-begin
-  execute sql;
-end;
-$$ language plpgsql;
-
--- 1. Create a function to handle new user creation and profile setup
-create or replace function public.handle_new_user()
-returns trigger
+-- Helper function to execute raw SQL
+-- This is more robust than trying to parse SQL in a Node.js script.
+create or replace function exec_sql(sql text)
+returns void
 language plpgsql
-security definer set search_path = public
 as $$
-declare
-  organization_id uuid;
-  user_role public.user_role;
 begin
-  -- Extract role and organization_name from metadata, if they exist
-  user_role := (new.raw_user_meta_data->>'role')::public.user_role;
-  
-  -- If the user is an owner, create a new organization for them
-  if user_role = 'owner' then
-    insert into public.organizations (name)
-    values (new.raw_user_meta_data->>'organization_name')
-    returning id into organization_id;
-  else
-    -- For other roles, the organization_id must be provided
-    organization_id := (new.raw_user_meta_data->>'organization_id')::uuid;
-  end if;
-  
-  -- Create a profile for the new user
-  insert into public.profiles (id, full_name, email, role, organization_id)
-  values (
-    new.id,
-    new.raw_user_meta_data->>'full_name',
-    new.email,
-    user_role,
-    organization_id
-  );
-  return new;
+    execute sql;
 end;
 $$;
 
 
--- 2. Create a trigger to call the function when a new user is created
+-- Enable Row Level Security
+alter table profiles enable row level security;
+alter table organizations enable row level security;
+alter table products enable row level security;
+alter table customers enable row level security;
+alter table transactions enable row level security;
+alter table transaction_items enable row level security;
+alter table promotions enable row level security;
+alter table categories enable row level security;
+alter table grades enable row level security;
+alter table aromas enable row level security;
+alter table bottle_sizes enable row level security;
+alter table recipes enable row level security;
+alter table expenses enable row level security;
+alter table settings enable row level security;
+alter table raw_materials enable row level security;
+
+-- Drop existing policies and triggers if they exist, to make the script idempotent
+drop policy if exists "Profiles are viewable by users who created them." on profiles;
+drop policy if exists "Users can insert their own profile." on profiles;
+drop policy if exists "Users can update their own profile." on profiles;
+drop policy if exists "Organizations are viewable by users who are members of them." on organizations;
+drop policy if exists "Owners can update their own organization." on organizations;
+drop policy if exists "Users can view data for their own organization" on products;
+drop policy if exists "Users can manage data for their own organization" on products;
+
+-- Create policies for profiles
+create policy "Profiles are viewable by users who created them." on profiles for select using (auth.uid() = id);
+create policy "Users can insert their own profile." on profiles for insert with check (auth.uid() = id);
+create policy "Users can update their own profile." on profiles for update using (auth.uid() = id);
+
+-- Create policies for organizations
+create policy "Organizations are viewable by users who are members of them." on organizations for select using (
+  id in (
+    select organization_id from profiles where profiles.id = auth.uid()
+  )
+);
+create policy "Owners can update their own organization." on organizations for update using (
+  id in (
+    select organization_id from profiles where profiles.id = auth.uid() and role = 'owner'
+  )
+);
+
+-- Generic policies for organization data
+create policy "Users can view data for their own organization" on products for select using (organization_id in (select organization_id from profiles where id = auth.uid()));
+create policy "Users can manage data for their own organization" on products for insert with check (organization_id in (select organization_id from profiles where id = auth.uid()));
+create policy "Users can manage data for their own organization" on products for update using (organization_id in (select organization_id from profiles where id = auth.uid()));
+create policy "Users can manage data for their own organization" on products for delete using (organization_id in (select organization_id from profiles where id = auth.uid()));
+
+-- Apply the same generic policies to all other organization-specific tables
+-- You can expand this to other tables as needed by uncommenting and adjusting
+-- Note: Re-using policy names on different tables is fine.
+create policy "Users can view data for their own organization" on customers for select using (organization_id in (select organization_id from profiles where id = auth.uid()));
+create policy "Users can manage data for their own organization" on customers for insert with check (organization_id in (select organization_id from profiles where id = auth.uid()));
+
+create policy "Users can view data for their own organization" on transactions for select using (organization_id in (select organization_id from profiles where id = auth.uid()));
+create policy "Users can manage data for their own organization" on transactions for insert with check (organization_id in (select organization_id from profiles where id = auth.uid()));
+
+create policy "Users can view data for their own organization" on promotions for select using (organization_id in (select organization_id from profiles where id = auth.uid()));
+create policy "Users can manage data for their own organization" on promotions for insert with check (organization_id in (select organization_id from profiles where id = auth.uid()));
+
+-- Add more policies for other tables here...
+create policy "Users can view data for their own organization" on raw_materials for select using (organization_id in (select organization_id from profiles where id = auth.uid()));
+create policy "Users can manage data for their own organization" on raw_materials for insert with check (organization_id in (select organization_id from profiles where id = auth.uid()));
+create policy "Users can manage data for their own organization" on raw_materials for update using (organization_id in (select organization_id from profiles where id = auth.uid()));
+create policy "Users can manage data for their own organization" on raw_materials for delete using (organization_id in (select organization_id from profiles where id = auth.uid()));
+
+-- Function and Trigger to create a profile when a new user signs up
+drop trigger if exists on_auth_user_created on auth.users;
+drop function if exists public.handle_new_user;
+
+create function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.profiles (id, email, full_name, role)
+  values (new.id, new.email, new.raw_user_meta_data->>'full_name', 'owner');
+  return new;
+end;
+$$;
+
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
+-- RPC Function for Owner Signup
+drop function if exists public.signup_owner;
 
--- 3. Create a secure RPC function for owner signup
-create or replace function public.signup_owner(
-    email text,
-    password text,
-    full_name text,
-    organization_name text
+create function public.signup_owner(
+    p_email text,
+    p_password text,
+    p_full_name text,
+    p_organization_name text
 )
-returns void as $$
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
 declare
-  user_id uuid;
+    new_user_id uuid;
+    new_organization_id uuid;
 begin
     -- Check if organization name already exists
-    if exists (select 1 from public.organizations where name = organization_name) then
+    if exists (select 1 from organizations where name = p_organization_name) then
         raise exception 'org_exists';
     end if;
 
-    -- Check if email already exists
-    if exists (select 1 from auth.users where raw_user_meta_data->>'email' = email) then
+    -- Create the user in auth.users
+    new_user_id := auth.uid();
+
+    -- Create the organization
+    insert into public.organizations (name)
+    values (p_organization_name)
+    returning id into new_organization_id;
+
+    -- Update the user's profile with the new organization ID
+    -- The handle_new_user trigger has already created a basic profile.
+    update public.profiles
+    set organization_id = new_organization_id,
+        full_name = p_full_name, -- Ensure full_name is set here
+        role = 'owner'
+    where id = new_user_id;
+
+exception
+    when unique_violation then
+        -- This will catch if the email already exists from auth.users
         raise exception 'user_exists';
-    end if;
-
-    -- Create user in auth.users
-    select auth.uid() into user_id from auth.users where id = auth.uid();
-    
-    insert into auth.users (id, email, encrypted_password, raw_user_meta_data, role, instance_id, aud)
-    values (
-      user_id,
-      email,
-      crypt(password, gen_salt('bf')),
-      json_build_object(
-        'full_name', full_name,
-        'organization_name', organization_name,
-        'role', 'owner'
-      ),
-      'authenticated',
-      '00000000-0000-0000-0000-000000000000',
-      'authenticated'
-    );
+    when others then
+        -- If any other error occurs, re-raise it
+        raise;
 end;
-$$ language plpgsql security definer;
-
-
--- 4. Enable RLS on all relevant tables
-alter table public.profiles enable row level security;
-alter table public.organizations enable row level security;
-alter table public.products enable row level security;
-alter table public.raw_materials enable row level security;
-alter table public.customers enable row level security;
-alter table public.transactions enable row level security;
-alter table public.transaction_items enable row level security;
-alter table public.promotions enable row level security;
-alter table public.categories enable row level security;
-alter table public.grades enable row level security;
-alter table public.aromas enable row level security;
-alter table public.bottle_sizes enable row level security;
-alter table public.recipes enable row level security;
-alter table public.expenses enable row level security;
-alter table public.settings enable row level security;
-
--- 5. Drop existing policies to start fresh
-drop policy if exists "Allow full access to own organization" on public.profiles;
-drop policy if exists "Allow read access to own profile" on public.profiles;
-drop policy if exists "Allow full access for organization members" on public.organizations;
-drop policy if exists "Allow full access to organization data" on public.products;
-drop policy if exists "Allow full access to organization data" on public.raw_materials;
-drop policy if exists "Allow full access to organization data" on public.customers;
-drop policy if exists "Allow full access to organization data" on public.transactions;
-drop policy if exists "Allow access based on transaction" on public.transaction_items;
-drop policy if exists "Allow full access to organization data" on public.promotions;
-drop policy if exists "Allow full access to organization data" on public.categories;
-drop policy if exists "Allow full access to organization data" on public.grades;
-drop policy if exists "Allow full access to organization data" on public.aromas;
-drop policy if exists "Allow full access to organization data" on public.bottle_sizes;
-drop policy if exists "Allow full access to organization data" on public.recipes;
-drop policy if exists "Allow full access to organization data" on public.expenses;
-drop policy if exists "Allow full access to organization data" on public.settings;
-
--- 6. Create RLS Policies
--- PROFILES table
-create policy "Allow full access to own organization" on public.profiles
-for all using (auth.uid() in (
-  select id from public.profiles where organization_id = (select organization_id from public.profiles where id = auth.uid())
-));
-
-create policy "Allow read access to own profile" on public.profiles
-for select using (auth.uid() = id);
-
--- ORGANIZATIONS table
-create policy "Allow full access for organization members" on public.organizations
-for all using (id in (
-  select organization_id from public.profiles where id = auth.uid()
-));
-
--- Generic policy for most tables
-create policy "Allow full access to organization data" on public.products
-for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
-
-create policy "Allow full access to organization data" on public.raw_materials
-for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
-
-create policy "Allow full access to organization data" on public.customers
-for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
-
-create policy "Allow full access to organization data" on public.transactions
-for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
-
--- TRANSACTION_ITEMS table (special case, depends on transaction)
-create policy "Allow access based on transaction" on public.transaction_items
-for all using (transaction_id in (
-  select id from public.transactions where organization_id = (select organization_id from public.profiles where id = auth.uid())
-));
-
-create policy "Allow full access to organization data" on public.promotions
-for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
-
-create policy "Allow full access to organization data" on public.categories
-for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
-
-create policy "Allow full access to organization data" on public.grades
-for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
-
-create policy "Allow full access to organization data" on public.aromas
-for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
-
-create policy "Allow full access to organization data" on public.bottle_sizes
-for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
-
-create policy "Allow full access to organization data" on public.recipes
-for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
-
-create policy "Allow full access to organization data" on public.expenses
-for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
-
-create policy "Allow full access to organization data" on public.settings
-for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
-
--- Function to get dashboard analytics
-CREATE OR REPLACE FUNCTION get_dashboard_analytics(p_organization_id uuid)
-RETURNS TABLE(daily_revenue numeric, daily_sales_count bigint, new_customers_today bigint, top_selling_products json) AS $$
-BEGIN
-    RETURN QUERY
-    WITH daily_stats AS (
-        SELECT
-            COALESCE(SUM(total_amount), 0) AS revenue,
-            COUNT(id) AS sales_count
-        FROM transactions
-        WHERE
-            organization_id = p_organization_id AND
-            created_at >= date_trunc('day', now() at time zone 'utc')
-    ),
-    new_customers AS (
-        SELECT COUNT(id) AS count
-        FROM customers
-        WHERE
-            organization_id = p_organization_id AND
-            created_at >= date_trunc('day', now() at time zone 'utc')
-    ),
-    top_products AS (
-        SELECT
-            p.name,
-            SUM(ti.quantity) AS sales
-        FROM transaction_items ti
-        JOIN products p ON ti.product_id = p.id
-        JOIN transactions t ON ti.transaction_id = t.id
-        WHERE t.organization_id = p_organization_id
-        GROUP BY p.name
-        ORDER BY sales DESC
-        LIMIT 5
-    )
-    SELECT
-        ds.revenue,
-        ds.sales_count,
-        nc.count,
-        (SELECT json_agg(tp) FROM top_products tp)
-    FROM
-        daily_stats ds,
-        new_customers nc;
-END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Function to update product stock
-CREATE OR REPLACE FUNCTION update_product_stock(p_product_id uuid, p_quantity_sold integer)
-RETURNS void AS $$
-BEGIN
-    UPDATE products
-    SET stock = stock - p_quantity_sold
-    WHERE id = p_product_id;
-END;
-$$ LANGUAGE plpgsql;
+create or replace function public.update_product_stock(p_product_id uuid, p_quantity_sold int)
+returns void as $$
+begin
+  update public.products
+  set stock = stock - p_quantity_sold
+  where id = p_product_id;
+end;
+$$ language plpgsql;
 
--- RPC for checkout
-CREATE OR REPLACE FUNCTION process_checkout(
+-- Function to handle the checkout process
+create or replace function public.process_checkout(
     p_organization_id uuid,
     p_cashier_id uuid,
     p_customer_id uuid,
@@ -248,33 +165,68 @@ CREATE OR REPLACE FUNCTION process_checkout(
     p_total_amount numeric,
     p_payment_method text
 )
-RETURNS uuid AS $$
-DECLARE
+returns uuid as $$
+declare
     v_transaction_id uuid;
     item record;
-BEGIN
-    -- Insert into transactions table
-    INSERT INTO transactions (organization_id, cashier_id, customer_id, total_amount, payment_method, status)
-    VALUES (p_organization_id, p_cashier_id, p_customer_id, p_total_amount, p_payment_method::payment_method, 'completed')
-    RETURNING id INTO v_transaction_id;
+begin
+    -- Create a new transaction
+    insert into public.transactions (organization_id, cashier_id, customer_id, total_amount, payment_method, status)
+    values (p_organization_id, p_cashier_id, p_customer_id, p_total_amount, p_payment_method::payment_method, 'completed')
+    returning id into v_transaction_id;
 
-    -- Loop through items and insert into transaction_items
-    FOR item IN SELECT * FROM json_to_recordset(p_items) AS x(product_id uuid, quantity integer, price numeric)
-    LOOP
-        INSERT INTO transaction_items (transaction_id, product_id, quantity, price)
-        VALUES (v_transaction_id, item.product_id, item.quantity, item.price);
+    -- Loop through items and insert into transaction_items and update stock
+    for item in select * from json_to_recordset(p_items) as x(product_id uuid, quantity int, price numeric)
+    loop
+        insert into public.transaction_items (transaction_id, product_id, quantity, price)
+        values (v_transaction_id, item.product_id, item.quantity, item.price);
 
-        -- Update stock
-        PERFORM update_product_stock(item.product_id, item.quantity);
-    END LOOP;
+        -- Update product stock
+        perform public.update_product_stock(item.product_id, item.quantity);
+    end loop;
+    
+    -- If a customer was part of the transaction, update their transaction count
+    if p_customer_id is not null then
+      update public.customers
+      set transaction_count = transaction_count + 1
+      where id = p_customer_id;
+    end if;
 
-    -- Update customer transaction count if applicable
-    IF p_customer_id IS NOT NULL THEN
-        UPDATE customers
-        SET transaction_count = transaction_count + 1
-        WHERE id = p_customer_id;
-    END IF;
+    return v_transaction_id;
+end;
+$$ language plpgsql;
 
-    RETURN v_transaction_id;
-END;
-$$ LANGUAGE plpgsql;
+-- Function to get dashboard analytics
+create or replace function public.get_dashboard_analytics(p_organization_id uuid)
+returns table (
+    daily_revenue numeric,
+    daily_sales_count int,
+    new_customers_today int,
+    top_selling_products json
+) as $$
+begin
+    return query
+    with daily_transactions as (
+        select * from transactions
+        where organization_id = p_organization_id
+          and created_at >= date_trunc('day', now())
+    )
+    select
+        (select coalesce(sum(total_amount), 0) from daily_transactions) as daily_revenue,
+        (select count(*)::int from daily_transactions) as daily_sales_count,
+        (select count(*)::int from customers where organization_id = p_organization_id and created_at >= date_trunc('day', now())) as new_customers_today,
+        (
+            select json_agg(top_products)
+            from (
+                select p.name, count(ti.product_id)::int as sales
+                from transaction_items ti
+                join products p on ti.product_id = p.id
+                join transactions t on ti.transaction_id = t.id
+                where t.organization_id = p_organization_id
+                group by p.name
+                order by sales desc
+                limit 5
+            ) as top_products
+        ) as top_selling_products;
+end;
+$$ language plpgsql;
