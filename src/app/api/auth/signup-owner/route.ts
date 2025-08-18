@@ -1,10 +1,29 @@
 
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from "next/server";
 import { handleSupabaseError } from '@/lib/utils/error';
-import { supabaseAdmin } from "@/lib/supabase-admin";
+
+// PENTING: Inisialisasi client Supabase dengan service_role key untuk operasi admin.
+// Kunci-kunci ini HANYA boleh digunakan di lingkungan server.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SERVICE_ROLE_KEY_SUPABASE;
 
 
 export async function POST(req: Request) {
+  // Pastikan variabel lingkungan ada
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error('Supabase URL or Service Role Key is missing.');
+    return NextResponse.json({ error: "Konfigurasi server tidak lengkap." }, { status: 500 });
+  }
+
+  // Buat client admin di dalam scope request handler
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
+  
   const { email, password, organization_name } = await req.json();
 
   // --- Langkah 0: Validasi Input & Keunikan Nama Organisasi ---

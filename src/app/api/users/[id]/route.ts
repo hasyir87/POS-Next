@@ -1,12 +1,13 @@
 
-// src/app/api/users/[id]/route.ts
-import { createClient } from '@/utils/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { handleSupabaseError } from '@/lib/utils/error';
-import { supabaseAdmin } from '@/lib/supabase-admin';
 
-async function getPrimaryOwnerId(organizationId: string): Promise<string | null> {
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SERVICE_ROLE_KEY_SUPABASE;
+
+async function getPrimaryOwnerId(supabaseAdmin: any, organizationId: string): Promise<string | null> {
     const { data, error } = await supabaseAdmin
         .from('profiles')
         .select('id')
@@ -25,6 +26,11 @@ async function getPrimaryOwnerId(organizationId: string): Promise<string | null>
 
 // API Route untuk memperbarui detail pengguna (misalnya, peran atau nama)
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
+    if (!supabaseUrl || !serviceRoleKey) {
+        return NextResponse.json({ error: "Konfigurasi server tidak lengkap." }, { status: 500 });
+    }
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+
     const targetUserId = params.id; // ID pengguna yang akan diperbarui
     const { full_name, role } = await req.json(); // Data yang akan diperbarui
 
@@ -72,7 +78,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         }
         
         // Dapatkan ID pemilik utama
-        const primaryOwnerId = await getPrimaryOwnerId(requestingProfile.organization_id);
+        const primaryOwnerId = await getPrimaryOwnerId(supabaseAdmin, requestingProfile.organization_id);
 
         // Mencegah siapapun (kecuali superadmin) mengubah data pemilik utama
         if (targetUserId === primaryOwnerId) {
@@ -110,6 +116,11 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
 // API Route untuk menghapus pengguna
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+    if (!supabaseUrl || !serviceRoleKey) {
+        return NextResponse.json({ error: "Konfigurasi server tidak lengkap." }, { status: 500 });
+    }
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+
     const targetUserId = params.id; // ID pengguna yang akan dihapus
     const cookieStore = cookies();
     const supabase = createClient(cookieStore);
@@ -160,7 +171,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
         }
         
         // Dapatkan ID pemilik utama
-        const primaryOwnerId = await getPrimaryOwnerId(requestingProfile.organization_id);
+        const primaryOwnerId = await getPrimaryOwnerId(supabaseAdmin, requestingProfile.organization_id);
 
         // Mencegah siapapun (termasuk owner lain) menghapus pemilik utama
         if (targetUserId === primaryOwnerId) {
@@ -179,5 +190,3 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     // --- Berhasil ---
     return NextResponse.json({ message: 'User deleted successfully' });
 }
-
-    

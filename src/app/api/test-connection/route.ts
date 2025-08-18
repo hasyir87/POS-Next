@@ -1,8 +1,16 @@
 
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SERVICE_ROLE_KEY_SUPABASE;
 
 export async function GET() {
+  if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json({ error: "Konfigurasi server tidak lengkap." }, { status: 500 });
+  }
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
   try {
     // Test koneksi ke database dengan mengambil data dari tabel profiles
     const { data: profiles, error: profilesError } = await supabaseAdmin
