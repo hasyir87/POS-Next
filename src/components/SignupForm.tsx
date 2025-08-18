@@ -65,7 +65,7 @@ export default function SignupForm() {
         throw new Error(data.error || "Terjadi kesalahan yang tidak terduga.");
       }
 
-      setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke halaman login.");
+      setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke halaman login dalam 2 detik.");
       setTimeout(() => {
         router.push("/");
       }, 2000);
