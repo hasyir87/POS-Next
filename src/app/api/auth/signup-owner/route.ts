@@ -1,15 +1,14 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+
+import { createClient } from '@/utils/supabase/server';
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { handleSupabaseError } from '@/lib/utils/error';
 
 // PENTING: Gunakan service_role key untuk operasi admin
 const getSupabaseAdmin = () => {
-    // Karena route handler ini dipanggil dari client-side, kita perlu cookies()
-    // untuk menginisialisasi client, meskipun kita akan menggunakan service key.
-    return createRouteHandlerClient({ cookies }, {
-      supabaseKey: process.env.SERVICE_ROLE_KEY_SUPABASE
-    });
+    const cookieStore = cookies();
+    // Buat client dengan hak akses service_role
+    return createClient(cookieStore);
 };
 
 

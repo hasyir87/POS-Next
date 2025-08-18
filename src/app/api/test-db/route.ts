@@ -1,11 +1,12 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+
+import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
 
     // Get organization data
     let { data: organizationData, error: organizationError } = await supabase
@@ -110,3 +111,4 @@ export async function GET() {
     );
   }
 }
+
