@@ -24,15 +24,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Profile or organization not found.' }, { status: 404 });
     }
 
+    // Mengambil profil pengguna lain yang terkait dengan organisasi yang sama,
+    // dan juga data organisasi terkait untuk ditampilkan di UI.
     const { data: profiles, error } = await supabase
       .from('profiles')
       .select(`
-        id,
-        email,
-        full_name,
-        avatar_url,
-        organization_id,
-        role
+        *,
+        organizations (*)
       `)
       .eq('organization_id', profile.organization_id);
 
@@ -49,7 +47,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(req: Request) {
-  const { email, password, full_name, role } = await req.json();
+  const { email, password, full_name, role, organization_id } = await req.json();
   
   const cookieStore = cookies();
   const supabase = createClient(cookieStore);
@@ -66,12 +64,13 @@ export async function POST(req: Request) {
       .eq('id', requestingUser.id)
       .single();
 
-    if (profileError || !requestingProfile || !requestingProfile.organization_id) {
+    if (profileError || !requestingProfile) {
       return NextResponse.json({ error: 'Requesting user profile not found.' }, { status: 404 });
     }
     
-    if (requestingProfile.role !== 'owner' && requestingProfile.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden: Only owners or admins can add users.' }, { status: 403 });
+    // Authorization check
+    if (requestingProfile.role !== 'owner' && requestingProfile.role !== 'admin' && requestingProfile.role !== 'superadmin') {
+      return NextResponse.json({ error: 'Forbidden: Only owners, admins, or superadmin can add users.' }, { status: 403 });
     }
 
     const allowedRoles = ['cashier', 'admin'];
@@ -79,6 +78,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Forbidden: Cannot assign role "${role}".` }, { status: 403 });
     }
 
+    // Gunakan service role key untuk membuat user baru di Supabase Auth
     const supabaseAdmin = createClient(cookieStore, {
         auth: {
             autoRefreshToken: false,
@@ -91,7 +91,7 @@ export async function POST(req: Request) {
     const { data: userAuthData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true,
+      email_confirm: true, // Auto-confirm email untuk kemudahan
     });
     
     if (authError) {
@@ -103,6 +103,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Supabase Auth user creation failed.' }, { status: 500 });
     }
 
+    // Tentukan organization_id untuk user baru
+    // Superadmin dapat memilih, sedangkan owner/admin hanya bisa di organisasi mereka sendiri.
+    const newUsersOrgId = requestingProfile.role === 'superadmin' ? organization_id : requestingProfile.organization_id;
+
+    if (!newUsersOrgId) {
+        await supabaseAdmin.auth.admin.deleteUser(userAuthData.user.id); // Rollback
+        return NextResponse.json({ error: 'Organization ID is missing for the new user.'}, { status: 400 });
+    }
+
+
     const { data: newUserProfile, error: insertProfileError } = await supabase
       .from('profiles')
       .insert([
@@ -111,7 +121,7 @@ export async function POST(req: Request) {
           full_name,
           email,
           role,
-          organization_id: requestingProfile.organization_id,
+          organization_id: newUsersOrgId,
         },
       ])
       .select()
@@ -119,6 +129,7 @@ export async function POST(req: Request) {
 
     if (insertProfileError) {
       console.error('Error creating user profile:', insertProfileError);
+      // Rollback: Hapus user dari Auth jika pembuatan profil gagal
       await supabaseAdmin.auth.admin.deleteUser(userAuthData.user.id);
       return NextResponse.json({ error: handleSupabaseError(insertProfileError) }, { status: 500 });
     }

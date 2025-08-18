@@ -312,5 +312,3 @@ export interface Database {
     }
   }
 }
-
-    

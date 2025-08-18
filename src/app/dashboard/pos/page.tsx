@@ -128,7 +128,7 @@ const RefillForm = ({ onAddToCart, grades, aromas, bottleSizes, recipes }: { onA
             <CardContent className="space-y-4">
                  <div className="space-y-2">
                     <Label>1. Pilih Grade</Label>
-                    <Select value={selectedGradeId} onValueChange={setSelectedGradeId}>
+                    <Select value={selectedGradeId} onValueChange={setSelectedGradeId} disabled={grades.length === 0}>
                         <SelectTrigger><SelectValue placeholder="Pilih grade parfum..." /></SelectTrigger>
                         <SelectContent>
                             {grades.map(g => (<SelectItem key={g.id} value={g.id || ''}>{g.name}</SelectItem>))}
@@ -141,9 +141,9 @@ const RefillForm = ({ onAddToCart, grades, aromas, bottleSizes, recipes }: { onA
                 </div>)}
                 {selectedAromaId && (<div className="space-y-2">
                     <Label>3. Pilih Ukuran Botol</Label>
-                    <Select value={selectedBottleSize > 0 ? selectedBottleSize.toString() : ""} onValueChange={(v) => setSelectedBottleSize(Number(v) || 0)}>
+                    <Select value={selectedBottleSize > 0 ? selectedBottleSize.toString() : ""} onValueChange={(v) => setSelectedBottleSize(Number(v) || 0)} disabled={bottleSizes.length === 0}>
                         <SelectTrigger><SelectValue placeholder="Pilih ukuran botol..." /></SelectTrigger>
-                        <SelectContent>{bottleSizes.map(b => (<SelectItem key={b.id} value={b.size?.toString()}>{b.size} {b.unit}</SelectItem>))}</SelectContent>
+                        <SelectContent>{bottleSizes.map(b => (<SelectItem key={b.id} value={b.size?.toString() ?? ''}>{b.size} {b.unit}</SelectItem>))}</SelectContent>
                     </Select>
                 </div>)}
                 {selectedBottleSize > 0 && basePrice > 0 && grade && (
@@ -465,5 +465,3 @@ export default function PosPage() {
         </div>
     );
 }
-
-    

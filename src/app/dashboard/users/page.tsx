@@ -31,6 +31,7 @@ export default function UsersPage() {
     const emptyUser: Partial<UserProfile> = { full_name: '', email: '', role: 'cashier', organization_id: currentProfile?.organization_id || '' };
 
     const fetchUsersAndOrgs = useCallback(async () => {
+        if (!currentProfile) return;
         setIsLoading(true);
         try {
             const usersPromise = fetchWithAuth('/api/users');
@@ -38,10 +39,13 @@ export default function UsersPage() {
 
             const [usersRes, orgsRes] = await Promise.all([usersPromise, orgsPromise]);
 
-            if (!usersRes.ok || !orgsRes.ok) {
-                const userError = usersRes.ok ? null : await usersRes.json();
-                const orgError = orgsRes.ok ? null : await orgsRes.json();
-                throw new Error(userError?.error || orgError?.error || 'Gagal mengambil data');
+            if (!usersRes.ok) {
+                const errorData = await usersRes.json();
+                throw new Error(errorData.error || 'Gagal mengambil data pengguna.');
+            }
+             if (!orgsRes.ok) {
+                const errorData = await orgsRes.json();
+                throw new Error(errorData.error || 'Gagal mengambil data organisasi.');
             }
 
             const usersData = await usersRes.json();
@@ -55,11 +59,14 @@ export default function UsersPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [fetchWithAuth, toast]);
+    }, [fetchWithAuth, toast, currentProfile]);
 
     useEffect(() => {
         if (!authLoading && currentProfile) {
             fetchUsersAndOrgs();
+        }
+         if (!authLoading && !currentProfile) {
+            setIsLoading(false);
         }
     }, [authLoading, currentProfile, fetchUsersAndOrgs]);
 
@@ -69,8 +76,8 @@ export default function UsersPage() {
     };
 
     const handleSaveUser = async () => {
-        if (!editingUser || !editingUser.full_name || !editingUser.email || !editingUser.role || !editingUser.organization_id) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Semua field harus diisi.' });
+        if (!editingUser || !editingUser.full_name || !editingUser.email || !editingUser.role) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Nama, Email, dan Peran harus diisi.' });
             return;
         }
         
@@ -83,9 +90,23 @@ export default function UsersPage() {
 
         const url = editingUser.id ? `/api/users/${editingUser.id}` : '/api/users';
         const method = editingUser.id ? 'PUT' : 'POST';
-        const body = editingUser.id
-            ? { full_name: editingUser.full_name, role: editingUser.role, organization_id: editingUser.organization_id }
-            : { ...editingUser };
+        
+        const body: any = { 
+          full_name: editingUser.full_name, 
+          role: editingUser.role, 
+          email: editingUser.email
+        };
+
+        if (editingUser.id) {
+          // Hanya superadmin yang bisa mengubah organization_id
+          if (currentProfile?.role === 'superadmin' && editingUser.organization_id) {
+            body.organization_id = editingUser.organization_id;
+          }
+        } else {
+          body.password = editingUser.password;
+          // Saat membuat pengguna baru, organization_id diambil dari profil admin yang membuat
+          body.organization_id = currentProfile?.organization_id;
+        }
         
         try {
             const response = await fetchWithAuth(url, {
@@ -109,6 +130,7 @@ export default function UsersPage() {
     const handleDeleteUser = async (userId: string) => {
         if (!confirm('Apakah Anda yakin ingin menghapus pengguna ini? Operasi ini tidak dapat dibatalkan.')) return;
         
+        setIsSubmitting(true);
         try {
             const response = await fetchWithAuth(`/api/users/${userId}`, { method: 'DELETE' });
             if (!response.ok) {
@@ -119,10 +141,12 @@ export default function UsersPage() {
             fetchUsersAndOrgs();
         } catch (error: any) {
              toast({ variant: 'destructive', title: 'Error', description: error.message });
+        } finally {
+            setIsSubmitting(false);
         }
     };
     
-    if (authLoading || isLoading) {
+    if (authLoading) {
         return <div className="p-6 flex justify-center items-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
     }
 
@@ -132,7 +156,7 @@ export default function UsersPage() {
                 <h1 className="font-headline text-3xl font-bold flex items-center gap-2"><Users className="h-8 w-8" /> Manajemen Pengguna</h1>
                 <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button onClick={() => handleOpenDialog()} disabled={!currentProfile}>
+                        <Button onClick={() => handleOpenDialog()} disabled={!currentProfile || (currentProfile?.role !== 'owner' && currentProfile?.role !== 'admin' && currentProfile?.role !== 'superadmin')}>
                             <PlusCircle className="mr-2 h-4 w-4" /> Tambah Pengguna
                         </Button>
                     </DialogTrigger>
@@ -208,11 +232,13 @@ export default function UsersPage() {
                             <TableBody>
                                 {isLoading ? (
                                     <TableRow><TableCell colSpan={5} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                                ) : users.length === 0 ? (
+                                     <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Tidak ada pengguna untuk ditampilkan.</TableCell></TableRow>
                                 ) : users.map((user) => (
                                     <TableRow key={user.id}>
                                         <TableCell className="font-medium">{user.full_name || 'N/A'}</TableCell>
                                         <TableCell>{user.email}</TableCell>
-                                        <TableCell>{(user.organizations as Organization)?.name || organizations.find(o => o.id === user.organization_id)?.name || 'N/A'}</TableCell>
+                                        <TableCell>{user.organizations?.name || 'N/A'}</TableCell>
                                         <TableCell className="text-center">
                                             <Badge variant="secondary">{user.role}</Badge>
                                         </TableCell>
