@@ -1,232 +1,168 @@
+-- Fungsi untuk menjalankan SQL secara dinamis
+DROP FUNCTION IF EXISTS exec_sql(text);
+CREATE OR REPLACE FUNCTION exec_sql(sql text)
+RETURNS void AS $$
+BEGIN
+  EXECUTE sql;
+END;
+$$ LANGUAGE plpgsql;
 
--- Helper function to execute raw SQL
--- This is more robust than trying to parse SQL in a Node.js script.
-create or replace function exec_sql(sql text)
-returns void
-language plpgsql
-as $$
-begin
-    execute sql;
-end;
-$$;
+-- Hapus trigger dan fungsi lama jika ada (dengan CASCADE)
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
+
+-- Buat fungsi baru untuk menangani pengguna baru
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Fungsi ini sekarang hanya sebagai placeholder atau untuk logika masa depan
+  -- Logika utama pembuatan profil dipindahkan ke fungsi signup_owner
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Buat trigger untuk menjalankan fungsi handle_new_user
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Fungsi untuk mendapatkan ID organisasi pengguna
+DROP FUNCTION IF EXISTS public.get_my_organization_id() CASCADE;
+CREATE OR REPLACE FUNCTION public.get_my_organization_id()
+RETURNS uuid AS $$
+DECLARE
+    org_id uuid;
+BEGIN
+    SELECT organization_id INTO org_id FROM public.profiles WHERE id = auth.uid();
+    RETURN org_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
--- Enable Row Level Security
-alter table profiles enable row level security;
-alter table organizations enable row level security;
-alter table products enable row level security;
-alter table customers enable row level security;
-alter table transactions enable row level security;
-alter table transaction_items enable row level security;
-alter table promotions enable row level security;
-alter table categories enable row level security;
-alter table grades enable row level security;
-alter table aromas enable row level security;
-alter table bottle_sizes enable row level security;
-alter table recipes enable row level security;
-alter table expenses enable row level security;
-alter table settings enable row level security;
-alter table raw_materials enable row level security;
+-- Fungsi utama untuk signup owner (Idempotent dan Aman)
+DROP FUNCTION IF EXISTS public.signup_owner(text, text, text, text);
+CREATE OR REPLACE FUNCTION public.signup_owner(
+  p_email text,
+  p_password text,
+  p_full_name text,
+  p_organization_name text
+) RETURNS void AS $$
+DECLARE
+  new_user_id uuid;
+  new_organization_id uuid;
+BEGIN
+  -- 1. Validasi duplikasi email
+  IF EXISTS (SELECT 1 FROM auth.users WHERE email = p_email) THEN
+    RAISE EXCEPTION 'user_exists';
+  END IF;
 
--- Drop existing policies and triggers if they exist, to make the script idempotent
-drop policy if exists "Profiles are viewable by users who created them." on profiles;
-drop policy if exists "Users can insert their own profile." on profiles;
-drop policy if exists "Users can update their own profile." on profiles;
-drop policy if exists "Organizations are viewable by users who are members of them." on organizations;
-drop policy if exists "Owners can update their own organization." on organizations;
-drop policy if exists "Users can view data for their own organization" on products;
-drop policy if exists "Users can manage data for their own organization" on products;
+  -- 2. Validasi duplikasi nama organisasi
+  IF EXISTS (SELECT 1 FROM public.organizations WHERE name = p_organization_name) THEN
+    RAISE EXCEPTION 'org_exists';
+  END IF;
 
--- Create policies for profiles
-create policy "Profiles are viewable by users who created them." on profiles for select using (auth.uid() = id);
-create policy "Users can insert their own profile." on profiles for insert with check (auth.uid() = id);
-create policy "Users can update their own profile." on profiles for update using (auth.uid() = id);
+  -- 3. Buat pengguna baru di auth.users
+  new_user_id := auth.uid(p_email, p_password);
 
--- Create policies for organizations
-create policy "Organizations are viewable by users who are members of them." on organizations for select using (
-  id in (
-    select organization_id from profiles where profiles.id = auth.uid()
-  )
-);
-create policy "Owners can update their own organization." on organizations for update using (
-  id in (
-    select organization_id from profiles where profiles.id = auth.uid() and role = 'owner'
-  )
-);
+  -- 4. Buat organisasi baru
+  INSERT INTO public.organizations (name)
+  VALUES (p_organization_name)
+  RETURNING id INTO new_organization_id;
 
--- Generic policies for organization data
-create policy "Users can view data for their own organization" on products for select using (organization_id in (select organization_id from profiles where id = auth.uid()));
-create policy "Users can manage data for their own organization" on products for insert with check (organization_id in (select organization_id from profiles where id = auth.uid()));
-create policy "Users can manage data for their own organization" on products for update using (organization_id in (select organization_id from profiles where id = auth.uid()));
-create policy "Users can manage data for their own organization" on products for delete using (organization_id in (select organization_id from profiles where id = auth.uid()));
+  -- 5. Buat profil untuk pengguna baru
+  INSERT INTO public.profiles (id, email, full_name, role, organization_id)
+  VALUES (new_user_id, p_email, p_full_name, 'owner', new_organization_id);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Apply the same generic policies to all other organization-specific tables
--- You can expand this to other tables as needed by uncommenting and adjusting
--- Note: Re-using policy names on different tables is fine.
-create policy "Users can view data for their own organization" on customers for select using (organization_id in (select organization_id from profiles where id = auth.uid()));
-create policy "Users can manage data for their own organization" on customers for insert with check (organization_id in (select organization_id from profiles where id = auth.uid()));
 
-create policy "Users can view data for their own organization" on transactions for select using (organization_id in (select organization_id from profiles where id = auth.uid()));
-create policy "Users can manage data for their own organization" on transactions for insert with check (organization_id in (select organization_id from profiles where id = auth.uid()));
+-- Aktifkan RLS untuk semua tabel
+ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.raw_materials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.transaction_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.promotions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.grades ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.aromas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bottle_sizes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.recipes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 
-create policy "Users can view data for their own organization" on promotions for select using (organization_id in (select organization_id from profiles where id = auth.uid()));
-create policy "Users can manage data for their own organization" on promotions for insert with check (organization_id in (select organization_id from profiles where id = auth.uid()));
+-- Hapus kebijakan lama jika ada sebelum membuat yang baru
+DROP POLICY IF EXISTS "Public access for all" ON public.organizations;
+DROP POLICY IF EXISTS "Users can manage data for their own organization" ON public.organizations;
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Admins can manage profiles in their organization" ON public.profiles;
+DROP POLICY IF EXISTS "Users can manage data for their own organization" ON public.products;
+DROP POLICY IF EXISTS "Users can manage data for their own organization" ON public.raw_materials;
+DROP POLICY IF EXISTS "Users can manage data for their own organization" ON public.customers;
+DROP POLICY IF EXISTS "Users can manage data for their own organization" ON public.transactions;
+DROP POLICY IF EXISTS "Users can manage data for their own organization" ON public.transaction_items;
+DROP POLICY IF EXISTS "Users can manage data for their own organization" ON public.promotions;
+DROP POLICY IF EXISTS "Users can manage data for their own organization" ON public.categories;
+DROP POLICY IF EXISTS "Users can manage data for their own organization" ON public.grades;
+DROP POLICY IF EXISTS "Users can manage data for their own organization" ON public.aromas;
+DROP POLICY IF EXISTS "Users can manage data for their own organization" ON public.bottle_sizes;
+DROP POLICY IF EXISTS "Users can manage data for their own organization" ON public.recipes;
+DROP POLICY IF EXISTS "Users can manage data for their own organization" ON public.expenses;
+DROP POLICY IF EXISTS "Users can manage data for their own organization" ON public.settings;
 
--- Add more policies for other tables here...
-create policy "Users can view data for their own organization" on raw_materials for select using (organization_id in (select organization_id from profiles where id = auth.uid()));
-create policy "Users can manage data for their own organization" on raw_materials for insert with check (organization_id in (select organization_id from profiles where id = auth.uid()));
-create policy "Users can manage data for their own organization" on raw_materials for update using (organization_id in (select organization_id from profiles where id = auth.uid()));
-create policy "Users can manage data for their own organization" on raw_materials for delete using (organization_id in (select organization_id from profiles where id = auth.uid()));
 
--- Function and Trigger to create a profile when a new user signs up
-drop trigger if exists on_auth_user_created on auth.users;
-drop function if exists public.handle_new_user;
+-- Kebijakan RLS
+-- Organizations: Pengguna dapat melihat data organisasi mereka sendiri
+CREATE POLICY "Users can manage data for their own organization" ON public.organizations FOR ALL
+USING (id = public.get_my_organization_id() OR parent_organization_id = public.get_my_organization_id())
+WITH CHECK (id = public.get_my_organization_id() OR parent_organization_id = public.get_my_organization_id());
 
-create function public.handle_new_user()
-returns trigger
-language plpgsql
-security definer set search_path = public
-as $$
-begin
-  insert into public.profiles (id, email, full_name, role)
-  values (new.id, new.email, new.raw_user_meta_data->>'full_name', 'owner');
-  return new;
-end;
-$$;
+-- Profiles: Pengguna dapat melihat dan mengedit profil mereka sendiri
+CREATE POLICY "Users can view their own profile" ON public.profiles FOR SELECT
+USING (auth.uid() = id);
 
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
+-- Profiles: Admin dapat mengelola profil dalam organisasi mereka
+CREATE POLICY "Admins can manage profiles in their organization" ON public.profiles FOR ALL
+USING (get_my_organization_id() = organization_id);
 
--- RPC Function for Owner Signup
-drop function if exists public.signup_owner;
+-- Kebijakan umum untuk tabel data lainnya
+CREATE POLICY "Users can manage data for their own organization" ON public.products FOR ALL
+USING (public.get_my_organization_id() = organization_id);
 
-create function public.signup_owner(
-    p_email text,
-    p_password text,
-    p_full_name text,
-    p_organization_name text
-)
-returns void
-language plpgsql
-security definer set search_path = public
-as $$
-declare
-    new_user_id uuid;
-    new_organization_id uuid;
-begin
-    -- Check if organization name already exists
-    if exists (select 1 from organizations where name = p_organization_name) then
-        raise exception 'org_exists';
-    end if;
+CREATE POLICY "Users can manage data for their own organization" ON public.raw_materials FOR ALL
+USING (public.get_my_organization_id() = organization_id);
 
-    -- Create the user in auth.users
-    new_user_id := auth.uid();
+CREATE POLICY "Users can manage data for their own organization" ON public.customers FOR ALL
+USING (public.get_my_organization_id() = organization_id);
 
-    -- Create the organization
-    insert into public.organizations (name)
-    values (p_organization_name)
-    returning id into new_organization_id;
+CREATE POLICY "Users can manage data for their own organization" ON public.transactions FOR ALL
+USING (public.get_my_organization_id() = organization_id);
 
-    -- Update the user's profile with the new organization ID
-    -- The handle_new_user trigger has already created a basic profile.
-    update public.profiles
-    set organization_id = new_organization_id,
-        full_name = p_full_name, -- Ensure full_name is set here
-        role = 'owner'
-    where id = new_user_id;
+CREATE POLICY "Users can manage data for their own organization" ON public.transaction_items FOR ALL
+USING (EXISTS (SELECT 1 FROM transactions WHERE id = transaction_id AND organization_id = public.get_my_organization_id()));
 
-exception
-    when unique_violation then
-        -- This will catch if the email already exists from auth.users
-        raise exception 'user_exists';
-    when others then
-        -- If any other error occurs, re-raise it
-        raise;
-end;
-$$;
+CREATE POLICY "Users can manage data for their own organization" ON public.promotions FOR ALL
+USING (public.get_my_organization_id() = organization_id);
 
--- Function to update product stock
-create or replace function public.update_product_stock(p_product_id uuid, p_quantity_sold int)
-returns void as $$
-begin
-  update public.products
-  set stock = stock - p_quantity_sold
-  where id = p_product_id;
-end;
-$$ language plpgsql;
+CREATE POLICY "Users can manage data for their own organization" ON public.categories FOR ALL
+USING (public.get_my_organization_id() = organization_id);
 
--- Function to handle the checkout process
-create or replace function public.process_checkout(
-    p_organization_id uuid,
-    p_cashier_id uuid,
-    p_customer_id uuid,
-    p_items json,
-    p_total_amount numeric,
-    p_payment_method text
-)
-returns uuid as $$
-declare
-    v_transaction_id uuid;
-    item record;
-begin
-    -- Create a new transaction
-    insert into public.transactions (organization_id, cashier_id, customer_id, total_amount, payment_method, status)
-    values (p_organization_id, p_cashier_id, p_customer_id, p_total_amount, p_payment_method::payment_method, 'completed')
-    returning id into v_transaction_id;
+CREATE POLICY "Users can manage data for their own organization" ON public.grades FOR ALL
+USING (public.get_my_organization_id() = organization_id);
 
-    -- Loop through items and insert into transaction_items and update stock
-    for item in select * from json_to_recordset(p_items) as x(product_id uuid, quantity int, price numeric)
-    loop
-        insert into public.transaction_items (transaction_id, product_id, quantity, price)
-        values (v_transaction_id, item.product_id, item.quantity, item.price);
+CREATE POLICY "Users can manage data for their own organization" ON public.aromas FOR ALL
+USING (public.get_my_organization_id() = organization_id);
 
-        -- Update product stock
-        perform public.update_product_stock(item.product_id, item.quantity);
-    end loop;
-    
-    -- If a customer was part of the transaction, update their transaction count
-    if p_customer_id is not null then
-      update public.customers
-      set transaction_count = transaction_count + 1
-      where id = p_customer_id;
-    end if;
+CREATE POLICY "Users can manage data for their own organization" ON public.bottle_sizes FOR ALL
+USING (public.get_my_organization_id() = organization_id);
 
-    return v_transaction_id;
-end;
-$$ language plpgsql;
+CREATE POLICY "Users can manage data for their own organization" ON public.recipes FOR ALL
+USING (public.get_my_organization_id() = organization_id);
 
--- Function to get dashboard analytics
-create or replace function public.get_dashboard_analytics(p_organization_id uuid)
-returns table (
-    daily_revenue numeric,
-    daily_sales_count int,
-    new_customers_today int,
-    top_selling_products json
-) as $$
-begin
-    return query
-    with daily_transactions as (
-        select * from transactions
-        where organization_id = p_organization_id
-          and created_at >= date_trunc('day', now())
-    )
-    select
-        (select coalesce(sum(total_amount), 0) from daily_transactions) as daily_revenue,
-        (select count(*)::int from daily_transactions) as daily_sales_count,
-        (select count(*)::int from customers where organization_id = p_organization_id and created_at >= date_trunc('day', now())) as new_customers_today,
-        (
-            select json_agg(top_products)
-            from (
-                select p.name, count(ti.product_id)::int as sales
-                from transaction_items ti
-                join products p on ti.product_id = p.id
-                join transactions t on ti.transaction_id = t.id
-                where t.organization_id = p_organization_id
-                group by p.name
-                order by sales desc
-                limit 5
-            ) as top_products
-        ) as top_selling_products;
-end;
-$$ language plpgsql;
+CREATE POLICY "Users can manage data for their own organization" ON public.expenses FOR ALL
+USING (public.get_my_organization_id() = organization_id);
+
+CREATE POLICY "Users can manage data for their own organization" ON public.settings FOR ALL
+USING (public.get_my_organization_id() = organization_id);
