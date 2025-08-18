@@ -17,6 +17,7 @@ import { AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 const formSchema = z.object({
+  fullName: z.string().min(3, { message: "Nama lengkap minimal 3 karakter." }),
   organizationName: z.string().min(3, { message: "Nama organisasi minimal 3 karakter." }),
   email: z.string().email({ message: "Harap masukkan email yang valid." }),
   password: z.string().min(8, { message: "Password minimal 8 karakter." }),
@@ -36,6 +37,7 @@ export default function SignupForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      fullName: "",
       organizationName: "",
       email: "",
       password: "",
@@ -56,6 +58,7 @@ export default function SignupForm() {
           email: values.email,
           password: values.password,
           organization_name: values.organizationName,
+          full_name: values.fullName,
         }),
       });
 
@@ -65,10 +68,10 @@ export default function SignupForm() {
         throw new Error(data.error || "Terjadi kesalahan yang tidak terduga.");
       }
 
-      setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke halaman login dalam 2 detik.");
+      setSuccess("Pendaftaran berhasil! Silakan cek email Anda untuk verifikasi dan kemudian login.");
       setTimeout(() => {
         router.push("/");
-      }, 2000);
+      }, 4000);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -102,12 +105,25 @@ export default function SignupForm() {
                 )}
               <FormField
                 control={form.control}
+                name="fullName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nama Lengkap Anda</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Contoh: John Doe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
                 name="organizationName"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Nama Organisasi/Toko</FormLabel>
                     <FormControl>
-                      <Input placeholder="Contoh: ScentPOS" {...field} />
+                      <Input placeholder="Contoh: ScentPRO" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

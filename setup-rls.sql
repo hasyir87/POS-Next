@@ -1,345 +1,274 @@
 
--- Ekstensi untuk UUID
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Helper function to execute arbitrary SQL
+create or replace function exec_sql(sql text) returns void as $$
+begin
+  execute sql;
+end;
+$$ language plpgsql;
 
--- Fungsi untuk mengeksekusi SQL dinamis (hanya untuk superadmin)
-CREATE OR REPLACE FUNCTION exec_sql(sql TEXT) RETURNS VOID AS $$
+-- 1. Create a function to handle new user creation and profile setup
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  organization_id uuid;
+  user_role public.user_role;
+begin
+  -- Extract role and organization_name from metadata, if they exist
+  user_role := (new.raw_user_meta_data->>'role')::public.user_role;
+  
+  -- If the user is an owner, create a new organization for them
+  if user_role = 'owner' then
+    insert into public.organizations (name)
+    values (new.raw_user_meta_data->>'organization_name')
+    returning id into organization_id;
+  else
+    -- For other roles, the organization_id must be provided
+    organization_id := (new.raw_user_meta_data->>'organization_id')::uuid;
+  end if;
+  
+  -- Create a profile for the new user
+  insert into public.profiles (id, full_name, email, role, organization_id)
+  values (
+    new.id,
+    new.raw_user_meta_data->>'full_name',
+    new.email,
+    user_role,
+    organization_id
+  );
+  return new;
+end;
+$$;
+
+
+-- 2. Create a trigger to call the function when a new user is created
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+
+-- 3. Create a secure RPC function for owner signup
+create or replace function public.signup_owner(
+    email text,
+    password text,
+    full_name text,
+    organization_name text
+)
+returns void as $$
+declare
+  user_id uuid;
+begin
+    -- Check if organization name already exists
+    if exists (select 1 from public.organizations where name = organization_name) then
+        raise exception 'org_exists';
+    end if;
+
+    -- Check if email already exists
+    if exists (select 1 from auth.users where raw_user_meta_data->>'email' = email) then
+        raise exception 'user_exists';
+    end if;
+
+    -- Create user in auth.users
+    select auth.uid() into user_id from auth.users where id = auth.uid();
+    
+    insert into auth.users (id, email, encrypted_password, raw_user_meta_data, role, instance_id, aud)
+    values (
+      user_id,
+      email,
+      crypt(password, gen_salt('bf')),
+      json_build_object(
+        'full_name', full_name,
+        'organization_name', organization_name,
+        'role', 'owner'
+      ),
+      'authenticated',
+      '00000000-0000-0000-0000-000000000000',
+      'authenticated'
+    );
+end;
+$$ language plpgsql security definer;
+
+
+-- 4. Enable RLS on all relevant tables
+alter table public.profiles enable row level security;
+alter table public.organizations enable row level security;
+alter table public.products enable row level security;
+alter table public.raw_materials enable row level security;
+alter table public.customers enable row level security;
+alter table public.transactions enable row level security;
+alter table public.transaction_items enable row level security;
+alter table public.promotions enable row level security;
+alter table public.categories enable row level security;
+alter table public.grades enable row level security;
+alter table public.aromas enable row level security;
+alter table public.bottle_sizes enable row level security;
+alter table public.recipes enable row level security;
+alter table public.expenses enable row level security;
+alter table public.settings enable row level security;
+
+-- 5. Drop existing policies to start fresh
+drop policy if exists "Allow full access to own organization" on public.profiles;
+drop policy if exists "Allow read access to own profile" on public.profiles;
+drop policy if exists "Allow full access for organization members" on public.organizations;
+drop policy if exists "Allow full access to organization data" on public.products;
+drop policy if exists "Allow full access to organization data" on public.raw_materials;
+drop policy if exists "Allow full access to organization data" on public.customers;
+drop policy if exists "Allow full access to organization data" on public.transactions;
+drop policy if exists "Allow access based on transaction" on public.transaction_items;
+drop policy if exists "Allow full access to organization data" on public.promotions;
+drop policy if exists "Allow full access to organization data" on public.categories;
+drop policy if exists "Allow full access to organization data" on public.grades;
+drop policy if exists "Allow full access to organization data" on public.aromas;
+drop policy if exists "Allow full access to organization data" on public.bottle_sizes;
+drop policy if exists "Allow full access to organization data" on public.recipes;
+drop policy if exists "Allow full access to organization data" on public.expenses;
+drop policy if exists "Allow full access to organization data" on public.settings;
+
+-- 6. Create RLS Policies
+-- PROFILES table
+create policy "Allow full access to own organization" on public.profiles
+for all using (auth.uid() in (
+  select id from public.profiles where organization_id = (select organization_id from public.profiles where id = auth.uid())
+));
+
+create policy "Allow read access to own profile" on public.profiles
+for select using (auth.uid() = id);
+
+-- ORGANIZATIONS table
+create policy "Allow full access for organization members" on public.organizations
+for all using (id in (
+  select organization_id from public.profiles where id = auth.uid()
+));
+
+-- Generic policy for most tables
+create policy "Allow full access to organization data" on public.products
+for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
+
+create policy "Allow full access to organization data" on public.raw_materials
+for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
+
+create policy "Allow full access to organization data" on public.customers
+for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
+
+create policy "Allow full access to organization data" on public.transactions
+for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
+
+-- TRANSACTION_ITEMS table (special case, depends on transaction)
+create policy "Allow access based on transaction" on public.transaction_items
+for all using (transaction_id in (
+  select id from public.transactions where organization_id = (select organization_id from public.profiles where id = auth.uid())
+));
+
+create policy "Allow full access to organization data" on public.promotions
+for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
+
+create policy "Allow full access to organization data" on public.categories
+for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
+
+create policy "Allow full access to organization data" on public.grades
+for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
+
+create policy "Allow full access to organization data" on public.aromas
+for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
+
+create policy "Allow full access to organization data" on public.bottle_sizes
+for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
+
+create policy "Allow full access to organization data" on public.recipes
+for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
+
+create policy "Allow full access to organization data" on public.expenses
+for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
+
+create policy "Allow full access to organization data" on public.settings
+for all using (organization_id = (select organization_id from public.profiles where id = auth.uid()));
+
+-- Function to get dashboard analytics
+CREATE OR REPLACE FUNCTION get_dashboard_analytics(p_organization_id uuid)
+RETURNS TABLE(daily_revenue numeric, daily_sales_count bigint, new_customers_today bigint, top_selling_products json) AS $$
 BEGIN
-    IF (
-        SELECT rolsuper
-        FROM pg_roles
-        WHERE rolname = current_user
-    ) THEN
-        EXECUTE sql;
-    ELSE
-        RAISE EXCEPTION 'Hanya superuser yang dapat menjalankan perintah ini';
-    END IF;
+    RETURN QUERY
+    WITH daily_stats AS (
+        SELECT
+            COALESCE(SUM(total_amount), 0) AS revenue,
+            COUNT(id) AS sales_count
+        FROM transactions
+        WHERE
+            organization_id = p_organization_id AND
+            created_at >= date_trunc('day', now() at time zone 'utc')
+    ),
+    new_customers AS (
+        SELECT COUNT(id) AS count
+        FROM customers
+        WHERE
+            organization_id = p_organization_id AND
+            created_at >= date_trunc('day', now() at time zone 'utc')
+    ),
+    top_products AS (
+        SELECT
+            p.name,
+            SUM(ti.quantity) AS sales
+        FROM transaction_items ti
+        JOIN products p ON ti.product_id = p.id
+        JOIN transactions t ON ti.transaction_id = t.id
+        WHERE t.organization_id = p_organization_id
+        GROUP BY p.name
+        ORDER BY sales DESC
+        LIMIT 5
+    )
+    SELECT
+        ds.revenue,
+        ds.sales_count,
+        nc.count,
+        (SELECT json_agg(tp) FROM top_products tp)
+    FROM
+        daily_stats ds,
+        new_customers nc;
 END;
 $$ LANGUAGE plpgsql;
 
--- Hapus trigger dan fungsi lama jika ada
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-DROP FUNCTION IF EXISTS public.handle_new_user;
-
--- Fungsi untuk mendapatkan peran pengguna dari custom claims di token JWT
-CREATE OR REPLACE FUNCTION get_user_role(p_user_id UUID)
-RETURNS TEXT AS $$
-DECLARE
-    v_role TEXT;
+-- Function to update product stock
+CREATE OR REPLACE FUNCTION update_product_stock(p_product_id uuid, p_quantity_sold integer)
+RETURNS void AS $$
 BEGIN
-    SELECT raw_app_meta_data->>'role'
-    INTO v_role
-    FROM auth.users
-    WHERE id = p_user_id;
-    RETURN v_role;
-EXCEPTION
-    WHEN OTHERS THEN
-        RETURN NULL; -- Mengembalikan NULL jika terjadi error
+    UPDATE products
+    SET stock = stock - p_quantity_sold
+    WHERE id = p_product_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
 
-
---
--- ORGANIZATIONS RLS
---
--- 1. Aktifkan RLS
-ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
--- 2. Owner & Admin bisa melihat semua data organisasi di dalam hierarki mereka (induk & semua outletnya)
-DROP POLICY IF EXISTS "Organizations are viewable by owner and admin" ON organizations;
-CREATE POLICY "Organizations are viewable by owner and admin" ON organizations
-  FOR SELECT USING (
-    id IN (
-        WITH RECURSIVE org_hierarchy AS (
-            SELECT o.id
-            FROM organizations o
-            JOIN profiles p ON o.id = p.organization_id
-            WHERE p.id = auth.uid()
-            
-            UNION
-            
-            SELECT o.id
-            FROM organizations o
-            JOIN org_hierarchy oh ON o.parent_organization_id = oh.id
-        )
-        SELECT id FROM org_hierarchy
-    )
-  );
-
--- 3. Owner & Superadmin bisa membuat organisasi
-DROP POLICY IF EXISTS "Owners and Superadmins can create organizations" ON organizations;
-CREATE POLICY "Owners and Superadmins can create organizations" ON organizations
-  FOR INSERT WITH CHECK (
-    get_user_role(auth.uid()) IN ('owner', 'superadmin')
-  );
-
--- 4. Owner & Superadmin bisa mengupdate organisasi mereka
-DROP POLICY IF EXISTS "Owners and Superadmins can update their organizations" ON organizations;
-CREATE POLICY "Owners and Superadmins can update their organizations" ON organizations
-  FOR UPDATE USING (
-    get_user_role(auth.uid()) IN ('owner', 'superadmin')
-  );
-
-
---
--- PROFILES RLS
---
--- 1. Aktifkan RLS
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-
--- 2. Pengguna bisa melihat profil mereka sendiri
-DROP POLICY IF EXISTS "Users can view their own profile" ON profiles;
-CREATE POLICY "Users can view their own profile" ON profiles
-  FOR SELECT USING (auth.uid() = id);
-
--- 3. Superadmin bisa melihat semua profil
-DROP POLICY IF EXISTS "Superadmins can view all profiles" ON profiles;
-CREATE POLICY "Superadmins can view all profiles" ON profiles
-  FOR SELECT USING (get_user_role(auth.uid()) = 'superadmin');
-
--- 4. Pengguna bisa memperbarui profil mereka sendiri
-DROP POLICY IF EXISTS "Users can update their own profile" ON profiles;
-CREATE POLICY "Users can update their own profile" ON profiles
-  FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
-
--- 5. Admin dan Owner bisa melihat profil di organisasi mereka
-DROP POLICY IF EXISTS "Admins and Owners can view profiles in their organization" ON profiles;
-CREATE POLICY "Admins and Owners can view profiles in their organization" ON profiles
-    FOR SELECT USING (
-        get_user_role(auth.uid()) IN ('admin', 'owner') AND
-        organization_id IN (
-             SELECT org.id FROM organizations org JOIN profiles p ON org.id = p.organization_id WHERE p.id = auth.uid()
-        )
-    );
-
--- 6. Owner dan admin bisa memperbarui profil di organisasi mereka (kecuali owner lain)
-DROP POLICY IF EXISTS "Owners/Admins can update profiles in their organization" ON profiles;
-CREATE POLICY "Owners/Admins can update profiles in their organization" ON profiles
-  FOR UPDATE USING (
-    get_user_role(auth.uid()) IN ('owner', 'admin') AND
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    ) AND
-    (SELECT role FROM profiles WHERE id = profiles.id) <> 'owner'
-  )
-  WITH CHECK (
-    get_user_role(auth.uid()) IN ('owner', 'admin') AND
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  );
-
---
--- RLS untuk semua tabel data lainnya
---
-ALTER TABLE products ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Product policy" ON products;
-CREATE POLICY "Product policy" ON products
-  USING (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  )
-  WITH CHECK (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  );
-
-ALTER TABLE raw_materials ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Raw material policy" ON raw_materials;
-CREATE POLICY "Raw material policy" ON raw_materials
-  USING (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  )
-  WITH CHECK (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  );
-
-ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Customer policy" ON customers;
-CREATE POLICY "Customer policy" ON customers
-  USING (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  )
-  WITH CHECK (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  );
-  
-ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Transaction policy" ON transactions;
-CREATE POLICY "Transaction policy" ON transactions
-  USING (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  )
-  WITH CHECK (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  );
-  
-ALTER TABLE transaction_items ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Transaction item policy" ON transaction_items;
-CREATE POLICY "Transaction item policy" ON transaction_items
-  USING (
-    (SELECT organization_id FROM transactions t WHERE t.id = transaction_id) IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  );
-
-ALTER TABLE promotions ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Promotion policy" ON promotions;
-CREATE POLICY "Promotion policy" ON promotions
-  USING (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  )
-  WITH CHECK (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  );
-
-ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Category policy" ON categories;
-CREATE POLICY "Category policy" ON categories
-  USING (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  )
-  WITH CHECK (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  );
-
-ALTER TABLE grades ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Grade policy" ON grades;
-CREATE POLICY "Grade policy" ON grades
-  USING (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  )
-  WITH CHECK (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  );
-
-ALTER TABLE aromas ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Aroma policy" ON aromas;
-CREATE POLICY "Aroma policy" ON aromas
-  USING (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  )
-  WITH CHECK (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  );
-
-ALTER TABLE bottle_sizes ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Bottle size policy" ON bottle_sizes;
-CREATE POLICY "Bottle size policy" ON bottle_sizes
-  USING (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  )
-  WITH CHECK (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  );
-
-ALTER TABLE recipes ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Recipe policy" ON recipes;
-CREATE POLICY "Recipe policy" ON recipes
-  USING (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  )
-  WITH CHECK (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  );
-
-ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Expense policy" ON expenses;
-CREATE POLICY "Expense policy" ON expenses
-  USING (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  )
-  WITH CHECK (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  );
-
-ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Settings policy" ON settings;
-CREATE POLICY "Settings policy" ON settings
-  USING (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  )
-  WITH CHECK (
-    organization_id IN (
-        SELECT p.organization_id FROM profiles p WHERE p.id = auth.uid()
-    )
-  );
-  
--- Fungsi RPC untuk menangani checkout
+-- RPC for checkout
 CREATE OR REPLACE FUNCTION process_checkout(
-    p_organization_id UUID,
-    p_cashier_id UUID,
-    p_customer_id UUID,
-    p_items JSONB,
-    p_total_amount NUMERIC,
-    p_payment_method TEXT
+    p_organization_id uuid,
+    p_cashier_id uuid,
+    p_customer_id uuid,
+    p_items json,
+    p_total_amount numeric,
+    p_payment_method text
 )
-RETURNS UUID AS $$
+RETURNS uuid AS $$
 DECLARE
-    v_transaction_id UUID;
-    item RECORD;
+    v_transaction_id uuid;
+    item record;
 BEGIN
-    -- 1. Buat record transaksi baru
-    INSERT INTO transactions(organization_id, cashier_id, customer_id, total_amount, payment_method, status)
+    -- Insert into transactions table
+    INSERT INTO transactions (organization_id, cashier_id, customer_id, total_amount, payment_method, status)
     VALUES (p_organization_id, p_cashier_id, p_customer_id, p_total_amount, p_payment_method::payment_method, 'completed')
     RETURNING id INTO v_transaction_id;
 
-    -- 2. Loop melalui item dan masukkan ke transaction_items
-    FOR item IN SELECT * FROM jsonb_to_recordset(p_items) AS x(product_id UUID, quantity INT, price NUMERIC)
+    -- Loop through items and insert into transaction_items
+    FOR item IN SELECT * FROM json_to_recordset(p_items) AS x(product_id uuid, quantity integer, price numeric)
     LOOP
-        INSERT INTO transaction_items(transaction_id, product_id, quantity, price)
+        INSERT INTO transaction_items (transaction_id, product_id, quantity, price)
         VALUES (v_transaction_id, item.product_id, item.quantity, item.price);
 
-        -- 3. Kurangi stok produk
-        UPDATE products
-        SET stock = stock - item.quantity
-        WHERE id = item.product_id;
+        -- Update stock
+        PERFORM update_product_stock(item.product_id, item.quantity);
     END LOOP;
-    
-    -- 4. Update transaction count untuk customer jika ada
+
+    -- Update customer transaction count if applicable
     IF p_customer_id IS NOT NULL THEN
         UPDATE customers
         SET transaction_count = transaction_count + 1
@@ -348,19 +277,4 @@ BEGIN
 
     RETURN v_transaction_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-
--- Fungsi untuk memperbarui stok produk (contoh, bisa dipanggil dari tempat lain)
-CREATE OR REPLACE FUNCTION update_product_stock(p_product_id UUID, p_quantity_sold INT)
-RETURNS VOID AS $$
-BEGIN
-    UPDATE products
-    SET stock = stock - p_quantity_sold
-    WHERE id = p_product_id;
-END;
 $$ LANGUAGE plpgsql;
-
-
--- Add parent_organization_id to organizations table
-ALTER TABLE organizations ADD COLUMN IF NOT EXISTS parent_organization_id UUID REFERENCES organizations(id);

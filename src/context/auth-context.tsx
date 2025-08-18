@@ -20,10 +20,13 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>;
 }
 
+// Create the context with a undefined value
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Create the supabase client instance once
+const supabase = createClient();
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [supabase] = useState<SupabaseClient>(createClient());
   const router = useRouter();
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -41,11 +44,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-    setSelectedOrganizationId(null);
-    router.push('/');
-  }, [supabase, router, setSelectedOrganizationId]);
+    // state will be cleared by onAuthStateChange listener
+  }, [supabase]);
 
   const fetchUserProfile = useCallback(async (currentUser: SupabaseUser) => {
       const { data: userProfile, error: profileError } = await supabase
@@ -62,48 +62,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return userProfile as UserProfile | null;
   }, [supabase]);
 
-
   useEffect(() => {
-    setLoading(true);
-    
-    const fetchSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        setUser(session.user);
-        const fetchedProfile = await fetchUserProfile(session.user);
-        if (fetchedProfile) {
-          setProfile(fetchedProfile);
-           const storedOrgId = localStorage.getItem('selectedOrgId');
-          if (storedOrgId) {
-              setSelectedOrganizationIdState(storedOrgId);
-          } else if (fetchedProfile.organization_id) {
-              setSelectedOrganizationId(fetchedProfile.organization_id);
-          }
-        } else {
-          console.warn(`No profile found for user ${session.user.id}. The user is authenticated but has no profile entry.`);
-        }
-      }
-      setLoading(false);
-    };
-
-    fetchSession();
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setLoading(true);
         if (session?.user) {
           setUser(session.user);
-           const fetchedProfile = await fetchUserProfile(session.user);
-           setProfile(fetchedProfile);
-           if (fetchedProfile?.organization_id && !localStorage.getItem('selectedOrgId')) {
-             setSelectedOrganizationId(fetchedProfile.organization_id);
-           }
+          const fetchedProfile = await fetchUserProfile(session.user);
+          setProfile(fetchedProfile);
+          
+          if(event === 'SIGNED_IN' || !selectedOrganizationId) {
+            const storedOrgId = localStorage.getItem('selectedOrgId');
+            if (storedOrgId) {
+              setSelectedOrganizationIdState(storedOrgId);
+            } else if (fetchedProfile?.organization_id) {
+              setSelectedOrganizationId(fetchedProfile.organization_id);
+            }
+          }
         } else {
+          // Clear everything on logout
           setUser(null);
           setProfile(null);
           setSelectedOrganizationId(null);
-          // router.push('/'); // THIS WAS THE PROBLEM: DO NOT REDIRECT GLOBALLY
         }
         setLoading(false);
       }
@@ -112,11 +92,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase, router, fetchUserProfile, setSelectedOrganizationId]);
+  }, [supabase, fetchUserProfile, setSelectedOrganizationId, selectedOrganizationId]);
 
   const login = async ({ email, password }: { email: string; password: string }) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    // onAuthStateChange will handle setting user and profile
   };
   
   const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}) => {
@@ -131,11 +112,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [supabase]);
 
   const refreshProfile = useCallback(async () => {
-    if(user) {
-      const refreshedProfile = await fetchUserProfile(user);
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if(currentUser) {
+      const refreshedProfile = await fetchUserProfile(currentUser);
       setProfile(refreshedProfile);
     }
-  }, [user, fetchUserProfile]);
+  }, [supabase, fetchUserProfile]);
 
 
   const value = {

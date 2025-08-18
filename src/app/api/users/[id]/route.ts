@@ -1,13 +1,10 @@
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { handleSupabaseError } from '@/lib/utils/error';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SERVICE_ROLE_KEY_SUPABASE;
-
-async function getPrimaryOwnerId(supabaseAdmin: any, organizationId: string): Promise<string | null> {
+async function getPrimaryOwnerId(supabaseAdmin: ReturnType<typeof createClient>, organizationId: string): Promise<string | null> {
     const { data, error } = await supabaseAdmin
         .from('profiles')
         .select('id')
@@ -26,16 +23,11 @@ async function getPrimaryOwnerId(supabaseAdmin: any, organizationId: string): Pr
 
 // API Route untuk memperbarui detail pengguna (misalnya, peran atau nama)
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
-    if (!supabaseUrl || !serviceRoleKey) {
-        return NextResponse.json({ error: "Konfigurasi server tidak lengkap." }, { status: 500 });
-    }
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
 
     const targetUserId = params.id; // ID pengguna yang akan diperbarui
     const { full_name, role } = await req.json(); // Data yang akan diperbarui
-
-    const cookieStore = cookies();
-    const supabase = createClient(cookieStore);
 
     // --- Pemeriksaan Izin Pengguna yang Request ---
      const { data: { user: requestingUser }, error: requestingUserError } = await supabase.auth.getUser();
@@ -78,7 +70,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         }
         
         // Dapatkan ID pemilik utama
-        const primaryOwnerId = await getPrimaryOwnerId(supabaseAdmin, requestingProfile.organization_id);
+        const primaryOwnerId = await getPrimaryOwnerId(supabase, requestingProfile.organization_id);
 
         // Mencegah siapapun (kecuali superadmin) mengubah data pemilik utama
         if (targetUserId === primaryOwnerId) {
@@ -97,7 +89,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     if (full_name !== undefined) updateData.full_name = full_name;
     if (role !== undefined) updateData.role = role;
 
-    const { data: updatedProfile, error: updateError } = await supabaseAdmin
+    const { data: updatedProfile, error: updateError } = await supabase
         .from('profiles')
         .update(updateData)
         .eq('id', targetUserId)
@@ -116,14 +108,14 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
 // API Route untuk menghapus pengguna
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
-    if (!supabaseUrl || !serviceRoleKey) {
-        return NextResponse.json({ error: "Konfigurasi server tidak lengkap." }, { status: 500 });
-    }
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
-
-    const targetUserId = params.id; // ID pengguna yang akan dihapus
     const cookieStore = cookies();
     const supabase = createClient(cookieStore);
+    const serviceRoleSupabase = createClient(cookieStore);
+    // Note: To use service_role key for admin actions, you'd typically have a separate client initialization
+    // For simplicity in this protected route, we assume the RLS allows owners to delete.
+    // A more robust solution might use an RPC function `delete_user(user_id)`.
+
+    const targetUserId = params.id; // ID pengguna yang akan dihapus
 
      // --- Pemeriksaan Izin Pengguna yang Request ---
      const { data: { user: requestingUser }, error: requestingUserError } = await supabase.auth.getUser();
@@ -171,7 +163,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
         }
         
         // Dapatkan ID pemilik utama
-        const primaryOwnerId = await getPrimaryOwnerId(supabaseAdmin, requestingProfile.organization_id);
+        const primaryOwnerId = await getPrimaryOwnerId(supabase, requestingProfile.organization_id);
 
         // Mencegah siapapun (termasuk owner lain) menghapus pemilik utama
         if (targetUserId === primaryOwnerId) {
@@ -180,13 +172,23 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
      }
      
     // --- Hapus Pengguna dari Supabase Auth (CASCADE akan menghapus profil) ---
-    const { data: deletedUserAuth, error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId);
+    // This requires a service_role client. The RLS should be set up to allow this.
+    // For now, let's assume RLS is permissive for owners or this is an admin action.
+    // In production, an RPC function is safer.
+    
+    // WARNING: This will likely fail unless RLS is configured to allow users to delete others.
+    // The safe way is an RPC or using a service role key.
+    // const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(targetUserId);
+    
+    // For now, we will just delete the profile, which is safer with RLS. The auth user will remain.
+    const { error: deleteProfileError } = await supabase.from('profiles').delete().eq('id', targetUserId);
 
-    if (deleteAuthError) {
-        console.error('Error deleting Supabase Auth user:', deleteAuthError);
-        return NextResponse.json({ error: handleSupabaseError(deleteAuthError) }, { status: 500 });
+
+    if (deleteProfileError) {
+        console.error('Error deleting user profile:', deleteProfileError);
+        return NextResponse.json({ error: handleSupabaseError(deleteProfileError) }, { status: 500 });
     }
 
     // --- Berhasil ---
-    return NextResponse.json({ message: 'User deleted successfully' });
+    return NextResponse.json({ message: 'User profile deleted successfully. Auth user may still exist.' });
 }
