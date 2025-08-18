@@ -1,6 +1,6 @@
-
 // src/lib/supabase-admin.ts
 import { createClient } from '@supabase/supabase-js'
+import 'dotenv/config'; // Memuat variabel lingkungan dari .env
 
 // PENTING: Inisialisasi client Supabase dengan service_role key untuk operasi admin.
 // Kunci-kunci ini HANYA boleh digunakan di lingkungan server dan TIDAK BOLEH diekspos ke client.
