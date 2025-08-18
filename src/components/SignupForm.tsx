@@ -29,8 +29,8 @@ const formSchema = z.object({
 
 
 export default function SignupForm() {
+  const [error, setErrorState] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
 
@@ -45,8 +45,10 @@ export default function SignupForm() {
     },
   });
 
+  const { setError } = form;
+
   const handleSignup = async (values: z.infer<typeof formSchema>) => {
-    setError(null);
+    setErrorState(null);
     setSuccess(null);
     setLoading(true);
 
@@ -73,7 +75,14 @@ export default function SignupForm() {
         router.push("/");
       }, 4000);
     } catch (err: any) {
-      setError(err.message);
+      const errorMessage = err.message || "Terjadi kesalahan";
+      if (errorMessage.toLowerCase().includes('email')) {
+          setError('email', { type: 'manual', message: errorMessage });
+      } else if (errorMessage.toLowerCase().includes('organisasi')) {
+          setError('organizationName', { type: 'manual', message: errorMessage });
+      } else {
+          setErrorState(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
