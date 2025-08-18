@@ -1,4 +1,4 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
 import type { Database } from '@/types/database';
@@ -9,7 +9,7 @@ type TransactionItemInsert = Database['public']['Tables']['transaction_items']['
 
 export async function GET(request: NextRequest) {
   const cookieStore = cookies();
-  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+  const supabase = createClient(cookieStore);
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const cookieStore = cookies();
-  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+  const supabase = createClient(cookieStore);
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();

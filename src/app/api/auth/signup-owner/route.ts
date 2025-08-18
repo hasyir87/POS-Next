@@ -4,10 +4,12 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { handleSupabaseError } from '@/lib/utils/error';
 
-// PENTING: Gunakan service_role key untuk operasi admin
+// PENTING: Fungsi ini sekarang akan menggunakan service_role key secara implisit dari createClient
+// jika diatur dengan benar di sisi server.
 const getSupabaseAdmin = () => {
     const cookieStore = cookies();
-    // Buat client dengan hak akses service_role
+    // Buat client dengan hak akses service_role. Kunci SERVICE_ROLE_KEY_SUPABASE
+    // harus diatur di environment agar Supabase dapat menggunakannya.
     return createClient(cookieStore);
 };
 
