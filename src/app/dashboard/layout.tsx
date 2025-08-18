@@ -37,44 +37,37 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { user, profile, loading, logout, selectedOrganizationId, setSelectedOrganizationId, supabase } = useAuth();
+  const { user, profile, loading, logout, selectedOrganizationId, setSelectedOrganizationId, fetchWithAuth } = useAuth();
   
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoadingOrgs, setIsLoadingOrgs] = useState(true);
 
   const fetchOrganizations = useCallback(async () => {
-    if (!profile || !supabase) {
+    if (!profile) {
       setIsLoadingOrgs(false);
       return;
     }
 
     setIsLoadingOrgs(true);
-    let query = supabase.from('organizations').select('*');
-
-    if (profile.role !== 'superadmin' && profile.organization_id) {
-       query = query.or(`id.eq.${profile.organization_id},parent_organization_id.eq.${profile.organization_id}`);
-    }
-    
-    const { data, error } = await query.order('created_at', { ascending: false });
-    
-    if (error) {
-      console.error("Error fetching organizations:", error.message);
-      setOrganizations([]);
-    } else {
+    try {
+      const response = await fetchWithAuth('/api/organizations');
+      if (!response.ok) throw new Error('Gagal mengambil data organisasi.');
+      const data = await response.json();
       setOrganizations(data || []);
+    } catch (error) {
+      console.error("Error fetching organizations:", error);
+      setOrganizations([]);
+    } finally {
+      setIsLoadingOrgs(false);
     }
-    setIsLoadingOrgs(false);
-  }, [profile, supabase]);
+  }, [profile, fetchWithAuth]);
 
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/');
-    }
     if (!loading && user) {
       fetchOrganizations();
     }
-  }, [user, loading, router, fetchOrganizations]);
+  }, [user, loading, fetchOrganizations]);
 
 
   if (loading) {
@@ -86,7 +79,7 @@ export default function DashboardLayout({
   }
 
   if (!user) {
-    return null; // or a redirect, but middleware should handle it.
+    return null;
   }
   
   const navItems = profile ? allNavItems.filter(item => profile.role && item.requiredRoles.includes(profile.role)) : [];
@@ -138,13 +131,13 @@ export default function DashboardLayout({
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col">
               <SheetHeader>
-                <SheetTitle className="sr-only">Navigasi Utama</SheetTitle>
-              </SheetHeader>
-              <nav className="grid gap-2 text-lg font-medium">
-                <Link href="#" className="flex items-center gap-2 text-lg font-semibold mb-4">
+                <SheetTitle>Navigasi Utama</SheetTitle>
+                 <Link href="#" className="flex items-center gap-2 text-lg font-semibold mb-4">
                   <MPerfumeAmalLogo className="h-6 w-6 text-primary" />
                   <span className="font-headline text-xl">ScentPOS</span>
                 </Link>
+              </SheetHeader>
+              <nav className="grid gap-2 text-lg font-medium">
                 {navItems.map((item) => (
                   <Link
                     key={item.label}

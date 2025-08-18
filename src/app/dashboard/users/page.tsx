@@ -18,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 
 export default function UsersPage() {
     const { toast } = useToast();
-    const { profile: currentProfile, loading: authLoading, supabase } = useAuth();
+    const { profile: currentProfile, loading: authLoading, fetchWithAuth } = useAuth();
 
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -26,32 +26,36 @@ export default function UsersPage() {
     
     const [isDialogOpen, setDialogOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [editingUser, setEditingUser] = useState<Partial<UserProfile> | null>(null);
+    const [editingUser, setEditingUser] = useState<Partial<UserProfile & {password?: string}> | null>(null);
 
     const emptyUser: Partial<UserProfile> = { full_name: '', email: '', role: 'cashier', organization_id: currentProfile?.organization_id || '' };
 
     const fetchUsersAndOrgs = useCallback(async () => {
-        if (!supabase) return;
         setIsLoading(true);
-
         try {
-            const usersPromise = supabase.from('profiles').select('*, organizations(id, name)');
-            const orgsPromise = supabase.from('organizations').select('*');
+            const usersPromise = fetchWithAuth('/api/users');
+            const orgsPromise = fetchWithAuth('/api/organizations');
 
             const [usersRes, orgsRes] = await Promise.all([usersPromise, orgsPromise]);
 
-            if (usersRes.error) throw usersRes.error;
-            if (orgsRes.error) throw orgsRes.error;
+            if (!usersRes.ok || !orgsRes.ok) {
+                const userError = usersRes.ok ? null : await usersRes.json();
+                const orgError = orgsRes.ok ? null : await orgsRes.json();
+                throw new Error(userError?.error || orgError?.error || 'Gagal mengambil data');
+            }
 
-            setUsers(usersRes.data || []);
-            setOrganizations(orgsRes.data || []);
+            const usersData = await usersRes.json();
+            const orgsData = await orgsRes.json();
+            
+            setUsers(usersData.users || []);
+            setOrganizations(orgsData || []);
 
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Error', description: `Gagal memuat data: ${error.message}` });
         } finally {
             setIsLoading(false);
         }
-    }, [supabase, toast]);
+    }, [fetchWithAuth, toast]);
 
     useEffect(() => {
         if (!authLoading && currentProfile) {
@@ -69,16 +73,22 @@ export default function UsersPage() {
             toast({ variant: 'destructive', title: 'Error', description: 'Semua field harus diisi.' });
             return;
         }
+        
+        if(!editingUser.id && (!editingUser.password || editingUser.password.length < 6)){
+             toast({ variant: 'destructive', title: 'Error', description: 'Password harus diisi minimal 6 karakter.' });
+            return;
+        }
+
         setIsSubmitting(true);
 
         const url = editingUser.id ? `/api/users/${editingUser.id}` : '/api/users';
         const method = editingUser.id ? 'PUT' : 'POST';
         const body = editingUser.id
-            ? { name: editingUser.full_name, role: editingUser.role, organization_id: editingUser.organization_id }
-            : { ...editingUser, password: 'password' }; // Password sementara, pengguna harus mengubahnya
+            ? { full_name: editingUser.full_name, role: editingUser.role, organization_id: editingUser.organization_id }
+            : { ...editingUser };
         
         try {
-            const response = await fetch(url, {
+            const response = await fetchWithAuth(url, {
                 method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
@@ -97,10 +107,10 @@ export default function UsersPage() {
     };
 
     const handleDeleteUser = async (userId: string) => {
-        if (!confirm('Apakah Anda yakin ingin menghapus pengguna ini?')) return;
+        if (!confirm('Apakah Anda yakin ingin menghapus pengguna ini? Operasi ini tidak dapat dibatalkan.')) return;
         
         try {
-            const response = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+            const response = await fetchWithAuth(`/api/users/${userId}`, { method: 'DELETE' });
             if (!response.ok) {
                  const data = await response.json();
                  throw new Error(data.error || 'Gagal menghapus pengguna.');
@@ -142,6 +152,12 @@ export default function UsersPage() {
                                 <Label htmlFor="email" className="text-right">Email</Label>
                                 <Input id="email" type="email" value={editingUser?.email || ''} onChange={(e) => setEditingUser(p => p ? {...p, email: e.target.value} : null)} className="col-span-3" disabled={!!editingUser?.id} />
                             </div>
+                             {!editingUser?.id && (
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="password" className="text-right">Password</Label>
+                                    <Input id="password" type="password" value={editingUser?.password || ''} onChange={(e) => setEditingUser(p => p ? {...p, password: e.target.value} : null)} className="col-span-3" />
+                                </div>
+                             )}
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="role" className="text-right">Peran</Label>
                                 <Select value={editingUser?.role || ''} onValueChange={(value: UserProfile['role']) => setEditingUser(p => p ? {...p, role: value} : null)}>
@@ -155,7 +171,7 @@ export default function UsersPage() {
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="organization_id" className="text-right">Outlet</Label>
                                 <Select value={editingUser?.organization_id || ''} onValueChange={(value) => setEditingUser(p => p ? {...p, organization_id: value} : null)} disabled={currentProfile?.role !== 'superadmin'}>
-                                    <SelectTrigger id="organization_id" className="col-span-3"><SelectValue /></SelectTrigger>
+                                    <SelectTrigger id="organization_id" className="col-span-3"><SelectValue placeholder="Pilih Outlet..." /></SelectTrigger>
                                     <SelectContent>
                                         {organizations.map(org => <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>)}
                                     </SelectContent>
@@ -196,7 +212,7 @@ export default function UsersPage() {
                                     <TableRow key={user.id}>
                                         <TableCell className="font-medium">{user.full_name || 'N/A'}</TableCell>
                                         <TableCell>{user.email}</TableCell>
-                                        <TableCell>{(user.organizations as Organization)?.name || 'N/A'}</TableCell>
+                                        <TableCell>{(user.organizations as Organization)?.name || organizations.find(o => o.id === user.organization_id)?.name || 'N/A'}</TableCell>
                                         <TableCell className="text-center">
                                             <Badge variant="secondary">{user.role}</Badge>
                                         </TableCell>
