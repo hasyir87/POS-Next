@@ -1,25 +1,38 @@
 
-import { createClient } from '../../../../utils/supabase/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { handleSupabaseError } from '@/lib/utils/error';
 
+// PENTING: Gunakan service_role key untuk operasi admin
+const getSupabaseAdmin = () => {
+    const cookieStore = cookies();
+    // Pastikan Anda telah mengatur SERVICE_ROLE_KEY_SUPABASE di environment variables Anda
+    const serviceRoleKey = process.env.SERVICE_ROLE_KEY_SUPABASE;
+    if (!serviceRoleKey) {
+        throw new Error("SERVICE_ROLE_KEY_SUPABASE is not set in environment variables.");
+    }
+    return createRouteHandlerClient({ cookies: () => cookieStore }, {
+      supabaseKey: serviceRoleKey
+    });
+};
+
+
 export async function POST(req: Request) {
-  const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
+  const supabaseAdmin = getSupabaseAdmin();
   const { email, password, organization_name } = await req.json();
 
   // --- Langkah 1: Buat Pengguna di Supabase Auth ---
   const { data: userAuthData, error: authError } =
-    await supabase.auth.admin.createUser({
+    await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true,
+      email_confirm: true, // Otomatis konfirmasi email untuk kemudahan
     });
 
   if (authError) {
     console.error("Error creating Supabase Auth user:", authError);
-    return NextResponse.json({ error: handleSupabaseError(authError) }, { status: 400 });
+    return NextResponse.json({ error: handleSupabaseError(authError) || authError.message }, { status: 400 });
   }
 
   if (!userAuthData?.user) {
@@ -32,7 +45,7 @@ export async function POST(req: Request) {
   const userId = userAuthData.user.id;
 
   // --- Langkah 2: Buat Organisasi Induk ---
-  const { data: organization, error: orgError } = await supabase
+  const { data: organization, error: orgError } = await supabaseAdmin
     .from("organizations")
     .insert([{ name: organization_name, is_setup_complete: false }])
     .select()
@@ -41,7 +54,7 @@ export async function POST(req: Request) {
   if (orgError || !organization) {
     console.error("Error creating organization:", orgError);
     // Rollback: hapus user yang sudah dibuat di Auth jika pembuatan organisasi gagal
-    await supabase.auth.admin.deleteUser(userId);
+    await supabaseAdmin.auth.admin.deleteUser(userId);
     return NextResponse.json(
       { error: handleSupabaseError(orgError) || "Organization creation failed." },
       { status: 500 },
@@ -49,12 +62,12 @@ export async function POST(req: Request) {
   }
 
   // --- Langkah 3: Buat Profil Pengguna (Pemilik) dan Hubungkan ke Organisasi ---
-  const { error: profileError } = await supabase
+  const { error: profileError } = await supabaseAdmin
     .from("profiles")
     .insert([
       {
         id: userId,
-        full_name: "Owner",
+        full_name: "Owner", // Default name, user bisa ubah nanti
         email: email,
         role: "owner",
         organization_id: organization.id,
@@ -64,8 +77,8 @@ export async function POST(req: Request) {
   if (profileError) {
     console.error("Error creating user profile:", profileError);
     // Rollback: hapus user di Auth dan organisasi jika pembuatan profil gagal
-    await supabase.auth.admin.deleteUser(userId);
-    await supabase
+    await supabaseAdmin.auth.admin.deleteUser(userId);
+    await supabaseAdmin
       .from("organizations")
       .delete()
       .eq("id", organization.id);
