@@ -107,7 +107,7 @@ export default function SignupForm() {
                   <FormItem>
                     <FormLabel>Nama Organisasi/Toko</FormLabel>
                     <FormControl>
-                      <Input placeholder="Contoh: M Perfume Amal" {...field} />
+                      <Input placeholder="Contoh: ScentPOS" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
