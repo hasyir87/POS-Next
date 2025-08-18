@@ -76,8 +76,8 @@ export async function POST(req: Request) {
     .insert([
       {
         id: userId,
-        full_name: "Owner", // Default name, user bisa ubah nanti
         email: email,
+        full_name: "Owner", // Default name, user bisa ubah nanti
         role: "owner",
         organization_id: organization.id,
       },
@@ -105,3 +105,5 @@ export async function POST(req: Request) {
     { status: 201 },
   );
 }
+
+    

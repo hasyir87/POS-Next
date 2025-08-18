@@ -1,13 +1,32 @@
+
 // src/app/api/users/[id]/route.ts
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { handleSupabaseError } from '@/lib/utils/error';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+
+async function getPrimaryOwnerId(organizationId: string): Promise<string | null> {
+    const { data, error } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .eq('role', 'owner')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single();
+
+    if (error || !data) {
+        return null;
+    }
+    return data.id;
+}
+
 
 // API Route untuk memperbarui detail pengguna (misalnya, peran atau nama)
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
-    const userId = params.id; // ID pengguna yang akan diperbarui
-    const { name, role, organization_id } = await req.json(); // Data yang akan diperbarui
+    const targetUserId = params.id; // ID pengguna yang akan diperbarui
+    const { full_name, role } = await req.json(); // Data yang akan diperbarui
 
     const cookieStore = cookies();
     const supabase = createClient(cookieStore);
@@ -28,54 +47,54 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
      if (requestingProfileError || !requestingProfile || !requestingProfile.organization_id) {
           return NextResponse.json({ error: 'Requesting user profile not found or not associated with an organization' }, { status: 404 });
      }
+     
+     // Superadmin bisa melakukan apa saja
+     if (requestingProfile.role !== 'superadmin') {
+        // Periksa izin: Hanya 'owner' atau 'admin' dari organisasi yang bisa memperbarui pengguna
+        if (requestingProfile.role !== 'owner' && requestingProfile.role !== 'admin') {
+            return NextResponse.json({ error: 'Forbidden: You do not have permission to update users' }, { status: 403 });
+        }
 
-     // Periksa izin: Hanya 'owner' atau 'admin' dari organisasi yang bisa memperbarui pengguna
-     if (requestingProfile.role !== 'owner' && requestingProfile.role !== 'admin' && requestingProfile.role !== 'superadmin') {
-          return NextResponse.json({ error: 'Forbidden: Only owners, admins, or superadmin can update users' }, { status: 403 });
+        // Dapatkan profil pengguna yang akan diperbarui untuk pemeriksaan tambahan
+        const { data: targetProfile, error: targetProfileError } = await supabase
+            .from('profiles')
+            .select('organization_id, role')
+            .eq('id', targetUserId)
+            .single();
+
+        if (targetProfileError || !targetProfile) {
+            return NextResponse.json({ error: 'Target user profile not found' }, { status: 404 });
+        }
+        
+        // Admin/Owner hanya bisa memperbarui user di organisasi mereka sendiri.
+        if (requestingProfile.organization_id !== targetProfile.organization_id) {
+            return NextResponse.json({ error: 'Forbidden: Cannot update user in a different organization' }, { status: 403 });
+        }
+        
+        // Dapatkan ID pemilik utama
+        const primaryOwnerId = await getPrimaryOwnerId(requestingProfile.organization_id);
+
+        // Mencegah siapapun (kecuali superadmin) mengubah data pemilik utama
+        if (targetUserId === primaryOwnerId) {
+             return NextResponse.json({ error: 'Forbidden: The primary owner account cannot be modified.' }, { status: 403 });
+        }
+        
+        // Mencegah admin biasa mengubah peran menjadi owner
+        if (requestingProfile.role === 'admin' && role === 'owner') {
+             return NextResponse.json({ error: 'Forbidden: Admins cannot assign the owner role.' }, { status: 403 });
+        }
      }
-
-     // Dapatkan profil pengguna yang akan diperbarui untuk pemeriksaan tambahan
-     const { data: targetProfile, error: targetProfileError } = await supabase
-          .from('profiles')
-          .select('organization_id, role')
-          .eq('id', userId)
-          .single();
-
-     if (targetProfileError || !targetProfile) {
-          return NextResponse.json({ error: 'Target user profile not found' }, { status: 404 });
-     }
-
-     // Periksa izin: Admin/Owner hanya bisa memperbarui user di organisasi mereka sendiri atau Outlet mereka.
-     // Superadmin bisa memperbarui user di organisasi mana pun.
-     if (requestingProfile.role !== 'superadmin' && requestingProfile.organization_id !== targetProfile.organization_id) {
-          return NextResponse.json({ error: 'Forbidden: Cannot update user in a different organization' }, { status: 403 });
-     }
-
-      // Periksa izin: Mencegah admin/owner biasa mengubah peran superadmin atau owner lain
-      if (requestingProfile.role !== 'superadmin') {
-          if (targetProfile.role === 'superadmin' || targetProfile.role === 'owner') {
-               return NextResponse.json({ error: 'Forbidden: Cannot modify superadmin or owner roles' }, { status: 403 });
-          }
-           if (role === 'superadmin' || role === 'owner') {
-                return NextResponse.json({ error: 'Forbidden: Cannot assign superadmin or owner roles' }, { status: 403 });
-           }
-      }
 
 
     // --- Perbarui Profil Pengguna ---
     const updateData: any = {};
-    if (name !== undefined) updateData.name = name;
+    if (full_name !== undefined) updateData.full_name = full_name;
     if (role !== undefined) updateData.role = role;
-    if (organization_id !== undefined && requestingProfile.role === 'superadmin') {
-        // Hanya superadmin yang bisa mengubah organisasi pengguna
-        updateData.organization_id = organization_id;
-    }
 
-
-    const { data: updatedProfile, error: updateError } = await supabase
+    const { data: updatedProfile, error: updateError } = await supabaseAdmin
         .from('profiles')
         .update(updateData)
-        .eq('id', userId)
+        .eq('id', targetUserId)
         .select()
         .single();
 
@@ -91,29 +110,19 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
 // API Route untuk menghapus pengguna
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
-    const userId = params.id; // ID pengguna yang akan dihapus
+    const targetUserId = params.id; // ID pengguna yang akan dihapus
     const cookieStore = cookies();
     const supabase = createClient(cookieStore);
 
-    // Perlu Service Role Key untuk menghapus user di auth.users
-    const serviceRoleSupabase = createClient(cookies(), {
-        auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-        },
-        cookies: {},
-        supabaseKey: process.env.SERVICE_ROLE_KEY_SUPABASE
-    });
-
-    // --- Pemeriksaan Izin Pengguna yang Request ---
+     // --- Pemeriksaan Izin Pengguna yang Request ---
      const { data: { user: requestingUser }, error: requestingUserError } = await supabase.auth.getUser();
 
      if (requestingUserError || !requestingUser) {
          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
      }
-
+     
      // Mencegah pengguna menghapus dirinya sendiri
-     if (requestingUser.id === userId) {
+     if (requestingUser.id === targetUserId) {
         return NextResponse.json({ error: 'Forbidden: You cannot delete your own account.' }, { status: 403 });
      }
 
@@ -126,38 +135,41 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
      if (requestingProfileError || !requestingProfile || !requestingProfile.organization_id) {
           return NextResponse.json({ error: 'Requesting user profile not found or not associated with an organization' }, { status: 404 });
      }
-
-    // Periksa izin: Hanya 'owner' atau 'admin' dari organisasi yang bisa menghapus pengguna
-    if (requestingProfile.role !== 'owner' && requestingProfile.role !== 'admin' && requestingProfile.role !== 'superadmin') {
-         return NextResponse.json({ error: 'Forbidden: Only owners, admins, or superadmin can delete users' }, { status: 403 });
-    }
-
-    // Dapatkan profil pengguna yang akan dihapus untuk pemeriksaan tambahan
-     const { data: targetProfile, error: targetProfileError } = await supabase
-          .from('profiles')
-          .select('organization_id, role')
-          .eq('id', userId)
-          .single();
-
-     if (targetProfileError || !targetProfile) {
-        return NextResponse.json({ error: 'Target user profile not found' }, { status: 404 });
-     }
-    
-    // Periksa izin: Admin/Owner hanya bisa menghapus user di organisasi mereka sendiri.
-    if (requestingProfile.role !== 'superadmin' && requestingProfile.organization_id !== targetProfile.organization_id) {
-        return NextResponse.json({ error: 'Forbidden: Cannot delete user in a different organization' }, { status: 403 });
-    }
-
-    // Periksa izin: Mencegah admin/owner biasa menghapus superadmin atau owner lain
-    if (requestingProfile.role !== 'superadmin') {
-        if (targetProfile.role === 'superadmin' || targetProfile.role === 'owner') {
-            return NextResponse.json({ error: 'Forbidden: Cannot delete superadmin or owner roles' }, { status: 403 });
-        }
-    }
      
-    // --- Hapus Pengguna dari Supabase Auth ---
-    // ON DELETE CASCADE yang kita atur di foreign key profiles.id akan otomatis menghapus record di profiles
-    const { data: deletedUserAuth, error: deleteAuthError } = await serviceRoleSupabase.auth.admin.deleteUser(userId);
+     // Superadmin bisa melakukan apa saja
+     if (requestingProfile.role !== 'superadmin') {
+        // Periksa izin: Hanya 'owner' yang bisa menghapus pengguna
+        if (requestingProfile.role !== 'owner') {
+            return NextResponse.json({ error: 'Forbidden: Only owners can delete users' }, { status: 403 });
+        }
+
+        // Dapatkan profil pengguna yang akan dihapus untuk pemeriksaan tambahan
+        const { data: targetProfile, error: targetProfileError } = await supabase
+            .from('profiles')
+            .select('organization_id, role')
+            .eq('id', targetUserId)
+            .single();
+
+        if (targetProfileError || !targetProfile) {
+            return NextResponse.json({ error: 'Target user profile not found' }, { status: 404 });
+        }
+        
+        // Owner hanya bisa menghapus user di organisasi mereka sendiri.
+        if (requestingProfile.organization_id !== targetProfile.organization_id) {
+            return NextResponse.json({ error: 'Forbidden: Cannot delete user in a different organization' }, { status: 403 });
+        }
+        
+        // Dapatkan ID pemilik utama
+        const primaryOwnerId = await getPrimaryOwnerId(requestingProfile.organization_id);
+
+        // Mencegah siapapun (termasuk owner lain) menghapus pemilik utama
+        if (targetUserId === primaryOwnerId) {
+             return NextResponse.json({ error: 'Forbidden: The primary owner account cannot be deleted.' }, { status: 403 });
+        }
+     }
+     
+    // --- Hapus Pengguna dari Supabase Auth (CASCADE akan menghapus profil) ---
+    const { data: deletedUserAuth, error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId);
 
     if (deleteAuthError) {
         console.error('Error deleting Supabase Auth user:', deleteAuthError);
@@ -167,3 +179,5 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     // --- Berhasil ---
     return NextResponse.json({ message: 'User deleted successfully' });
 }
+
+    
