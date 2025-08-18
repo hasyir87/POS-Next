@@ -394,9 +394,11 @@ export default function SettingsPage() {
                             {/* Grade Dialog */}
                             <Dialog open={isGradeDialogOpen} onOpenChange={setGradeDialogOpen}>
                                 <DialogContent>
-                                    <DialogHeader><DialogTitle className="font-headline">
-                                        {editingGrade?.id ? `Ubah Grade` : `Tambah Grade Baru`}
-                                    </DialogTitle></DialogHeader>
+                                    <DialogHeader>
+                                      <DialogTitle className="font-headline">
+                                          {editingGrade?.id ? `Ubah Grade` : `Tambah Grade Baru`}
+                                      </DialogTitle>
+                                    </DialogHeader>
                                     <div className="grid gap-4 py-4">
                                         <div className="grid grid-cols-4 items-center gap-4">
                                             <Label htmlFor="grade-name" className="text-right">Nama Grade</Label>
@@ -417,9 +419,11 @@ export default function SettingsPage() {
                             {/* Attribute Dialog */}
                             <Dialog open={isAttrDialogOpen} onOpenChange={setAttrDialogOpen}>
                                 <DialogContent>
-                                    <DialogHeader><DialogTitle className="font-headline">
+                                    <DialogHeader>
+                                      <DialogTitle className="font-headline">
                                         {editingAttr?.id ? `Ubah ${editingAttr?.type}` : `Tambah ${editingAttr?.type} Baru`}
-                                    </DialogTitle></DialogHeader>
+                                      </DialogTitle>
+                                    </DialogHeader>
                                     <div className="grid gap-4 py-4">
                                         <div className="grid grid-cols-4 items-center gap-4">
                                             <Label htmlFor="attr-name" className="text-right">Nama</Label>
@@ -435,7 +439,14 @@ export default function SettingsPage() {
                                 </div>
                                 <div className="border rounded-md">
                                 <Table>
-                                    <TableHeader><TableRow><TableHead>Nama Grade</TableHead><TableHead>Pengali Harga</TableHead><TableHead>Harga Tambahan Bibit</TableHead><TableHead className="w-[100px] text-right">Aksi</TableHead></TableRow></TableHeader>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Nama Grade</TableHead>
+                                        <TableHead>Pengali Harga</TableHead>
+                                        <TableHead>Harga Tambahan Bibit</TableHead>
+                                        <TableHead className="w-[100px] text-right">Aksi</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
                                     <TableBody>
                                         {isGradeLoading ? (
                                             <TableRow><TableCell colSpan={4} className="text-center p-4"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></TableCell></TableRow>
@@ -551,7 +562,9 @@ export default function SettingsPage() {
                             <Dialog open={isKeyDialogOpen} onOpenChange={setKeyDialogOpen}>
                                 <DialogTrigger asChild><Button disabled={!selectedOrganizationId}>Buat Kunci Baru</Button></DialogTrigger>
                                 <DialogContent>
-                                    <DialogHeader><DialogTitle className="font-headline">Buat Kunci API Baru</DialogTitle></DialogHeader>
+                                    <DialogHeader>
+                                      <DialogTitle className="font-headline">Buat Kunci API Baru</DialogTitle>
+                                    </DialogHeader>
                                     <div className="grid gap-4 py-4">
                                         <Label htmlFor="key-label">Label</Label>
                                         <Input id="key-label" value={newKeyLabel} onChange={e => setNewKeyLabel(e.target.value)} placeholder="e.g., Aplikasi POS Flutter" />
@@ -597,7 +610,9 @@ export default function SettingsPage() {
                              <Dialog open={isOutletDialogOpen} onOpenChange={setOutletDialogOpen}>
                                 <DialogTrigger asChild><Button onClick={() => handleOpenOutletDialog()} disabled={!selectedOrganizationId}><PlusCircle className="mr-2" /> Tambah Outlet Baru</Button></DialogTrigger>
                                 <DialogContent>
-                                    <DialogHeader><DialogTitle className="font-headline">{editingOutlet?.id ? 'Ubah Outlet' : 'Tambah Outlet Baru'}</DialogTitle></DialogHeader>
+                                    <DialogHeader>
+                                      <DialogTitle className="font-headline">{editingOutlet?.id ? 'Ubah Outlet' : 'Tambah Outlet Baru'}</DialogTitle>
+                                    </DialogHeader>
                                     <div className="grid gap-4 py-4">
                                         <div className="grid grid-cols-4 items-center gap-4">
                                             <Label htmlFor="outlet-name" className="text-right">Nama</Label>
@@ -654,7 +669,9 @@ export default function SettingsPage() {
                             <Dialog open={isPromoDialogOpen} onOpenChange={setPromoDialogOpen}>
                                 <DialogTrigger asChild><Button onClick={() => handleOpenPromoDialog()} disabled={!selectedOrganizationId}><PlusCircle className="mr-2" /> Buat Promosi Baru</Button></DialogTrigger>
                                 <DialogContent>
-                                    <DialogHeader><DialogTitle className="font-headline">{editingPromo?.id ? 'Ubah Promosi' : 'Buat Promosi Baru'}</DialogTitle></DialogHeader>
+                                    <DialogHeader>
+                                      <DialogTitle className="font-headline">{editingPromo?.id ? 'Ubah Promosi' : 'Buat Promosi Baru'}</DialogTitle>
+                                    </DialogHeader>
                                     <div className="grid gap-4 py-4">
                                         <div className="grid grid-cols-4 items-center gap-4">
                                             <Label htmlFor="promo-name" className="text-right">Nama</Label>
@@ -740,7 +757,7 @@ export default function SettingsPage() {
                         <CardDescription>Kelola akun staf dan peran mereka (Kasir, Admin, Pemilik).</CardDescription>
                     </CardHeader>
                     <CardContent className="flex gap-2">
-                         <Button disabled={!selectedOrganizationId}>Tambah Pengguna Baru</Button>
+                         <Button asChild><Link href="/dashboard/users">Kelola Pengguna</Link></Button>
                          <Button variant="outline" asChild>
                             <Link href="/dashboard/settings/roles">Kelola Peran</Link>
                          </Button>

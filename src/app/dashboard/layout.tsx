@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { BarChart3, Clock, Home, LogOut, Menu, Settings, DollarSign, BookUser, Store, ChevronsUpDown, Users, PackageSearch, SprayCan, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from 'next/navigation';
 import { MPerfumeAmalLogo } from "@/components/m-perfume-amal-logo";
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
@@ -37,10 +38,26 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, profile, loading, logout, selectedOrganizationId, setSelectedOrganizationId, fetchWithAuth } = useAuth();
   
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoadingOrgs, setIsLoadingOrgs] = useState(false);
+
+  // Redirect logic
+  useEffect(() => {
+    if (!loading && profile) {
+      const isSetupPage = pathname === '/dashboard/setup';
+      const mainOrg = organizations.find(org => org.id === profile.organization_id);
+
+      if (mainOrg && !mainOrg.is_setup_complete && !isSetupPage) {
+        router.push('/dashboard/setup');
+      } else if (mainOrg && mainOrg.is_setup_complete && isSetupPage) {
+        router.push('/dashboard');
+      }
+    }
+  }, [profile, loading, organizations, pathname, router]);
+
 
   const fetchOrganizations = useCallback(async () => {
     if (!user) {
@@ -73,17 +90,12 @@ export default function DashboardLayout({
   }, [user, loading, fetchOrganizations]);
 
   // Main loading state for the entire auth process
-  if (loading) {
+  if (loading || !profile) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
-  }
-
-  // If auth is done and still no user, something is wrong, redirect handled by middleware/page
-  if (!user) {
-    return null;
   }
   
   const navItems = profile ? allNavItems.filter(item => profile.role && item.requiredRoles.includes(profile.role)) : [];
@@ -97,6 +109,12 @@ export default function DashboardLayout({
   };
   
   const selectedOrganization = organizations.find(org => org.id === selectedOrganizationId);
+
+  // Hide sidebar and header on the setup page
+  if (pathname === '/dashboard/setup') {
+    return <>{children}</>;
+  }
+
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
@@ -185,13 +203,13 @@ export default function DashboardLayout({
               <Button variant="secondary" size="icon" className="rounded-full">
                 <Avatar>
                   <AvatarImage src={profile?.avatar_url || "https://placehold.co/40x40"} alt={profile?.full_name || 'Avatar'} data-ai-hint="avatar" />
-                  <AvatarFallback>{profile?.full_name?.substring(0, 2).toUpperCase() || user.email?.substring(0,2).toUpperCase() || 'U'}</AvatarFallback>
+                  <AvatarFallback>{profile?.full_name?.substring(0, 2).toUpperCase() || user?.email?.substring(0,2).toUpperCase() || 'U'}</AvatarFallback>
                 </Avatar>
                 <span className="sr-only">Buka menu pengguna</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>{profile?.full_name || user.email}</DropdownMenuLabel>
+              <DropdownMenuLabel>{profile?.full_name || user?.email}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>Profil</DropdownMenuItem>
               <DropdownMenuItem>Dukungan</DropdownMenuItem>

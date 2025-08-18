@@ -47,12 +47,21 @@ export default function DashboardPage() {
             throw error;
         }
 
-        setDashboardData({
-            dailyRevenue: data[0].daily_revenue || 0,
-            dailySalesCount: data[0].daily_sales_count || 0,
-            newCustomersToday: data[0].new_customers_today || 0,
-            topProducts: data[0].top_selling_products || [],
-        });
+        if (data && data.length > 0) {
+            setDashboardData({
+                dailyRevenue: data[0].daily_revenue || 0,
+                dailySalesCount: data[0].daily_sales_count || 0,
+                newCustomersToday: data[0].new_customers_today || 0,
+                topProducts: data[0].top_selling_products || [],
+            });
+        } else {
+             setDashboardData({
+                dailyRevenue: 0,
+                dailySalesCount: 0,
+                newCustomersToday: 0,
+                topProducts: [],
+            });
+        }
 
     } catch (err: any) {
         console.error("Error fetching dashboard data:", err);
@@ -111,7 +120,7 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-bold font-headline">Dasbor</h1>
       </div>
 
-       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Pendapatan Hari Ini</CardTitle>
@@ -175,4 +184,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

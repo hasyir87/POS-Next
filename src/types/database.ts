@@ -20,6 +20,7 @@ export interface Organization {
   phone?: string | null
   logo_url?: string | null
   parent_organization_id?: string | null
+  is_setup_complete: boolean
   created_at: string
   updated_at: string
 }

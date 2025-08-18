@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   // --- Langkah 2: Buat Organisasi Induk ---
   const { data: organization, error: orgError } = await supabase
     .from("organizations")
-    .insert([{ name: organization_name }])
+    .insert([{ name: organization_name, is_setup_complete: false }])
     .select()
     .single();
 
