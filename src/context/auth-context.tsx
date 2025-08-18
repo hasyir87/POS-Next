@@ -8,7 +8,7 @@ import type { UserProfile } from '@/types/database';
 import { useRouter } from 'next/navigation';
 
 interface AuthContextType {
-  supabase: SupabaseClient | null;
+  supabase: SupabaseClient;
   user: SupabaseUser | null;
   profile: UserProfile | null;
   loading: boolean;
@@ -41,67 +41,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
-    // Clear all states on logout
     setUser(null);
     setProfile(null);
     setSelectedOrganizationId(null);
     router.push('/');
   }, [supabase, router, setSelectedOrganizationId]);
 
-  const refreshProfile = useCallback(async () => {
-    if (!user) return;
-
-    const { data: userProfile, error: profileError } = await supabase
+  const fetchUserProfile = useCallback(async (currentUser: SupabaseUser) => {
+      const { data: userProfile, error: profileError } = await supabase
         .from('profiles')
         .select('*, organizations(*)')
-        .eq('id', user.id)
+        .eq('id', currentUser.id)
         .maybeSingle();
 
-    if (profileError) {
-        console.error("Error refreshing profile:", profileError.message);
-    } else if (userProfile) {
-        setProfile(userProfile as UserProfile);
-    }
-  }, [user, supabase]);
-
-  useEffect(() => {
-    const fetchSession = async () => {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-      if (sessionError) {
-          console.error("Error getting session:", sessionError.message);
-          setLoading(false);
-          return;
+      if (profileError) {
+        console.error("Error fetching profile:", profileError.message);
+        return null;
       }
       
-      if (session) {
-        const currentUser = session.user;
-        setUser(currentUser);
+      return userProfile as UserProfile | null;
+  }, [supabase]);
 
-        const { data: userProfile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*, organizations(*)')
-          .eq('id', currentUser.id)
-          .maybeSingle();
 
-        if (profileError) {
-          console.error("Error fetching profile:", profileError.message);
-        } else if (userProfile) {
-          setProfile(userProfile as UserProfile);
-          const storedOrgId = localStorage.getItem('selectedOrgId');
+  useEffect(() => {
+    setLoading(true);
+    
+    const fetchSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        setUser(session.user);
+        const fetchedProfile = await fetchUserProfile(session.user);
+        if (fetchedProfile) {
+          setProfile(fetchedProfile);
+           const storedOrgId = localStorage.getItem('selectedOrgId');
           if (storedOrgId) {
               setSelectedOrganizationIdState(storedOrgId);
-          } else if (userProfile.organization_id) {
-              setSelectedOrganizationId(userProfile.organization_id);
+          } else if (fetchedProfile.organization_id) {
+              setSelectedOrganizationId(fetchedProfile.organization_id);
           }
         } else {
-            console.warn(`No profile found for user ${currentUser.id}. The user is authenticated but has no profile entry.`);
-            setProfile(null);
+          console.warn(`No profile found for user ${session.user.id}. The user is authenticated but has no profile entry.`);
         }
-      } else {
-          setUser(null);
-          setProfile(null);
-          setSelectedOrganizationId(null);
       }
       setLoading(false);
     };
@@ -109,22 +90,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     fetchSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          fetchSession();
-        } else if (event === 'SIGNED_OUT') {
+      async (event, session) => {
+        setLoading(true);
+        if (session?.user) {
+          setUser(session.user);
+           const fetchedProfile = await fetchUserProfile(session.user);
+           setProfile(fetchedProfile);
+           if (fetchedProfile?.organization_id && !localStorage.getItem('selectedOrgId')) {
+             setSelectedOrganizationId(fetchedProfile.organization_id);
+           }
+        } else {
           setUser(null);
           setProfile(null);
           setSelectedOrganizationId(null);
           router.push('/');
         }
+        setLoading(false);
       }
     );
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase, router, setSelectedOrganizationId]);
+  }, [supabase, router, fetchUserProfile, setSelectedOrganizationId]);
 
   const login = async ({ email, password }: { email: string; password: string }) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -141,6 +129,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       return fetch(url, { ...options, headers });
   }, [supabase]);
+
+  const refreshProfile = useCallback(async () => {
+    if(user) {
+      const refreshedProfile = await fetchUserProfile(user);
+      setProfile(refreshedProfile);
+    }
+  }, [user, fetchUserProfile]);
 
 
   const value = {

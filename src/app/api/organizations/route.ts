@@ -22,19 +22,38 @@ export async function GET(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
+    // Perubahan Kunci: Jika profil tidak ditemukan, jangan lempar error.
+    // Kembalikan saja array kosong karena kemungkinan profil sedang dibuat.
+    // Frontend akan menangani state kosong ini.
     if (profileError || !profile) {
-      return NextResponse.json({ error: 'Profile not found for user.' }, { status: 404 });
+      console.warn(`Profile not found for user ${user.id} when fetching organizations. Returning empty array.`);
+      return NextResponse.json([]);
     }
 
     let query = supabase.from('organizations').select('*');
 
-    // Superadmin can see all organizations
     if (profile.role !== 'superadmin') {
-      if (!profile.organization_id) {
-         return NextResponse.json({ organizations: [] });
+       if (!profile.organization_id) {
+         // Jika user tidak punya org, kembalikan array kosong.
+         return NextResponse.json([]);
       }
-      // Owners/Admins can see their own organization and its children (outlets)
-      query = query.or(`id.eq.${profile.organization_id},parent_organization_id.eq.${profile.organization_id}`);
+      // Ambil organisasi utama PENGGUNA, bukan outlet yang dipilih.
+      const { data: mainOrg, error: mainOrgError } = await supabase
+        .from('organizations')
+        .select('id, parent_organization_id')
+        .eq('id', profile.organization_id)
+        .single();
+      
+      if(mainOrgError || !mainOrg) {
+        console.error('Error fetching main organization for user:', mainOrgError);
+        return NextResponse.json([]);
+      }
+
+      // Tentukan ID organisasi induk (atau diri sendiri jika itu adalah induk)
+      const parentOrgId = mainOrg.parent_organization_id || mainOrg.id;
+      
+      // Ambil organisasi induk DAN semua anaknya (outlet)
+      query = query.or(`id.eq.${parentOrgId},parent_organization_id.eq.${parentOrgId}`);
     }
     
     const { data: organizations, error } = await query.order('created_at', { ascending: false });
@@ -47,9 +66,9 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    return NextResponse.json(organizations)
+    return NextResponse.json(organizations || []);
   } catch (error) {
-    console.error('Unexpected error:', error)
+    console.error('Unexpected error in GET /api/organizations:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

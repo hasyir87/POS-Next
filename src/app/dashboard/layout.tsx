@@ -44,24 +44,8 @@ export default function DashboardLayout({
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoadingOrgs, setIsLoadingOrgs] = useState(false);
 
-  // Redirect logic
-  useEffect(() => {
-    if (!loading && profile) {
-      const isSetupPage = pathname === '/dashboard/setup';
-      const mainOrg = organizations.find(org => org.id === profile.organization_id);
-
-      if (mainOrg && !mainOrg.is_setup_complete && !isSetupPage) {
-        router.push('/dashboard/setup');
-      } else if (mainOrg && mainOrg.is_setup_complete && isSetupPage) {
-        router.push('/dashboard');
-      }
-    }
-  }, [profile, loading, organizations, pathname, router]);
-
-
   const fetchOrganizations = useCallback(async () => {
     if (!user) {
-      setIsLoadingOrgs(false);
       return;
     }
 
@@ -82,16 +66,42 @@ export default function DashboardLayout({
     }
   }, [user, fetchWithAuth]);
 
-
   useEffect(() => {
     if (!loading && user) {
       fetchOrganizations();
     }
   }, [user, loading, fetchOrganizations]);
 
+  // Redirect logic
+  useEffect(() => {
+    // Tunggu hingga profile dan organisasi selesai dimuat
+    if (!loading && profile && !isLoadingOrgs) {
+      const isSetupPage = pathname === '/dashboard/setup';
+      
+      // Cari organisasi utama pengguna, BUKAN yang sedang dipilih
+      const mainOrg = organizations.find(org => org.id === profile.organization_id);
+
+      if (mainOrg && !mainOrg.is_setup_complete && !isSetupPage) {
+        router.push('/dashboard/setup');
+      } else if (mainOrg && mainOrg.is_setup_complete && isSetupPage) {
+        router.push('/dashboard');
+      }
+    }
+  }, [profile, loading, organizations, isLoadingOrgs, pathname, router]);
+
   // Main loading state for the entire auth process
-  if (loading || !profile) {
+  if (loading) {
     return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Jika tidak ada user sama sekali setelah loading, middleware seharusnya sudah mengarahkan
+  // Tapi sebagai fallback, kita tampilkan loader agar tidak ada flash of content
+  if (!user) {
+     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
@@ -112,7 +122,7 @@ export default function DashboardLayout({
 
   // Hide sidebar and header on the setup page
   if (pathname === '/dashboard/setup') {
-    return <>{children}</>;
+    return <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-background">{children}</main>;
   }
 
 
@@ -153,10 +163,10 @@ export default function DashboardLayout({
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col">
               <SheetHeader>
-                <SheetTitle className="font-headline text-xl flex items-center gap-2">
-                  <MPerfumeAmalLogo className="h-6 w-6 text-primary" />
-                  ScentPOS
-                </SheetTitle>
+                  <SheetTitle className="font-headline text-xl flex items-center gap-2">
+                    <MPerfumeAmalLogo className="h-6 w-6 text-primary" />
+                    ScentPOS
+                  </SheetTitle>
               </SheetHeader>
               <nav className="grid gap-2 text-lg font-medium mt-4">
                 {navItems.map((item) => (
