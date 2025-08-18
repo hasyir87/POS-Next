@@ -23,7 +23,7 @@ const formSchema = z.object({
   confirmPassword: z.string(),
 }).refine(data => data.password === data.confirmPassword, {
   message: "Konfirmasi password tidak cocok.",
-  path: ["confirmPassword"], // path untuk menampilkan error
+  path: ["confirmPassword"],
 });
 
 
