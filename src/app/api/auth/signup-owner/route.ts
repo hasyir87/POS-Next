@@ -1,21 +1,17 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 import { NextResponse } from "next/server";
-import { handleSupabaseError } from '@/lib/utils/error';
-
-// This route should use the service role key to perform admin-level actions.
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SERVICE_ROLE_KEY_SUPABASE;
 
 export async function POST(req: Request) {
-  // Ensure we have the required environment variables
+  // CORRECT: Initialize the client inside the handler to ensure env vars are available.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SERVICE_ROLE_KEY_SUPABASE;
+
   if (!supabaseUrl || !supabaseServiceKey) {
     console.error('Missing Supabase URL or Service Role Key');
     return NextResponse.json({ error: 'Konfigurasi server tidak lengkap.' }, { status: 500 });
   }
 
-  // Create a dedicated admin client for this operation
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,
@@ -33,7 +29,7 @@ export async function POST(req: Request) {
      return NextResponse.json({ error: "Password harus memiliki setidaknya 8 karakter." }, { status: 400 });
   }
 
-  // Check if organization name already exists using a safer method
+  // Check if organization name already exists
   const { data: existingOrg, error: orgCheckError } = await supabaseAdmin
     .from('organizations')
     .select('id')
@@ -54,20 +50,20 @@ export async function POST(req: Request) {
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
-    email_confirm: true, // Set to true for production to send verification email
+    email_confirm: true, // Should be true in production to send verification email
     user_metadata: { full_name: full_name }
   });
 
   if (authError) {
     console.error("Auth user creation error:", authError);
-    if (authError.message.includes('unique constraint')) {
+    if (authError.message.includes('unique constraint') || authError.message.toLowerCase().includes('already exists')) {
         return NextResponse.json({ error: 'Pengguna dengan email ini sudah ada.' }, { status: 409 });
     }
     return NextResponse.json({ error: authError.message || 'Gagal membuat pengguna.' }, { status: 400 });
   }
 
   if (!authData.user) {
-    return NextResponse.json({ error: 'Gagal membuat pengguna.' }, { status: 500 });
+    return NextResponse.json({ error: 'Gagal membuat pengguna (user data tidak kembali).' }, { status: 500 });
   }
 
   const newUserId = authData.user.id;
