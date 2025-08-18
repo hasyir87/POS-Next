@@ -51,7 +51,7 @@ export default function DashboardPage() {
         <AlertTriangle className="h-4 w-4" />
         <AlertTitle>Profil Tidak Ditemukan</AlertTitle>
         <AlertDescription>
-          Tidak dapat memuat profil pengguna. Silakan coba masuk kembali atau hubungi dukungan.
+          Tidak dapat memuat profil pengguna. Ini mungkin karena profil belum dibuat sepenuhnya. Silakan coba masuk kembali atau hubungi dukungan jika masalah berlanjut.
         </AlertDescription>
       </Alert>
     );

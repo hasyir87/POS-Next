@@ -40,12 +40,10 @@ export default function DashboardLayout({
   const { user, profile, loading, logout, selectedOrganizationId, setSelectedOrganizationId, fetchWithAuth } = useAuth();
   
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [isLoadingOrgs, setIsLoadingOrgs] = useState(true);
+  const [isLoadingOrgs, setIsLoadingOrgs] = useState(false);
 
   const fetchOrganizations = useCallback(async () => {
-    // We can fetch organizations even without a profile if the user is a superadmin,
-    // but for now, we'll keep it simple and require a profile to know which orgs to fetch.
-    if (!profile) {
+    if (!user) {
       setIsLoadingOrgs(false);
       return;
     }
@@ -62,7 +60,7 @@ export default function DashboardLayout({
     } finally {
       setIsLoadingOrgs(false);
     }
-  }, [profile, fetchWithAuth]);
+  }, [user, fetchWithAuth]);
 
 
   useEffect(() => {
@@ -134,13 +132,12 @@ export default function DashboardLayout({
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col">
               <SheetHeader>
-                <SheetTitle>Navigasi Utama</SheetTitle>
-                 <Link href="#" className="flex items-center gap-2 text-lg font-semibold mb-4">
+                <SheetTitle className="font-headline text-xl flex items-center gap-2">
                   <MPerfumeAmalLogo className="h-6 w-6 text-primary" />
-                  <span className="font-headline text-xl">ScentPOS</span>
-                </Link>
+                  ScentPOS
+                </SheetTitle>
               </SheetHeader>
-              <nav className="grid gap-2 text-lg font-medium">
+              <nav className="grid gap-2 text-lg font-medium mt-4">
                 {navItems.map((item) => (
                   <Link
                     key={item.label}
