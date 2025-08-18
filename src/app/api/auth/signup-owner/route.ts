@@ -33,14 +33,15 @@ export async function POST(req: Request) {
      return NextResponse.json({ error: "Password harus memiliki setidaknya 8 karakter." }, { status: 400 });
   }
 
-  // Check if organization name already exists
+  // Check if organization name already exists using a safer method
   const { data: existingOrg, error: orgCheckError } = await supabaseAdmin
     .from('organizations')
     .select('id')
     .eq('name', organization_name)
-    .single();
+    .limit(1)
+    .maybeSingle();
 
-  if (orgCheckError && orgCheckError.code !== 'PGRST116') { // Ignore 'PGRST116' (No rows found)
+  if (orgCheckError) {
       console.error('Organization check error:', orgCheckError);
       return NextResponse.json({ error: 'Gagal memeriksa organisasi.' }, { status: 500 });
   }
@@ -59,7 +60,10 @@ export async function POST(req: Request) {
 
   if (authError) {
     console.error("Auth user creation error:", authError);
-    return NextResponse.json({ error: 'Pengguna dengan email ini sudah ada.' }, { status: 409 });
+    if (authError.message.includes('unique constraint')) {
+        return NextResponse.json({ error: 'Pengguna dengan email ini sudah ada.' }, { status: 409 });
+    }
+    return NextResponse.json({ error: authError.message || 'Gagal membuat pengguna.' }, { status: 400 });
   }
 
   if (!authData.user) {
