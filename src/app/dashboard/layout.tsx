@@ -43,6 +43,8 @@ export default function DashboardLayout({
   const [isLoadingOrgs, setIsLoadingOrgs] = useState(true);
 
   const fetchOrganizations = useCallback(async () => {
+    // We can fetch organizations even without a profile if the user is a superadmin,
+    // but for now, we'll keep it simple and require a profile to know which orgs to fetch.
     if (!profile) {
       setIsLoadingOrgs(false);
       return;
@@ -69,7 +71,7 @@ export default function DashboardLayout({
     }
   }, [user, loading, fetchOrganizations]);
 
-
+  // Main loading state for the entire auth process
   if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
@@ -78,6 +80,7 @@ export default function DashboardLayout({
     );
   }
 
+  // If auth is done and still no user, something is wrong, redirect handled by middleware/page
   if (!user) {
     return null;
   }
