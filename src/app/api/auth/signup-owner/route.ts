@@ -1,27 +1,33 @@
-
-import { createClient } from '@/utils/supabase/server';
-import { cookies } from "next/headers";
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from "next/server";
 import { handleSupabaseError } from '@/lib/utils/error';
 
-// PENTING: Fungsi ini sekarang akan menggunakan service_role key secara implisit dari createClient
-// jika diatur dengan benar di sisi server.
-const getSupabaseAdmin = () => {
-    const cookieStore = cookies();
-    // Buat client dengan hak akses service_role. Kunci SERVICE_ROLE_KEY_SUPABASE
-    // harus diatur di environment agar Supabase dapat menggunakannya.
-    return createClient(cookieStore);
-};
+// PENTING: Inisialisasi client Supabase dengan service_role key untuk operasi admin.
+// Kunci-kunci ini HANYA boleh digunakan di lingkungan server.
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SERVICE_ROLE_KEY_SUPABASE!,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+);
 
 
 export async function POST(req: Request) {
-  const supabaseAdmin = getSupabaseAdmin();
   const { email, password, organization_name } = await req.json();
 
   // --- Langkah 0: Validasi Input & Keunikan Nama Organisasi ---
   if (!email || !password || !organization_name) {
     return NextResponse.json({ error: "Email, password, dan nama organisasi harus diisi." }, { status: 400 });
   }
+  
+  if (password.length < 8) {
+     return NextResponse.json({ error: "Password harus memiliki setidaknya 8 karakter." }, { status: 400 });
+  }
+
 
   const { data: existingOrg, error: existingOrgError } = await supabaseAdmin
     .from('organizations')
