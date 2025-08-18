@@ -3,40 +3,74 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, Loader2, TrendingUp } from 'lucide-react';
+import { AlertTriangle, DollarSign, Loader2, Package, TrendingUp, Users } from 'lucide-react';
 import { SalesChart } from '@/components/sales-chart';
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from '@/components/ui/table';
 import { Droplets, Trophy } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
+import { useCallback, useEffect, useState } from 'react';
+import type { Product } from '@/types/database';
 
-// This is placeholder data. In a real app, this data would come from an API.
-const salesData = [
-  { name: "Sen", sales: 4000 },
-  { name: "Sel", sales: 3000 },
-  { name: "Rab", sales: 2000 },
-  { name: "Kam", sales: 2780 },
-  { name: "Jum", sales: 1890 },
-  { name: "Sab", sales: 2390 },
-  { name: "Min", sales: 3490 },
-];
+// Helper function to format currency
+const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
+};
 
-const topProducts = [
-    { rank: 1, name: "Ocean Breeze", sales: 124 },
-    { rank: 2, name: "Mystic Woods", sales: 98 },
-    { rank: 3, name: "Citrus Grove", sales: 76 },
-];
-
-const topRefillAromas = [
-    { rank: 1, aroma: "YSL Black Opium", sales: 88 },
-    { rank: 2, aroma: "Baccarat Rouge", sales: 81 },
-    { rank: 3, aroma: "Creed Aventus", sales: 65 },
-];
-
+interface DashboardData {
+    dailyRevenue: number;
+    dailySalesCount: number;
+    newCustomersToday: number;
+    topProducts: Array<{ name: string | null, sales: number | null }>;
+}
 
 export default function DashboardPage() {
-  const { loading: authLoading, profile, selectedOrganizationId } = useAuth();
+  const { loading: authLoading, profile, selectedOrganizationId, supabase } = useAuth();
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchDashboardData = useCallback(async () => {
+    if (!selectedOrganizationId || !supabase) {
+        setIsLoading(false);
+        return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+        const { data, error } = await supabase.rpc('get_dashboard_analytics', {
+            p_organization_id: selectedOrganizationId
+        });
+
+        if (error) {
+            throw error;
+        }
+
+        setDashboardData({
+            dailyRevenue: data[0].daily_revenue || 0,
+            dailySalesCount: data[0].daily_sales_count || 0,
+            newCustomersToday: data[0].new_customers_today || 0,
+            topProducts: data[0].top_selling_products || [],
+        });
+
+    } catch (err: any) {
+        console.error("Error fetching dashboard data:", err);
+        setError("Gagal memuat data dasbor. Silakan coba lagi.");
+    } finally {
+        setIsLoading(false);
+    }
+  }, [selectedOrganizationId, supabase]);
+
+  useEffect(() => {
+    if (!authLoading && selectedOrganizationId) {
+      fetchDashboardData();
+    } else if (!authLoading && !selectedOrganizationId) {
+      setIsLoading(false);
+    }
+  }, [authLoading, selectedOrganizationId, fetchDashboardData]);
   
-  if (authLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -44,20 +78,6 @@ export default function DashboardPage() {
     );
   }
 
-  // After loading, if there's still no profile, it's an issue.
-  if (!profile) {
-    return (
-      <Alert variant="destructive">
-        <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>Profil Tidak Ditemukan</AlertTitle>
-        <AlertDescription>
-          Tidak dapat memuat profil pengguna. Ini mungkin karena profil belum dibuat sepenuhnya. Silakan coba masuk kembali atau hubungi dukungan jika masalah berlanjut.
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
-  // If there's a profile but no organization is selected, guide the user.
   if (!selectedOrganizationId) {
     return (
       <Card className="m-auto">
@@ -70,6 +90,19 @@ export default function DashboardPage() {
       </Card>
     );
   }
+  
+   if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertTitle>Terjadi Kesalahan</AlertTitle>
+        <AlertDescription>
+          {error}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
 
   // Main dashboard content
   return (
@@ -82,11 +115,28 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Pendapatan Hari Ini</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">Rp 0</div>
-              <p className="text-xs text-muted-foreground">Data belum tersedia</p>
+              <div className="text-2xl font-bold">{formatCurrency(dashboardData?.dailyRevenue || 0)}</div>
+            </CardContent>
+          </Card>
+           <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Penjualan Hari Ini</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">+{dashboardData?.dailySalesCount || 0}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pelanggan Baru (Hari Ini)</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">+{dashboardData?.newCustomersToday || 0}</div>
             </CardContent>
           </Card>
         </div>
@@ -94,51 +144,35 @@ export default function DashboardPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
             <Card className="lg:col-span-4">
               <CardHeader>
-                <CardTitle>Performa Penjualan</CardTitle>
-                <CardDescription>Penjualan minggu ini.</CardDescription>
+                <CardTitle>Grafik Penjualan</CardTitle>
+                <CardDescription>Data belum tersedia.</CardDescription>
               </CardHeader>
               <CardContent className="pl-2">
-                <SalesChart data={salesData} />
+                 <div className="h-[350px] w-full flex items-center justify-center text-muted-foreground">
+                    Grafik akan ditampilkan di sini
+                </div>
               </CardContent>
             </Card>
             <Card className="lg:col-span-3">
               <CardHeader>
-                <CardTitle>Notifikasi</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Trophy className="text-yellow-500" /> Produk Terlaris</CardTitle>
+                 <CardDescription>Produk dengan penjualan unit terbanyak.</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-center text-muted-foreground">Tidak ada notifikasi baru.</p>
-              </CardContent>
-            </Card>
-        </div>
-        
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Trophy className="text-yellow-500" /> Produk Jadi Terlaris</CardTitle>
-                </CardHeader>
-                <CardContent>
                     <Table>
                         <TableHeader><TableRow><TableHead>Peringkat</TableHead><TableHead>Produk</TableHead><TableHead className="text-right">Penjualan</TableHead></TableRow></TableHeader>
                         <TableBody>
-                            {topProducts.map(p => <TableRow key={p.rank}><TableCell>{p.rank}</TableCell><TableCell>{p.name}</TableCell><TableCell className="text-right">{p.sales} unit</TableCell></TableRow>)}
+                            {dashboardData?.topProducts && dashboardData.topProducts.length > 0 ? (
+                                dashboardData.topProducts.map((p, index) => <TableRow key={index}><TableCell>{index + 1}</TableCell><TableCell>{p.name}</TableCell><TableCell className="text-right">{p.sales} unit</TableCell></TableRow>)
+                            ) : (
+                                <TableRow><TableCell colSpan={3} className="text-center">Belum ada data penjualan.</TableCell></TableRow>
+                            )}
                         </TableBody>
                     </Table>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Droplets className="text-blue-500" /> Aroma Isi Ulang Terpopuler</CardTitle>
-                </CardHeader>
-                <CardContent>
-                     <Table>
-                        <TableHeader><TableRow><TableHead>Peringkat</TableHead><TableHead>Aroma</TableHead><TableHead className="text-right">Penjualan</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                            {topRefillAromas.map(a => <TableRow key={a.rank}><TableCell>{a.rank}</TableCell><TableCell>{a.aroma}</TableCell><TableCell className="text-right">{a.sales} kali</TableCell></TableRow>)}
-                        </TableBody>
-                    </Table>
-                </CardContent>
+              </CardContent>
             </Card>
         </div>
     </div>
   );
 }
+

@@ -51,7 +51,10 @@ export default function DashboardLayout({
     setIsLoadingOrgs(true);
     try {
       const response = await fetchWithAuth('/api/organizations');
-      if (!response.ok) throw new Error('Gagal mengambil data organisasi.');
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Gagal mengambil data organisasi.');
+      }
       const data = await response.json();
       setOrganizations(data || []);
     } catch (error) {
