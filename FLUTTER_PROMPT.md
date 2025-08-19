@@ -22,6 +22,7 @@ Tugas Anda adalah membangun aplikasi Point of Sale (POS) lintas platform (iOS/An
     *   `go_router`: Untuk navigasi.
     *   `intl`: Untuk format mata uang dan tanggal.
     *   `equatable`: Untuk perbandingan objek dalam BLoC.
+    *   `blue_thermal_printer` (atau alternatif): Untuk pencetakan struk.
 
 **PENTING**: Backend Supabase (Database, Otentikasi, RLS, Functions) **SUDAH ADA DAN BERFUNGSI**. Aplikasi Flutter ini adalah *headless client*. Jangan membuat ulang logika backend.
 
@@ -45,21 +46,24 @@ Berikut adalah rincian fungsionalitas yang harus Anda implementasikan:
 -   Data ini harus diambil dari database berdasarkan `selectedOrganizationId`.
 
 ### 2.3. Point of Sale (POS)
-Ini adalah fitur inti. Buat antarmuka kasir yang efisien.
+Ini adalah fitur inti. Buat antarmuka kasir yang efisien dan intuitif.
 -   **Layout Terpadu**: Gunakan `TabBar` atau sejenisnya untuk beralih antara mode "Produk Jadi" dan "Isi Ulang".
 -   **Mode Produk Jadi**:
     -   Tampilkan katalog produk dalam bentuk grid yang menarik (`StaggeredGridView` atau `GridView`).
     -   Setiap item produk dapat diketuk untuk ditambahkan ke keranjang.
     -   Implementasikan fitur pencarian produk.
 -   **Mode Isi Ulang (Refill)**:
-    -   Buat formulir bertingkat (multi-step) yang memandu kasir:
-        1.  Pilih Grade Parfum.
-        2.  Pilih Aroma (disaring berdasarkan Grade).
-        3.  Pilih Ukuran Botol.
-        4.  (Opsional) Sesuaikan jumlah bibit.
-    -   Harga harus dihitung secara dinamis berdasarkan pilihan di atas.
+    -   Buat formulir bertingkat (multi-step) yang memandu kasir.
+    -   **Langkah 1: Pilih Grade Parfum**: Tampilkan pilihan grade (misal: Standard, Premium). Pilihan ini akan memfilter aroma yang tersedia.
+    -   **Langkah 2: Pilih Aroma (Fitur Mix)**:
+        -   Sediakan daftar aroma yang sesuai dengan grade yang dipilih.
+        -   **PENTING**: Izinkan kasir untuk memilih **satu atau lebih aroma**. Gunakan UI yang mendukung multi-seleksi seperti daftar `CheckboxListTile` atau `Wrap` dengan `ChoiceChip`.
+        -   Aroma yang dipilih harus ditampilkan dengan jelas.
+    -   **Langkah 3: Pilih Ukuran Botol**: Tampilkan pilihan ukuran botol yang tersedia.
+    -   **Langkah 4 (Opsional): Sesuaikan Komposisi**: Beri opsi untuk menambah atau mengurangi jumlah bibit (dalam ml), di mana harga akan disesuaikan secara dinamis.
+    -   **Kalkulasi Harga**: Harga harus dihitung secara dinamis berdasarkan kombinasi dari Grade, semua Aroma yang dipilih, dan Ukuran Botol.
 -   **Keranjang Belanja (Cart)**:
-    -   Tampilkan daftar item yang ditambahkan.
+    -   Tampilkan daftar item yang ditambahkan (baik produk jadi maupun item isi ulang).
     -   Fungsi untuk menambah/mengurangi kuantitas atau menghapus item.
     -   Terapkan promosi (diskon persentase/nominal atau BOGO).
     -   Hitung subtotal, diskon, pajak, dan total akhir.
@@ -67,6 +71,7 @@ Ini adalah fitur inti. Buat antarmuka kasir yang efisien.
     -   Pilih pelanggan dari daftar yang ada atau tambahkan pelanggan baru.
     -   Pilih metode pembayaran (Tunai, QRIS, Debit).
     -   Saat tombol "Bayar" ditekan, panggil fungsi RPC `process_checkout` di Supabase dengan semua data yang diperlukan (items, total, customer_id, dll.) untuk memastikan transaksi atomik.
+    -   Setelah checkout berhasil, beri opsi untuk mencetak struk.
 
 ### 2.4. Manajemen Data
 Implementasikan fungsionalitas CRUD (Create, Read, Update, Delete) penuh untuk modul-modul berikut. Setiap halaman harus menampilkan data berdasarkan `selectedOrganizationId`.
@@ -82,6 +87,16 @@ Implementasikan fungsionalitas CRUD (Create, Read, Update, Delete) penuh untuk m
     -   Ukuran Botol
     -   Promosi
     -   Pengaturan Loyalitas
+
+### 2.6. Integrasi Perangkat Keras
+-   **Cetak Struk via Bluetooth**:
+    -   Implementasikan fungsionalitas untuk terhubung dengan printer thermal mini melalui Bluetooth.
+    -   Gunakan paket seperti `blue_thermal_printer` atau alternatif yang setara.
+    -   Buat fungsi untuk memformat dan mencetak struk setelah transaksi berhasil.
+    -   **Isi Struk**: Struk harus berisi informasi berikut:
+        -   Header: Nama & Alamat Toko, ID Transaksi, Tanggal, Nama Kasir.
+        -   Body: Daftar item yang dibeli, kuantitas, harga satuan, dan subtotal per item.
+        -   Footer: Subtotal, Diskon, Pajak, Total, Metode Pembayaran, dan pesan terima kasih.
 
 ---
 
