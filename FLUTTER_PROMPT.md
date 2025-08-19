@@ -22,7 +22,7 @@ Tugas Anda adalah membangun aplikasi Point of Sale (POS) lintas platform (iOS/An
     *   `go_router`: Untuk navigasi.
     *   `intl`: Untuk format mata uang dan tanggal.
     *   `equatable`: Untuk perbandingan objek dalam BLoC.
-    *   `blue_thermal_printer` (atau alternatif): Untuk pencetakan struk.
+    *   Paket untuk konektivitas printer (misalnya, `blue_thermal_printer` untuk Bluetooth, dan alternatif lain untuk USB/Wi-Fi).
 
 **PENTING**: Backend Supabase (Database, Otentikasi, RLS, Functions) **SUDAH ADA DAN BERFUNGSI**. Aplikasi Flutter ini adalah *headless client*. Jangan membuat ulang logika backend.
 
@@ -54,14 +54,14 @@ Ini adalah fitur inti. Buat antarmuka kasir yang efisien dan intuitif.
     -   Implementasikan fitur pencarian produk.
 -   **Mode Isi Ulang (Refill)**:
     -   Buat formulir bertingkat (multi-step) yang memandu kasir.
-    -   **Langkah 1: Pilih Grade Parfum**: Tampilkan pilihan grade (misal: Standard, Premium). Pilihan ini akan memfilter aroma yang tersedia.
+    -   **Langkah 1: Pilih Grade Parfum**: Tampilkan pilihan grade (misal: Standard, Premium). Pilihan ini akan memfilter aroma yang tersedia dan menentukan basis harga.
     -   **Langkah 2: Pilih Aroma (Fitur Mix)**:
         -   Sediakan daftar aroma yang sesuai dengan grade yang dipilih.
         -   **PENTING**: Izinkan kasir untuk memilih **satu atau lebih aroma**. Gunakan UI yang mendukung multi-seleksi seperti daftar `CheckboxListTile` atau `Wrap` dengan `ChoiceChip`.
         -   Aroma yang dipilih harus ditampilkan dengan jelas.
     -   **Langkah 3: Pilih Ukuran Botol**: Tampilkan pilihan ukuran botol yang tersedia.
-    -   **Langkah 4 (Opsional): Sesuaikan Komposisi**: Beri opsi untuk menambah atau mengurangi jumlah bibit (dalam ml), di mana harga akan disesuaikan secara dinamis.
-    -   **Kalkulasi Harga**: Harga harus dihitung secara dinamis berdasarkan kombinasi dari Grade, semua Aroma yang dipilih, dan Ukuran Botol.
+    -   **Langkah 4 (Opsional): Sesuaikan Komposisi**: Beri opsi untuk menambah atau mengurangi jumlah bibit (dalam ml). Harga harus disesuaikan secara dinamis berdasarkan nilai `extra_essence_price` (harga per ml) dari tabel `grades` untuk grade yang dipilih.
+    -   **Kalkulasi Harga**: Harga harus dihitung secara dinamis berdasarkan kombinasi dari Grade, semua Aroma yang dipilih, dan Ukuran Botol, ditambah biaya tambahan dari penyesuaian komposisi.
 -   **Keranjang Belanja (Cart)**:
     -   Tampilkan daftar item yang ditambahkan (baik produk jadi maupun item isi ulang).
     -   Fungsi untuk menambah/mengurangi kuantitas atau menghapus item.
@@ -82,18 +82,20 @@ Implementasikan fungsionalitas CRUD (Create, Read, Update, Delete) penuh untuk m
 
 ### 2.5. Pengaturan
 -   Buat halaman di mana pengguna (dengan peran 'owner') dapat mengelola atribut bisnis seperti:
-    -   Daftar Grade Parfum
-    -   Daftar Aroma
-    -   Ukuran Botol
-    -   Promosi
-    -   Pengaturan Loyalitas
+    -   Daftar Grade Parfum (termasuk `price_multiplier` dan `extra_essence_price`).
+    -   Daftar Aroma.
+    -   Ukuran Botol.
+    -   Promosi.
+    -   Pengaturan Loyalitas.
+    -   **Pengaturan Printer**: UI untuk memilih printer yang terhubung dan mengatur template struk.
 
 ### 2.6. Integrasi Perangkat Keras
--   **Cetak Struk via Bluetooth**:
-    -   Implementasikan fungsionalitas untuk terhubung dengan printer thermal mini melalui Bluetooth.
-    -   Gunakan paket seperti `blue_thermal_printer` atau alternatif yang setara.
+-   **Cetak Struk**:
+    -   Implementasikan fungsionalitas untuk mencari dan terhubung dengan printer melalui **Bluetooth, Wi-Fi, dan USB**.
+    -   Gunakan paket yang sesuai untuk setiap jenis koneksi.
     -   Buat fungsi untuk memformat dan mencetak struk setelah transaksi berhasil.
-    -   **Isi Struk**: Struk harus berisi informasi berikut:
+    -   **Template Struk**: Buat halaman pengaturan di mana pengguna dapat mendesain template struk (misalnya, menambahkan logo, mengubah header/footer, memilih informasi yang akan ditampilkan).
+    -   **Isi Struk (Default)**: Struk harus berisi informasi berikut:
         -   Header: Nama & Alamat Toko, ID Transaksi, Tanggal, Nama Kasir.
         -   Body: Daftar item yang dibeli, kuantitas, harga satuan, dan subtotal per item.
         -   Footer: Subtotal, Diskon, Pajak, Total, Metode Pembayaran, dan pesan terima kasih.
