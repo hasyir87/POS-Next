@@ -1,4 +1,6 @@
-import { createClient } from '@/utils/supabase/server';
+
+import { createClient as createServerClient } from '@/utils/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
 import type { Database } from '@/types/database';
@@ -6,7 +8,7 @@ import { handleSupabaseError } from '@/lib/utils/error';
 
 export async function GET(request: NextRequest) {
   const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createServerClient(cookieStore);
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -50,7 +52,7 @@ export async function POST(req: Request) {
   const { email, password, full_name, role, organization_id } = await req.json();
   
   const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = createServerClient(cookieStore);
 
   try {
     const { data: { user: requestingUser }, error: userError } = await supabase.auth.getUser();
@@ -79,14 +81,12 @@ export async function POST(req: Request) {
     }
 
     // Gunakan service role key untuk membuat user baru di Supabase Auth
-    const supabaseAdmin = createClient(cookieStore, {
-        auth: {
-            autoRefreshToken: false,
-            persistSession: false
-        },
-        cookies: {},
-        supabaseKey: process.env.SERVICE_ROLE_KEY_SUPABASE
-    });
+    const supabaseAdmin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SERVICE_ROLE_KEY_SUPABASE!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
 
     const { data: userAuthData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,

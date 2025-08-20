@@ -1,13 +1,10 @@
 
-import { createClient } from '@/utils/supabase/server';
-import { cookies } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from "next/server";
-import { handleSupabaseError } from '@/lib/utils/error';
 
+// PENTING: Untuk operasi admin seperti ini, kita perlu menggunakan service_role key.
+// Client harus dibuat di dalam fungsi request untuk memastikan env vars dimuat.
 export async function POST(req: Request) {
-  const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
-  
   const { email, password, organization_name, full_name } = await req.json();
 
   if (!email || !password || !organization_name || !full_name) {
@@ -18,35 +15,37 @@ export async function POST(req: Request) {
      return NextResponse.json({ error: "Password harus memiliki setidaknya 8 karakter." }, { status: 400 });
   }
 
-  try {
-    // Panggil fungsi RPC yang telah diperkuat untuk menangani seluruh proses pendaftaran.
-    const { error } = await supabase.rpc('signup_owner', {
-      p_email: email,
-      p_password: password,
-      p_full_name: full_name,
-      p_organization_name: organization_name
-    });
+  // Inisialisasi admin client di dalam fungsi request
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SERVICE_ROLE_KEY_SUPABASE!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
 
-    if (error) {
-      console.error("Signup RPC error:", error);
-      // Berikan umpan balik yang lebih spesifik berdasarkan pesan error dari fungsi database.
-      if (error.message.includes('org_exists')) {
-        return NextResponse.json({ error: "Nama organisasi ini sudah digunakan." }, { status: 409 });
-      }
-      if (error.message.includes('user_exists')) {
-        return NextResponse.json({ error: "Pengguna dengan email ini sudah ada." }, { status: 409 });
-      }
-      // Fallback untuk error lain yang tidak terduga.
-      return NextResponse.json({ error: "Gagal melakukan pendaftaran. Silakan coba lagi." }, { status: 500 });
+  // Panggil fungsi RPC menggunakan admin client yang sudah benar
+  const { error } = await supabaseAdmin.rpc('signup_owner', {
+    p_email: email,
+    p_password: password,
+    p_full_name: full_name,
+    p_organization_name: organization_name
+  });
+
+  if (error) {
+    console.error("Signup RPC error:", error);
+    // Berikan umpan balik yang lebih spesifik berdasarkan pesan error dari fungsi database.
+    if (error.message.includes('org_exists')) {
+      return NextResponse.json({ error: "Nama organisasi ini sudah digunakan." }, { status: 409 });
     }
-
-    return NextResponse.json(
-      {
-        message: "Pendaftaran berhasil! Silakan periksa email Anda untuk verifikasi.",
-      },
-      { status: 201 },
-    );
-  } catch(e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+     if (error.message.includes('user_exists')) {
+      return NextResponse.json({ error: "Pengguna dengan email ini sudah ada." }, { status: 409 });
+    }
+    return NextResponse.json({ error: error.message || "Gagal mendaftar." }, { status: 400 });
   }
+
+  return NextResponse.json(
+    {
+      message: "Pendaftaran berhasil! Silakan periksa email Anda untuk verifikasi.",
+    },
+    { status: 201 },
+  );
 }
