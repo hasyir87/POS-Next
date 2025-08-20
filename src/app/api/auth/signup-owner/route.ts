@@ -1,10 +1,15 @@
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/utils/supabase/server';
+import { cookies } from 'next/headers';
 import { NextResponse } from "next/server";
+import { handleSupabaseError } from '@/lib/utils/error';
 
-// PENTING: Untuk operasi admin seperti ini, kita perlu menggunakan service_role key.
-// Client harus dibuat di dalam fungsi request untuk memastikan env vars dimuat.
 export async function POST(req: Request) {
+  const cookieStore = cookies();
+  // We use the standard server client here, which has the anon key.
+  // The actual user creation is handled by the RPC function with elevated privileges.
+  const supabase = createClient(cookieStore);
+  
   const { email, password, organization_name, full_name } = await req.json();
 
   if (!email || !password || !organization_name || !full_name) {
@@ -15,15 +20,9 @@ export async function POST(req: Request) {
      return NextResponse.json({ error: "Password harus memiliki setidaknya 8 karakter." }, { status: 400 });
   }
 
-  // Inisialisasi admin client di dalam fungsi request
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SERVICE_ROLE_KEY_SUPABASE!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
-
-  // Panggil fungsi RPC menggunakan admin client yang sudah benar
-  const { error } = await supabaseAdmin.rpc('signup_owner', {
+  // Call the RPC function to handle the entire signup process securely
+  // The parameter order in the object must match the function definition in SQL
+  const { error } = await supabase.rpc('signup_owner', {
     p_email: email,
     p_password: password,
     p_full_name: full_name,
@@ -32,7 +31,7 @@ export async function POST(req: Request) {
 
   if (error) {
     console.error("Signup RPC error:", error);
-    // Berikan umpan balik yang lebih spesifik berdasarkan pesan error dari fungsi database.
+    // Provide more specific feedback based on the error message from the DB function
     if (error.message.includes('org_exists')) {
       return NextResponse.json({ error: "Nama organisasi ini sudah digunakan." }, { status: 409 });
     }
