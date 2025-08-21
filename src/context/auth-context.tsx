@@ -3,15 +3,17 @@
 
 import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback } from 'react';
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import type { UserProfile, Organization, UserRole } from '@/types/database'; 
+import type { UserProfile, Organization } from '@/types/database'; 
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // Initialize Firebase services
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
+const functions = getFunctions(firebaseApp);
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -30,6 +32,7 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,82 +47,82 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSelectedOrganizationIdState(orgId);
   }, []);
 
-  const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser) => {
+  const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser | null): Promise<UserProfile | null> => {
     if (!firebaseUser) return null;
     const profileDocRef = doc(db, 'profiles', firebaseUser.uid);
     const profileDocSnap = await getDoc(profileDocRef);
     if (profileDocSnap.exists()) {
-      return profileDocSnap.data() as UserProfile;
+        const profileData = profileDocSnap.data() as UserProfile;
+        
+        // Fetch organization details if organization_id exists
+        if (profileData.organization_id) {
+            const orgDocRef = doc(db, 'organizations', profileData.organization_id);
+            const orgDocSnap = await getDoc(orgDocRef);
+            if (orgDocSnap.exists()) {
+                profileData.organizations = { id: orgDocSnap.id, ...orgDocSnap.data() } as Organization;
+            }
+        }
+        return profileData;
     }
     return null;
-  }, []);
+  }, [db]);
+
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
+      const publicRoutes = ['/', '/signup', '/unauthorized'];
+      
       if (firebaseUser) {
         setUser(firebaseUser);
         const userProfile = await fetchUserProfile(firebaseUser);
         setProfile(userProfile);
         
-        // Handle organization selection
         const storedOrgId = localStorage.getItem('selectedOrgId');
         if (storedOrgId) {
             setSelectedOrganizationIdState(storedOrgId);
         } else if (userProfile?.organization_id) {
             setSelectedOrganizationId(userProfile.organization_id);
         }
+        
+        if (userProfile && userProfile.organizations && !userProfile.organizations.is_setup_complete && pathname !== '/dashboard/setup') {
+            router.replace('/dashboard/setup');
+        } else if (publicRoutes.includes(pathname)) {
+            router.replace('/dashboard');
+        }
 
-        router.replace('/dashboard');
       } else {
         setUser(null);
         setProfile(null);
         setSelectedOrganizationId(null);
-        router.replace('/');
+        if (!publicRoutes.includes(pathname)) {
+            router.replace('/');
+        }
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [router, fetchUserProfile, setSelectedOrganizationId]);
+  }, [router, fetchUserProfile, setSelectedOrganizationId, pathname]);
 
   const signup = async (values: any) => {
     const { email, password, fullName, organizationName } = values;
-
-    // Check if organization name is unique
-    const orgsRef = collection(db, "organizations");
-    const q = query(orgsRef, where("name", "==", organizationName));
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-      throw new Error("Nama organisasi sudah digunakan.");
+    const signupOwner = httpsCallable(functions, 'signupOwner');
+    try {
+        await signupOwner({ email, password, fullName, organizationName });
+    } catch (error) {
+        console.error("Cloud function error:", error);
+        // Translate Firebase error codes to user-friendly messages
+        if (error instanceof Error) {
+           if (error.message.includes('auth/email-already-in-use')) {
+             throw new Error("Email ini sudah terdaftar.");
+           }
+            if (error.message.includes('org-exists')) {
+             throw new Error("Nama organisasi sudah digunakan.");
+           }
+        }
+        throw new Error("Gagal melakukan pendaftaran. Silakan coba lagi.");
     }
-
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const firebaseUser = userCredential.user;
-
-    // Create organization document
-    const orgDocRef = doc(collection(db, 'organizations'));
-    const organizationData: Organization = {
-      id: orgDocRef.id,
-      name: organizationName,
-      is_setup_complete: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    await setDoc(orgDocRef, organizationData);
-
-    // Create user profile document
-    const profileData: UserProfile = {
-      id: firebaseUser.uid,
-      email: firebaseUser.email,
-      full_name: fullName,
-      role: 'owner',
-      organization_id: orgDocRef.id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      avatar_url: null,
-    };
-    await setDoc(doc(db, 'profiles', firebaseUser.uid), profileData);
   };
 
   const login = async ({ email, password }: { email: string, password: string }) => {
@@ -128,6 +131,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     await signOut(auth);
+    router.push('/');
   };
   
   const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
@@ -137,7 +141,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (idToken) {
           headers.set('Authorization', `Bearer ${idToken}`);
       }
-
       return fetch(url, { ...options, headers });
   };
   
@@ -160,12 +163,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logout,
     fetchWithAuth,
     refreshProfile,
-    supabase: {} as any // Dummy property to prevent type errors in components that will be refactored
+    supabase: null // Explicitly set supabase to null
   };
 
   if (loading) {
      return (
-      <div className="flex h-screen w-full items-center justify-center">
+      <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );

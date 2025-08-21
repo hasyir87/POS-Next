@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -16,6 +17,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { Database } from '@/types/database';
+import { getFirestore, collection, query, where, getDocs, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { firebaseApp } from '@/lib/firebase/config';
 
 type RawMaterial = Database['public']['Tables']['raw_materials']['Row'];
 
@@ -47,7 +50,8 @@ const formatCurrency = (amount: number) => {
 
 export default function InventoryPage() {
   const { toast } = useToast();
-  const { selectedOrganizationId, loading: authLoading, supabase } = useAuth();
+  const { selectedOrganizationId, loading: authLoading } = useAuth();
+  const db = getFirestore(firebaseApp);
 
   const [materials, setMaterials] = useState<RawMaterial[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,24 +66,27 @@ export default function InventoryPage() {
   const emptyMaterial: Partial<RawMaterial> = { name: "", brand: "", quantity: 0, unit: "", category: "", purchase_price: 0 };
 
   const fetchMaterials = useCallback(async () => {
-    if (!selectedOrganizationId || !supabase) return;
+    if (!selectedOrganizationId) {
+        setMaterials([]);
+        setIsLoading(false);
+        return;
+    }
 
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('raw_materials')
-      .select('*')
-      .eq('organization_id', selectedOrganizationId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error("Error fetching materials:", error);
-      toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data inventaris." });
-      setMaterials([]);
-    } else {
-      setMaterials(data as RawMaterial[]);
+    try {
+        const q = query(collection(db, "raw_materials"), where("organization_id", "==", selectedOrganizationId));
+        const querySnapshot = await getDocs(q);
+        const materialsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RawMaterial));
+        setMaterials(materialsData);
+    } catch (error) {
+        console.error("Error fetching materials:", error);
+        toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data inventaris." });
+        setMaterials([]);
+    } finally {
+        setIsLoading(false);
     }
-    setIsLoading(false);
-  }, [selectedOrganizationId, supabase, toast]);
+}, [selectedOrganizationId, db, toast]);
+
 
   useEffect(() => {
     if(!authLoading && selectedOrganizationId) {
@@ -100,40 +107,31 @@ export default function InventoryPage() {
       toast({ variant: "destructive", title: "Error", description: "Nama, brand, unit, dan kategori bahan harus diisi." });
       return;
     }
-    if (!selectedOrganizationId || !supabase) {
-        toast({ variant: "destructive", title: "Error", description: "Organisasi tidak terpilih atau koneksi DB gagal." });
+    if (!selectedOrganizationId) {
+        toast({ variant: "destructive", title: "Error", description: "Organisasi tidak terpilih." });
         return;
     }
+    
+    const materialData = {
+        name: editingMaterial.name,
+        brand: editingMaterial.brand,
+        quantity: editingMaterial.quantity,
+        unit: editingMaterial.unit,
+        category: editingMaterial.category,
+        purchase_price: editingMaterial.purchase_price,
+        organization_id: selectedOrganizationId,
+    };
 
-    if (editingMaterial.id) {
-      const { error } = await supabase
-        .from('raw_materials')
-        .update({
-          name: editingMaterial.name,
-          brand: editingMaterial.brand,
-          quantity: editingMaterial.quantity,
-          unit: editingMaterial.unit,
-          category: editingMaterial.category,
-          purchase_price: editingMaterial.purchase_price,
-        })
-        .eq('id', editingMaterial.id);
-
-      if (error) {
-        toast({ variant: "destructive", title: "Error", description: `Gagal memperbarui bahan: ${error.message}` });
-      } else {
-        toast({ title: "Sukses", description: "Bahan berhasil diperbarui." });
-      }
-
-    } else {
-      const { error } = await supabase
-        .from('raw_materials')
-        .insert([{ ...editingMaterial, organization_id: selectedOrganizationId } as RawMaterial]);
-
-      if (error) {
-        toast({ variant: "destructive", title: "Error", description: `Gagal menambahkan bahan: ${error.message}` });
-      } else {
-        toast({ title: "Sukses", description: "Bahan baru berhasil ditambahkan." });
-      }
+    try {
+        if (editingMaterial.id) {
+            const materialRef = doc(db, 'raw_materials', editingMaterial.id);
+            await updateDoc(materialRef, materialData);
+        } else {
+            await addDoc(collection(db, 'raw_materials'), materialData);
+        }
+        toast({ title: "Sukses", description: "Bahan berhasil disimpan." });
+    } catch (error: any) {
+        toast({ variant: "destructive", title: "Error", description: `Gagal menyimpan bahan: ${error.message}` });
     }
     
     setDialogOpen(false);
@@ -142,17 +140,12 @@ export default function InventoryPage() {
   };
 
   const handleDeleteMaterial = async (id: string) => {
-    if (!supabase) return;
-    const { error } = await supabase
-        .from('raw_materials')
-        .delete()
-        .eq('id', id);
-
-    if (error) {
-         toast({ variant: "destructive", title: "Error", description: `Gagal menghapus bahan: ${error.message}` });
-    } else {
+    try {
+        await deleteDoc(doc(db, 'raw_materials', id));
         toast({ title: "Sukses", description: "Bahan berhasil dihapus." });
         await fetchMaterials();
+    } catch (error: any) {
+        toast({ variant: "destructive", title: "Error", description: `Gagal menghapus bahan: ${error.message}` });
     }
   };
   
@@ -313,7 +306,7 @@ export default function InventoryPage() {
             </Card>
         </div>
         <div className="lg:col-span-3">
-          <InventoryTool availableMaterials={materials} />
+          <InventoryTool availableMaterials={materials.map(m => ({ name: m.name, quantity: m.quantity, unit: m.unit}))} />
         </div>
       </div>
     </div>

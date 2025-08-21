@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,6 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/auth-context";
 import type { Customer } from "@/types/database";
+import { getFirestore, collection, query, where, getDocs, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { firebaseApp } from '@/lib/firebase/config';
 
 const getLoyaltyLevel = (transactionCount: number): "Bronze" | "Silver" | "Gold" => {
     if (transactionCount >= 20) return "Gold";
@@ -22,7 +25,8 @@ const getLoyaltyLevel = (transactionCount: number): "Bronze" | "Silver" | "Gold"
 
 export default function MembersPage() {
     const { toast } = useToast();
-    const { selectedOrganizationId, supabase, loading: authLoading } = useAuth();
+    const { selectedOrganizationId, loading: authLoading } = useAuth();
+    const db = getFirestore(firebaseApp);
     
     const [members, setMembers] = useState<Customer[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -31,7 +35,7 @@ export default function MembersPage() {
 
     const emptyMember: Partial<Customer> = { name: "", email: "", phone: "", transaction_count: 0, loyalty_points: 0 };
 
-    const fetchMembers = async () => {
+    const fetchMembers = useCallback(async () => {
         if (!selectedOrganizationId) {
             setMembers([]);
             setIsLoading(false);
@@ -39,26 +43,26 @@ export default function MembersPage() {
         }
 
         setIsLoading(true);
-        const { data, error } = await supabase
-            .from('customers')
-            .select('*')
-            .eq('organization_id', selectedOrganizationId)
-            .order('created_at', { ascending: false });
-
-        if (error) {
+        try {
+            const q = query(collection(db, "customers"), where("organization_id", "==", selectedOrganizationId));
+            const querySnapshot = await getDocs(q);
+            const membersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+            setMembers(membersData);
+        } catch (error) {
             toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data anggota." });
             setMembers([]);
-        } else {
-            setMembers(data as Customer[]);
         }
         setIsLoading(false);
-    };
+    }, [selectedOrganizationId, db, toast]);
 
     useEffect(() => {
         if (!authLoading && selectedOrganizationId) {
             fetchMembers();
+        } else if (!selectedOrganizationId && !authLoading) {
+            setMembers([]);
+            setIsLoading(false);
         }
-    }, [selectedOrganizationId, authLoading]);
+    }, [selectedOrganizationId, authLoading, fetchMembers]);
 
     const handleOpenDialog = (member: Partial<Customer> | null = null) => {
         setEditingMember(member ? { ...member } : emptyMember);
@@ -80,30 +84,29 @@ export default function MembersPage() {
             organization_id: selectedOrganizationId,
         };
 
-        let error;
-        if (editingMember.id) {
-            ({ error } = await supabase.from('customers').update(memberData).eq('id', editingMember.id));
-        } else {
-            ({ error } = await supabase.from('customers').insert([memberData]));
-        }
-
-        if (error) {
-            toast({ variant: "destructive", title: "Error", description: `Gagal menyimpan anggota: ${error.message}` });
-        } else {
+        try {
+            if (editingMember.id) {
+                const memberRef = doc(db, 'customers', editingMember.id);
+                await updateDoc(memberRef, memberData);
+            } else {
+                await addDoc(collection(db, 'customers'), memberData);
+            }
             toast({ title: "Sukses", description: "Data anggota berhasil disimpan." });
             setDialogOpen(false);
             setEditingMember(null);
             fetchMembers();
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Error", description: `Gagal menyimpan anggota: ${error.message}` });
         }
     };
     
     const handleDeleteMember = async (id: string) => {
-        const { error } = await supabase.from('customers').delete().eq('id', id);
-        if (error) {
-            toast({ variant: "destructive", title: "Error", description: `Gagal menghapus anggota: ${error.message}` });
-        } else {
+        try {
+            await deleteDoc(doc(db, 'customers', id));
             toast({ title: "Sukses", description: "Data anggota berhasil dihapus." });
             fetchMembers();
+        } catch(error: any) {
+            toast({ variant: "destructive", title: "Error", description: `Gagal menghapus anggota: ${error.message}` });
         }
     };
     
@@ -117,7 +120,7 @@ export default function MembersPage() {
                 <h1 className="font-headline text-3xl font-bold flex items-center gap-2 shrink-0"><Users className="h-8 w-8" /> Manajemen Anggota</h1>
                 <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button onClick={() => handleOpenDialog()} className="w-full sm:w-auto">
+                        <Button onClick={() => handleOpenDialog()} className="w-full sm:w-auto" disabled={!selectedOrganizationId}>
                             <PlusCircle className="mr-2 h-4 w-4" /> Tambah Anggota Baru
                         </Button>
                     </DialogTrigger>
@@ -170,6 +173,8 @@ export default function MembersPage() {
                             <TableBody>
                                 {isLoading ? (
                                     <TableRow><TableCell colSpan={5} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                                ) : !selectedOrganizationId ? (
+                                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Pilih outlet untuk melihat anggota.</TableCell></TableRow>
                                 ) : members.length > 0 ? (
                                     members.map((member) => {
                                         const level = getLoyaltyLevel(member.transaction_count);

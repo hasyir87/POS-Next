@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -13,6 +14,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
 import type { Database } from "@/types/database";
+import { getFirestore, collection, query, where, getDocs, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { firebaseApp } from '@/lib/firebase/config';
 
 type Product = Database['public']['Tables']['products']['Row'];
 
@@ -22,7 +25,8 @@ const formatCurrency = (amount: number) => {
 
 export default function ProductsPage() {
     const { toast } = useToast();
-    const { selectedOrganizationId, loading: authLoading, supabase } = useAuth();
+    const { selectedOrganizationId, loading: authLoading } = useAuth();
+    const db = getFirestore(firebaseApp);
     
     const [products, setProducts] = useState<Product[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -32,24 +36,26 @@ export default function ProductsPage() {
     const emptyProduct: Partial<Product> = { name: "", price: 0, stock: 0, image_url: "https://placehold.co/150x150.png" };
     
     const fetchProducts = useCallback(async () => {
-        if (!selectedOrganizationId || !supabase) return;
+        if (!selectedOrganizationId) {
+            setProducts([]);
+            setIsLoading(false);
+            return;
+        }
 
         setIsLoading(true);
-        const { data, error } = await supabase
-            .from('products')
-            .select('*')
-            .eq('organization_id', selectedOrganizationId)
-            .order('created_at', { ascending: false });
-
-        if (error) {
+        try {
+            const q = query(collection(db, "products"), where("organization_id", "==", selectedOrganizationId));
+            const querySnapshot = await getDocs(q);
+            const productsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+            setProducts(productsData);
+        } catch (error) {
             console.error("Error fetching products:", error);
             toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data produk." });
             setProducts([]);
-        } else {
-            setProducts(data as Product[]);
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
-    }, [selectedOrganizationId, supabase, toast]);
+    }, [selectedOrganizationId, db, toast]);
 
     useEffect(() => {
         if (!authLoading && selectedOrganizationId) {
@@ -70,8 +76,8 @@ export default function ProductsPage() {
             toast({ variant: "destructive", title: "Error", description: "Nama dan harga produk harus diisi." });
             return;
         }
-        if (!selectedOrganizationId || !supabase) {
-            toast({ variant: "destructive", title: "Error", description: "Organisasi tidak terpilih atau koneksi DB gagal." });
+        if (!selectedOrganizationId) {
+            toast({ variant: "destructive", title: "Error", description: "Organisasi tidak terpilih." });
             return;
         }
 
@@ -84,23 +90,16 @@ export default function ProductsPage() {
             description: editingProduct.description
         };
 
-        let error;
-
-        if (editingProduct.id) {
-            ({ error } = await supabase
-                .from('products')
-                .update(productData)
-                .eq('id', editingProduct.id));
-        } else {
-            ({ error } = await supabase
-                .from('products')
-                .insert([productData as Product]));
-        }
-
-        if (error) {
-            toast({ variant: "destructive", title: "Error", description: `Gagal menyimpan produk: ${error.message}` });
-        } else {
-            toast({ title: "Sukses", description: `Produk berhasil ${editingProduct.id ? 'diperbarui' : 'ditambahkan'}.` });
+        try {
+            if (editingProduct.id) {
+                const productRef = doc(db, 'products', editingProduct.id);
+                await updateDoc(productRef, productData);
+            } else {
+                await addDoc(collection(db, 'products'), productData);
+            }
+             toast({ title: "Sukses", description: `Produk berhasil disimpan.` });
+        } catch (error: any) {
+             toast({ variant: "destructive", title: "Error", description: `Gagal menyimpan produk: ${error.message}` });
         }
         
         setDialogOpen(false);
@@ -109,17 +108,12 @@ export default function ProductsPage() {
     };
     
     const handleDeleteProduct = async (id: string) => {
-        if (!supabase) return;
-        const { error } = await supabase
-            .from('products')
-            .delete()
-            .eq('id', id);
-
-        if (error) {
-            toast({ variant: "destructive", title: "Error", description: `Gagal menghapus produk: ${error.message}` });
-        } else {
+        try {
+            await deleteDoc(doc(db, 'products', id));
             toast({ title: "Sukses", description: "Produk berhasil dihapus." });
             await fetchProducts();
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Error", description: `Gagal menghapus produk: ${error.message}` });
         }
     };
 

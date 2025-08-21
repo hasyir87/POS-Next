@@ -13,6 +13,8 @@ import { MPerfumeAmalLogo } from "@/components/m-perfume-amal-logo";
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 import type { Organization, UserProfile } from '@/types/database';
+import { getFirestore, collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { firebaseApp } from '@/lib/firebase/config';
 
 type NavItem = {
   href: string;
@@ -39,55 +41,51 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, profile, loading, logout, selectedOrganizationId, setSelectedOrganizationId, fetchWithAuth } = useAuth();
+  const { user, profile, loading, logout, selectedOrganizationId, setSelectedOrganizationId } = useAuth();
   
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoadingOrgs, setIsLoadingOrgs] = useState(false);
+  const db = getFirestore(firebaseApp);
 
   const fetchOrganizations = useCallback(async () => {
-    if (!user) {
-      return;
-    }
-
+    if (!profile?.organization_id) return;
     setIsLoadingOrgs(true);
     try {
-      const response = await fetchWithAuth('/api/organizations');
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Gagal mengambil data organisasi.');
+      // Find the parent organization ID from the user's main organization
+      const mainOrgRef = doc(db, 'organizations', profile.organization_id);
+      const mainOrgSnap = await getDoc(mainOrgRef);
+      if (!mainOrgSnap.exists()) {
+        throw new Error("Organisasi utama tidak ditemukan.");
       }
-      const data = await response.json();
-      setOrganizations(data || []);
+      const mainOrgData = mainOrgSnap.data() as Organization;
+      const parentId = mainOrgData.parent_organization_id || mainOrgData.id;
+
+      // Query for the parent and all its children
+      const orgsRef = collection(db, 'organizations');
+      const q = query(orgsRef, where('parent_organization_id', '==', parentId));
+      const querySnapshot = await getDocs(q);
+      const outlets = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() } as Organization));
+      
+      // Add the parent org to the list
+      const allOrgs = [{ id: mainOrgSnap.id, ...mainOrgSnap.data() } as Organization, ...outlets];
+      const uniqueOrgs = Array.from(new Map(allOrgs.map(item => [item.id, item])).values());
+
+      setOrganizations(uniqueOrgs);
+
     } catch (error) {
       console.error("Error fetching organizations:", error);
       setOrganizations([]);
     } finally {
       setIsLoadingOrgs(false);
     }
-  }, [user, fetchWithAuth]);
+  }, [profile, db]);
+
 
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && profile) {
       fetchOrganizations();
     }
-  }, [user, loading, fetchOrganizations]);
-
-  // Redirect logic
-  useEffect(() => {
-    // Tunggu hingga profile dan organisasi selesai dimuat
-    if (!loading && profile && !isLoadingOrgs) {
-      const isSetupPage = pathname === '/dashboard/setup';
-      
-      // Cari organisasi utama pengguna, BUKAN yang sedang dipilih
-      const mainOrg = organizations.find(org => org.id === profile.organization_id);
-
-      if (mainOrg && !mainOrg.is_setup_complete && !isSetupPage) {
-        router.push('/dashboard/setup');
-      } else if (mainOrg && mainOrg.is_setup_complete && isSetupPage) {
-        router.push('/dashboard');
-      }
-    }
-  }, [profile, loading, organizations, isLoadingOrgs, pathname, router]);
+  }, [profile, loading, fetchOrganizations]);
 
   // Main loading state for the entire auth process
   if (loading) {
@@ -98,12 +96,10 @@ export default function DashboardLayout({
     );
   }
 
-  // Jika tidak ada user sama sekali setelah loading, middleware seharusnya sudah mengarahkan
-  // Tapi sebagai fallback, kita tampilkan loader agar tidak ada flash of content
-  if (!user) {
+  if (!user || !profile) {
      return (
       <div className="flex h-screen w-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -119,12 +115,6 @@ export default function DashboardLayout({
   };
   
   const selectedOrganization = organizations.find(org => org.id === selectedOrganizationId);
-
-  // Hide sidebar and header on the setup page
-  if (pathname === '/dashboard/setup') {
-    return <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-background">{children}</main>;
-  }
-
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
@@ -183,7 +173,7 @@ export default function DashboardLayout({
             </SheetContent>
           </Sheet>
           <div className="w-full flex-1">
-            {profile && (profile.role === 'owner' || profile.role === 'superadmin' || profile.role === 'admin') && (
+            {(profile.role === 'owner' || profile.role === 'superadmin' || profile.role === 'admin') && (
               <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                       <Button variant="outline" className="w-full max-w-xs">
