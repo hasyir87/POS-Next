@@ -15,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MPerfumeAmalLogo } from "./m-perfume-amal-logo";
 import { AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/context/auth-context";
 
 const formSchema = z.object({
   fullName: z.string().min(3, { message: "Nama lengkap minimal 3 karakter." }),
@@ -33,6 +34,7 @@ export default function SignupForm() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
+  const { signup } = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -53,35 +55,19 @@ export default function SignupForm() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/auth/signup-owner", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: values.email,
-          password: values.password,
-          organization_name: values.organizationName,
-          full_name: values.fullName,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Terjadi kesalahan yang tidak terduga.");
-      }
-
-      setSuccess("Pendaftaran berhasil! Silakan cek email Anda untuk verifikasi dan kemudian login.");
-      setTimeout(() => {
-        router.push("/");
-      }, 4000);
+      await signup(values);
+      setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke dasbor.");
+      // Redirect is handled by the onAuthStateChanged listener in AuthContext
     } catch (err: any) {
-      const errorMessage = err.message || "Terjadi kesalahan";
-      if (errorMessage.toLowerCase().includes('email')) {
-          setError('email', { type: 'manual', message: errorMessage });
-      } else if (errorMessage.toLowerCase().includes('organisasi')) {
-          setError('organizationName', { type: 'manual', message: errorMessage });
+      let errorMessage = "Terjadi kesalahan yang tidak terduga.";
+      if (err.code === 'auth/email-already-in-use') {
+        errorMessage = 'Email ini sudah terdaftar. Silakan gunakan email lain.';
+        setError('email', { type: 'manual', message: errorMessage });
+      } else if (err.message) {
+        errorMessage = err.message;
+        setErrorState(errorMessage);
       } else {
-          setErrorState(errorMessage);
+        setErrorState(errorMessage);
       }
     } finally {
       setLoading(false);

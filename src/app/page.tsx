@@ -4,38 +4,17 @@
 import { LoginForm } from '@/components/login-form';
 import { MPerfumeAmalLogo } from '@/components/m-perfume-amal-logo';
 import { useAuth } from '@/context/auth-context';
-import { Loader2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 import Link from 'next/link';
 
 export default function Home() {
   const { loading, user } = useAuth();
-  const router = useRouter();
 
-  // This effect will run on the client side after the AuthContext has determined the auth state.
-  useEffect(() => {
-    // Let the middleware handle the initial redirect. 
-    // This effect is a fallback for client-side navigation.
-    if (!loading && user) {
-      router.push('/dashboard');
-    }
-  }, [loading, user, router]);
-
-  // While the context is loading, or if the user is logged in (and about to be redirected),
-  // show a loading state. This prevents the login form from flashing briefly for logged-in users.
+  // The AuthProvider now handles redirection, so this component can be simpler.
+  // We don't want to show the login page if the user is already logged in.
   if (loading || user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Memuat sesi...</p>
-        </div>
-      </div>
-    );
+    return null; // or a loading spinner
   }
 
-  // Only render the login form if we are done loading and there is no user.
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="mx-auto w-full max-w-sm space-y-6">

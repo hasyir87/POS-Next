@@ -52,14 +52,11 @@ export function LoginForm() {
     
     try {
       await login({ email: values.email, password: values.password });
-      // Redirect is handled by middleware and the AuthProvider's onAuthStateChange effect
-    } catch (error) {
-      const err = error as Error;
+      // Redirect is handled by the onAuthStateChanged listener in AuthContext
+    } catch (error: any) {
       let msg = "Login gagal. Silakan coba lagi.";
-      if (err.message?.toLowerCase().includes("invalid login credentials")) {
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
         msg = "Email atau password salah.";
-      } else if (err.message) {
-        msg = err.message;
       }
       setLoginError(msg);
     } finally {
