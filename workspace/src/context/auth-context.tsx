@@ -7,13 +7,18 @@ import { getFirestore, doc, setDoc, getDoc, collection, addDoc, serverTimestamp 
 import { firebaseApp } from '@/lib/firebase/config';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import type { UserProfile, Organization } from '@/types/database'; 
+import type { UserProfile, Organization } from '@/types/database';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import cors from 'cors';
+
 
 // Initialize Firebase services
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
-const functions = getFunctions(firebaseApp, 'asia-southeast1'); // Specify region if needed
+
+// Dapatkan region dari environment variable atau default ke 'asia-southeast1'
+const functionsRegion = process.env.NEXT_PUBLIC_FIREBASE_FUNCTIONS_REGION || 'asia-southeast1';
+
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -106,22 +111,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [router, fetchUserProfile, setSelectedOrganizationId, pathname]);
 
   const signup = async (values: any) => {
-    const { email, password, fullName, organizationName } = values;
-    const signupOwner = httpsCallable(functions, 'signupOwner');
+    // Construct the correct URL for the HTTP-triggered Cloud Function
+    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    if (!projectId) {
+        throw new Error("Konfigurasi Firebase (Project ID) tidak ditemukan.");
+    }
+    const functionUrl = `https://${functionsRegion}-${projectId}.cloudfunctions.net/signupOwner`;
+
     try {
-        await signupOwner({ email, password, fullName, organizationName });
-        // After the cloud function successfully creates the user, log them in on the client
-        await signInWithEmailAndPassword(auth, email, password);
-    } catch (error: any) {
-        console.error("Cloud function error:", error);
-        // Check if it's a Firebase Functions-like error by looking for the 'code' property
-        if (error.code) {
-            // Pass the specific message from the function, which is in error.message for callable functions
-            const message = error.message || "Terjadi kesalahan.";
-            throw new Error(message);
+        const response = await fetch(functionUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(values),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            // Throw the specific error message from the backend
+            throw new Error(data.error || 'Terjadi kesalahan saat mendaftar.');
         }
-        // Throw a generic error for other issues
-        throw new Error("Gagal melakukan pendaftaran. Silakan coba lagi.");
+
+        // If the backend function is successful, log the user in on the client
+        await signInWithEmailAndPassword(auth, values.email, values.password);
+    } catch (error: any) {
+        console.error("Signup error:", error);
+        // If the error is "Failed to fetch", it's likely a network or CORS issue. Provide a clearer message.
+        if (error instanceof TypeError && error.message === 'Failed to fetch') {
+            throw new Error('Gagal terhubung ke server. Periksa koneksi internet atau konfigurasi CORS.');
+        }
+        // Rethrow the original or processed error message
+        throw new Error(error.message || "Gagal melakukan pendaftaran. Silakan coba lagi.");
     }
   };
 
