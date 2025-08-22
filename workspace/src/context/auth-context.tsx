@@ -24,7 +24,6 @@ interface AuthContextType {
   logout: () => Promise<void>;
   fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
   refreshProfile: () => Promise<void>;
-  supabase: null;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -107,7 +106,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { email, password, fullName, organizationName } = values;
 
     // --- Client-Side Validation ---
-    // 1. Check for duplicate organization name
     const orgsRef = collection(db, "organizations");
     const orgQuery = query(orgsRef, where("name", "==", organizationName));
     const orgQuerySnapshot = await getDocs(orgQuery);
@@ -115,14 +113,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error("Nama organisasi sudah digunakan.");
     }
     
-    // --- Client-Side Registration Logic ---
     let userCredential;
     try {
-        // Step 1: Create user in Firebase Auth
         userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const newUser = userCredential.user;
         
-        // Step 2: Create organization document in Firestore
         const orgCollectionRef = collection(db, 'organizations');
         const orgDocRef = await addDoc(orgCollectionRef, {
             name: organizationName,
@@ -132,7 +127,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             updated_at: serverTimestamp()
         });
 
-        // Step 3: Create user profile document in Firestore
         const profileDocRef = doc(db, 'profiles', newUser.uid);
         await setDoc(profileDocRef, {
             id: newUser.uid,
@@ -144,10 +138,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             updated_at: serverTimestamp()
         });
         
-        // Login will be handled by onAuthStateChanged listener
     } catch (error: any) {
         console.error("Client-side signup error:", error);
-        // If user was created but subsequent steps failed, delete the user for cleanup
         if (userCredential) {
             await userCredential.user.delete();
         }
