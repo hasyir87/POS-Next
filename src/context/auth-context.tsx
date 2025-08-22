@@ -8,7 +8,7 @@ import { firebaseApp } from '@/lib/firebase/config';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import type { UserProfile, Organization } from '@/types/database'; 
-import { getFunctions, httpsCallable, FunctionsError } from 'firebase/functions';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // Initialize Firebase services
 const auth = getAuth(firebaseApp);
@@ -112,14 +112,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await signupOwner({ email, password, fullName, organizationName });
         // After the cloud function successfully creates the user, log them in on the client
         await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
-        console.error("Signup Error Context:", error);
-        if (error instanceof FunctionsError) {
-             // These are the clean messages we set up in the Cloud Function.
-             // We pass them directly to the form.
-             throw new Error(error.message);
+    } catch (error: any) {
+        console.error("Cloud function error:", error);
+        // Check if it's a Firebase Functions-like error by looking for the 'code' property
+        if (error.code) {
+            // Pass the specific message from the function, which is in error.message for callable functions
+            const message = error.message || "Terjadi kesalahan.";
+            throw new Error(message);
         }
-        // Fallback for any other unexpected errors
+        // Throw a generic error for other issues
         throw new Error("Gagal melakukan pendaftaran. Silakan coba lagi.");
     }
   };
