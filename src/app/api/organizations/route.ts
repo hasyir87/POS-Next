@@ -1,5 +1,5 @@
 
-import { createClient } from '../../../utils/supabase/server';
+import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server'
 import type { Database } from '@/types/database'

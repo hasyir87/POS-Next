@@ -1,7 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import type { Database } from '@/types/database';
 import { handleSupabaseError } from '@/lib/utils/error';
 
 export async function GET(req: Request) {

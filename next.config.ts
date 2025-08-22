@@ -21,12 +21,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  experimental: {
-    // This is needed to allow the Next.js dev server to work correctly in the cloud workspace.
-    allowedDevOrigins: [
-      '*.cloudworkstations.dev',
-    ],
-  },
 };
 
 export default nextConfig;

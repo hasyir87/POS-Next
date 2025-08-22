@@ -9,7 +9,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
-    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts"
+    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
+    "setup-db": "node setup-database.js"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.14.1",
@@ -36,12 +37,14 @@
     "@radix-ui/react-tabs": "^1.1.3",
     "@radix-ui/react-toast": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.1.8",
+    "@supabase/ssr": "^0.4.0",
+    "@supabase/supabase-js": "^2.53.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.6.0",
-    "firebase": "^10.12.3",
+    "firebase": "^11.9.1",
     "genkit": "^1.14.1",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
@@ -56,7 +59,6 @@
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "xlsx": "^0.18.5",
-    "file-saver": "^2.0.5",
     "zod": "^3.24.2"
   },
   "devDependencies": {
