@@ -1,5 +1,5 @@
 
-// This route is deprecated and its logic is now inside the Products page component.
+// This route is deprecated and its logic is now inside the User page component.
 // It can be deleted, but we'll keep it for reference for now.
 import { NextResponse } from 'next/server';
 

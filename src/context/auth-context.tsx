@@ -2,21 +2,18 @@
 "use client";
 
 import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback } from 'react';
-import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import type { UserProfile, Organization } from '@/types/database';
-import Cookies from 'js-cookie';
 import { useToast } from '@/hooks/use-toast';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 
 
 // Initialize Firebase services
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
-const functions = getFunctions(firebaseApp);
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -24,10 +21,8 @@ interface AuthContextType {
   loading: boolean;
   selectedOrganizationId: string | null;
   setSelectedOrganizationId: (orgId: string | null) => void;
-  signup: (values: any) => Promise<any>;
   login: ({ email, password }: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
-  fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -56,7 +51,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     setProfile(null);
     setSelectedOrganizationId(null);
-    Cookies.remove('firebase-session-token');
     router.push('/');
     if (message) {
       toast({
@@ -105,9 +99,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(firebaseUser);
         setProfile(userProfile);
         
-        const idToken = await firebaseUser.getIdToken();
-        Cookies.set('firebase-session-token', idToken, { expires: 1, path: '/' });
-
         const storedOrgId = localStorage.getItem('selectedOrgId');
         if (storedOrgId) {
             setSelectedOrganizationIdState(storedOrgId);
@@ -125,7 +116,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setProfile(null);
         setSelectedOrganizationId(null);
-        Cookies.remove('firebase-session-token');
+        if (!publicRoutes.includes(pathname)) {
+            router.replace('/');
+        }
       }
       setLoading(false);
     });
@@ -133,34 +126,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [router, fetchUserProfile, setSelectedOrganizationId, pathname, handleLogout]);
 
-  const signup = async (values: any) => {
-    const { email, password, fullName, organizationName } = values;
-    const createOwner = httpsCallable(functions, 'createOwner');
-    try {
-      const result = await createOwner({ email, password, fullName, organizationName });
-      
-      // Log in the user immediately after successful signup
-      await signInWithEmailAndPassword(auth, email, password);
-
-      return result.data;
-    } catch (error: any) {
-      console.error("Cloud function 'createOwner' error:", error);
-      throw new Error(error.message || "Gagal melakukan pendaftaran. Silakan coba lagi.");
-    }
-  };
-
   const login = async ({ email, password }: { email: string, password: string }) => {
     await signInWithEmailAndPassword(auth, email, password);
-  };
-  
-  const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
-      const idToken = await user?.getIdToken();
-      
-      const headers = new Headers(options.headers || {});
-      if (idToken) {
-          headers.set('Authorization', `Bearer ${idToken}`);
-      }
-      return fetch(url, { ...options, headers });
   };
   
   const refreshProfile = useCallback(async () => {
@@ -177,12 +144,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     loading,
     selectedOrganizationId,
     setSelectedOrganizationId,
-    signup,
     login,
     logout: handleLogout,
-    fetchWithAuth,
     refreshProfile,
-  };
+  } as AuthContextType;
 
   if (loading) {
      return (

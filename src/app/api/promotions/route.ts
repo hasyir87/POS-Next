@@ -1,85 +1,12 @@
-import { createClient } from '@/utils/supabase/server';
-import { cookies } from 'next/headers';
+
+// This route is deprecated and its logic is now inside the Settings page component.
+// It can be deleted, but we'll keep it for reference for now.
 import { NextResponse } from 'next/server';
-import type { Database } from '@/types/database';
-import { handleSupabaseError } from '@/lib/utils/error';
 
-export async function GET(req: Request) {
-  const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
-
-  try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
-    }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('organization_id')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile || !profile.organization_id) {
-      return NextResponse.json({ error: 'Profile or organization not found for user.' }, { status: 404 });
-    }
-    
-    const { data: promotions, error } = await supabase
-      .from('promotions')
-      .select('*')
-      .eq('organization_id', profile.organization_id);
-
-    if (error) {
-      console.error('Error fetching promotions:', error);
-      return NextResponse.json({ error: handleSupabaseError(error) }, { status: 500 });
-    }
-
-    return NextResponse.json(promotions);
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
+export async function GET() {
+  return NextResponse.json({ message: 'This API route is deprecated.' }, { status: 410 });
 }
 
-export async function POST(req: Request) {
-  const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
-
-  try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
-    }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('organization_id')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile || !profile.organization_id) {
-      return NextResponse.json({ error: 'Profile or organization not found for user.' }, { status: 404 });
-    }
-    
-    const promotionData = await req.json();
-
-    const { data, error } = await supabase
-      .from('promotions')
-      .insert([
-        {
-          ...promotionData,
-          organization_id: profile.organization_id,
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating promotion:', error);
-      return NextResponse.json({ error: handleSupabaseError(error) }, { status: 500 });
-    }
-
-    return NextResponse.json(data, { status: 201 });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
+export async function POST() {
+  return NextResponse.json({ message: 'This API route is deprecated.' }, { status: 410 });
 }
