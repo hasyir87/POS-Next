@@ -22,8 +22,13 @@ export default function SetupPage() {
     setIsSuccess(false);
 
     try {
+      // The API now gets the organizationId from the user's token,
+      // so we don't need to send a body anymore.
       const response = await fetchWithAuth('/api/setup/seed', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
       const data = await response.json();
@@ -64,7 +69,6 @@ export default function SetupPage() {
             </p>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
               <li>Kategori produk standar (Bibit Parfum, Kemasan, dll.)</li>
-              <li>Satuan unit umum (ml, pcs, g)</li>
               <li>Grade parfum awal (Standard, Premium)</li>
             </ul>
             <p className="text-sm text-muted-foreground">

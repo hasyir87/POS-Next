@@ -1,9 +1,22 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirestore, writeBatch, doc, collection } from 'firebase/firestore';
+import { getFirestore, writeBatch, doc, collection, getDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { firebaseApp } from '@/lib/firebase/config';
 import { initAdminApp } from '@/lib/firebase/admin-config';
+import type { UserProfile } from '@/types/database';
+
+// Helper function to get user profile and verify ownership/role
+async function getUserProfile(uid: string): Promise<UserProfile | null> {
+    const db = getFirestore(firebaseApp);
+    const profileRef = doc(db, 'profiles', uid);
+    const profileSnap = await getDoc(profileRef);
+    if (profileSnap.exists()) {
+        return { id: uid, ...profileSnap.data() } as UserProfile;
+    }
+    return null;
+}
+
 
 // Initial data for seeding
 const initialCategories = [
@@ -30,16 +43,17 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Read organizationId from the request body
-    const body = await request.json();
-    const organizationId = body.organizationId;
-
-    if (!organizationId) {
-        return NextResponse.json({ error: 'Bad Request: organizationId is required in the request body.' }, { status: 400 });
-    }
-
     const adminApp = initAdminApp();
-    await getAuth(adminApp).verifyIdToken(token);
+    const decodedToken = await getAuth(adminApp).verifyIdToken(token);
+    const uid = decodedToken.uid;
+    
+    // Get organizationId from the user's profile on the server-side for security
+    const userProfile = await getUserProfile(uid);
+
+    if (!userProfile || !userProfile.organization_id) {
+        return NextResponse.json({ error: 'Bad Request: User profile or organization not found.' }, { status: 404 });
+    }
+    const organizationId = userProfile.organization_id;
     
     const db = getFirestore(firebaseApp);
     const batch = writeBatch(db);
@@ -58,7 +72,7 @@ export async function POST(request: NextRequest) {
     
     // Mark setup as complete
     const orgRef = doc(db, 'organizations', organizationId);
-    batch.update(orgRef, { is_setup_complete: true });
+    batch.update(orgRef, { is_setup_complete: true, updated_at: new Date().toISOString() });
 
     await batch.commit();
 
