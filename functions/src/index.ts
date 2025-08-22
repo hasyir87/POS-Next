@@ -1,16 +1,89 @@
 
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import * as cors from "cors";
-
-const corsHandler = cors({origin: true});
 
 admin.initializeApp();
 const db = admin.firestore();
 
+const initialCategories = [
+  { name: "Bibit Parfum" },
+  { name: "Pelarut" },
+  { name: "Bahan Sintetis" },
+  { name: "Kemasan" },
+];
+
+const initialGrades = [
+  { name: "Standard", price_multiplier: 1.0, extra_essence_price: 2000 },
+  { name: "Premium", price_multiplier: 1.5, extra_essence_price: 3500 },
+];
+
+export const setupInitialData = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Anda harus login untuk melakukan setup.");
+  }
+
+  const uid = context.auth.uid;
+  const profileRef = db.collection("profiles").doc(uid);
+
+  try {
+    const profileSnap = await profileRef.get();
+    if (!profileSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "Profil pengguna tidak ditemukan.");
+    }
+
+    const profileData = profileSnap.data();
+    if (!profileData || !profileData.organization_id) {
+      throw new functions.https.HttpsError("failed-precondition", "Pengguna tidak terhubung ke organisasi.");
+    }
+
+    const organizationId = profileData.organization_id;
+    const orgRef = db.collection("organizations").doc(organizationId);
+    const orgSnap = await orgRef.get();
+    const orgData = orgSnap.data();
+
+    if (!orgData) {
+        throw new functions.https.HttpsError("not-found", "Organisasi tidak ditemukan.");
+    }
+
+    if (orgData.is_setup_complete) {
+        return { status: "success", message: "Toko sudah disiapkan sebelumnya." };
+    }
+
+
+    const batch = db.batch();
+
+    // Seed Categories
+    initialCategories.forEach((category) => {
+      const categoryRef = db.collection("categories").doc();
+      batch.set(categoryRef, { ...category, organization_id: organizationId });
+    });
+
+    // Seed Grades
+    initialGrades.forEach((grade) => {
+      const gradeRef = db.collection("grades").doc();
+      batch.set(gradeRef, { ...grade, organization_id: organizationId });
+    });
+
+    // Mark setup as complete
+    batch.update(orgRef, {
+        is_setup_complete: true,
+        updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+
+    return { status: "success", message: "Toko berhasil disiapkan." };
+  } catch (error: any) {
+    console.error("Error in setupInitialData function:", error);
+    // Re-throw as an HttpsError to be caught by the client
+    throw new functions.https.HttpsError("internal", error.message, error);
+  }
+});
+
 // Cloud Function untuk mendaftar pemilik baru
 export const signupOwner = functions.https.onRequest(async (req, res) => {
-  corsHandler(req, res, async () => {
+  const cors = (await import("cors"))({ origin: true });
+  cors(req, res, async () => {
     if (req.method !== "POST") {
       res.status(405).send("Method Not Allowed");
       return;
@@ -26,19 +99,16 @@ export const signupOwner = functions.https.onRequest(async (req, res) => {
     }
 
     try {
-      // Periksa duplikasi email di Firebase Auth
       try {
         await admin.auth().getUserByEmail(email);
         res.status(409).json({error: "Email ini sudah terdaftar."});
         return;
       } catch (error: any) {
         if (error.code !== "auth/user-not-found") {
-          throw error; // Lemparkan error lain yang tidak terduga
+          throw error;
         }
-        // Jika user tidak ditemukan, lanjutkan proses
       }
 
-      // Periksa duplikasi nama organisasi di Firestore
       const orgsRef = db.collection("organizations");
       const orgQuery = await orgsRef.where("name", "==", organizationName).get();
       if (!orgQuery.empty) {
@@ -46,14 +116,12 @@ export const signupOwner = functions.https.onRequest(async (req, res) => {
         return;
       }
 
-      // Buat pengguna di Firebase Authentication
       const userRecord = await admin.auth().createUser({
         email: email,
         password: password,
         displayName: fullName,
       });
 
-      // Buat organisasi di Firestore
       const orgRef = db.collection("organizations").doc();
       await orgRef.set({
         name: organizationName,
@@ -63,7 +131,6 @@ export const signupOwner = functions.https.onRequest(async (req, res) => {
         updated_at: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // Buat profil pengguna di Firestore
       const profileRef = db.collection("profiles").doc(userRecord.uid);
       await profileRef.set({
         id: userRecord.uid,
@@ -91,7 +158,6 @@ export const signupOwner = functions.https.onRequest(async (req, res) => {
   });
 });
 
-
 // Cloud Function untuk membuat pengguna (kasir/admin) oleh owner/admin
 export const createUser = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
@@ -101,7 +167,6 @@ export const createUser = functions.https.onCall(async (data, context) => {
   const {email, password, fullName, role, organizationId} = data;
   const requesterUid = context.auth.uid;
 
-  // Verifikasi peran pembuat permintaan
   const requesterProfileRef = db.doc(`profiles/${requesterUid}`);
   const requesterProfileSnap = await requesterProfileRef.get();
   if (!requesterProfileSnap.exists) {
@@ -118,7 +183,7 @@ export const createUser = functions.https.onCall(async (data, context) => {
       id: userRecord.uid,
       email,
       full_name: fullName,
-      role: role, // 'cashier' or 'admin'
+      role: role,
       organization_id: organizationId,
       created_at: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -140,7 +205,6 @@ export const deleteUser = functions.https.onCall(async (data, context) => {
   const {uid} = data;
   const requesterUid = context.auth.uid;
 
-  // Verifikasi peran pembuat permintaan
   const requesterProfileRef = db.doc(`profiles/${requesterUid}`);
   const requesterProfileSnap = await requesterProfileRef.get();
   if (!requesterProfileSnap.exists) {

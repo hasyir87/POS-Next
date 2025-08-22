@@ -1,88 +1,13 @@
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getFirestore, writeBatch, doc, collection, getDoc } from 'firebase/firestore';
-import { getAuth } from 'firebase-admin/auth';
-import { firebaseApp } from '@/lib/firebase/config';
-import { initAdminApp } from '@/lib/firebase/admin-config';
-import type { UserProfile } from '@/types/database';
+// This API route has been deprecated and its logic moved to a Firebase Cloud Function
+// for better security and reliability. The new function is `setupInitialData`
+// in `functions/src/index.ts`. The setup page now calls this function directly.
 
-// Helper function to get user profile and verify ownership/role
-async function getUserProfile(uid: string): Promise<UserProfile | null> {
-    const db = getFirestore(firebaseApp);
-    const profileRef = doc(db, 'profiles', uid);
-    const profileSnap = await getDoc(profileRef);
-    if (profileSnap.exists()) {
-        return { id: uid, ...profileSnap.data() } as UserProfile;
-    }
-    return null;
-}
+import { NextResponse } from 'next/server';
 
-
-// Initial data for seeding
-const initialCategories = [
-  { name: 'Bibit Parfum' },
-  { name: 'Pelarut' },
-  { name: 'Bahan Sintetis' },
-  { name: 'Kemasan' },
-];
-
-const initialGrades = [
-  { name: 'Standard', price_multiplier: 1.0, extra_essence_price: 2000 },
-  { name: 'Premium', price_multiplier: 1.5, extra_essence_price: 3500 },
-];
-
-export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get('Authorization');
-  if (!authHeader) {
-    return NextResponse.json({ error: 'Unauthorized: No token provided' }, { status: 401 });
-  }
-
-  const token = authHeader.split('Bearer ')[1];
-  if (!token) {
-    return NextResponse.json({ error: 'Unauthorized: Invalid token format' }, { status: 401 });
-  }
-
-  try {
-    const adminApp = initAdminApp();
-    const decodedToken = await getAuth(adminApp).verifyIdToken(token);
-    const uid = decodedToken.uid;
-    
-    // Get organizationId from the user's profile on the server-side for security
-    const userProfile = await getUserProfile(uid);
-
-    if (!userProfile || !userProfile.organization_id) {
-        return NextResponse.json({ error: 'Bad Request: User profile or organization not found.' }, { status: 404 });
-    }
-    const organizationId = userProfile.organization_id;
-    
-    const db = getFirestore(firebaseApp);
-    const batch = writeBatch(db);
-
-    // Seed Categories
-    initialCategories.forEach(category => {
-        const categoryRef = doc(collection(db, 'categories'));
-        batch.set(categoryRef, { ...category, organization_id: organizationId });
-    });
-
-    // Seed Grades
-    initialGrades.forEach(grade => {
-        const gradeRef = doc(collection(db, 'grades'));
-        batch.set(gradeRef, { ...grade, organization_id: organizationId });
-    });
-    
-    // Mark setup as complete
-    const orgRef = doc(db, 'organizations', organizationId);
-    batch.update(orgRef, { is_setup_complete: true, updated_at: new Date().toISOString() });
-
-    await batch.commit();
-
-    return NextResponse.json({ status: 'success', message: 'Toko berhasil disiapkan.' });
-
-  } catch (error: any) {
-    console.error('Error in setup/seed API:', error);
-    if (error.code === 'auth/id-token-expired') {
-        return NextResponse.json({ error: 'Sesi telah berakhir, silakan login kembali.' }, { status: 401 });
-    }
-    return NextResponse.json({ error: 'Internal Server Error', details: error.message }, { status: 500 });
-  }
+export async function POST(request: Request) {
+  return NextResponse.json(
+    { error: 'This endpoint is deprecated. Please use the setupInitialData cloud function.' },
+    { status: 410 }
+  );
 }

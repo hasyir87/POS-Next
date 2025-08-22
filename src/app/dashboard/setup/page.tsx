@@ -8,12 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Rocket, CheckCircle, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { firebaseApp } from '@/lib/firebase/config';
 
 export default function SetupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
-  const { fetchWithAuth, refreshProfile } = useAuth();
+  const { refreshProfile } = useAuth();
   const router = useRouter();
 
   const handleSetup = async () => {
@@ -22,23 +24,17 @@ export default function SetupPage() {
     setIsSuccess(false);
 
     try {
-      // The API now gets the organizationId from the user's token,
-      // so we don't need to send a body anymore.
-      const response = await fetchWithAuth('/api/setup/seed', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const functions = getFunctions(firebaseApp);
+      const setupInitialData = httpsCallable(functions, 'setupInitialData');
+      
+      const result = await setupInitialData();
+      const data = result.data as { status: string; message: string };
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Gagal melakukan setup toko.');
+      if (data.status !== 'success') {
+        throw new Error(data.message || 'Gagal melakukan setup toko.');
       }
 
       setIsSuccess(true);
-      // Refresh the user's profile in the context to get the updated `is_setup_complete` flag
       await refreshProfile(); 
       
       setTimeout(() => {
@@ -46,7 +42,8 @@ export default function SetupPage() {
       }, 2000);
 
     } catch (err: any) {
-      setError(err.message);
+      console.error("Setup error:", err);
+      setError(err.message || 'Terjadi kesalahan yang tidak terduga.');
     } finally {
       setIsLoading(false);
     }
