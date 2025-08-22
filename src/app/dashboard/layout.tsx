@@ -52,31 +52,37 @@ export default function DashboardLayout({
     
     setIsLoadingOrgs(true);
     try {
+      // Find the parent organization ID. If the current organization has a parent_organization_id, use that.
+      // Otherwise, assume the current organization is the parent.
       const mainOrgRef = doc(db, 'organizations', profile.organization_id);
       const mainOrgSnap = await getDoc(mainOrgRef);
       if (!mainOrgSnap.exists()) {
         throw new Error("Organisasi utama tidak ditemukan.");
       }
-
+      
       const mainOrgData = { id: mainOrgSnap.id, ...mainOrgSnap.data() } as Organization;
       const parentId = mainOrgData.parent_organization_id || mainOrgData.id;
 
       if (!parentId) {
-          // If parentId is still not available, we can't query.
-          // Set the main org as the only one and stop.
-          setOrganizations([mainOrgData]);
+          setOrganizations([mainOrgData]); // Case where there is no parent and it's the only org
           setIsLoadingOrgs(false);
           return;
       }
       
+      // Query for all organizations that share the same parent (i.e., are outlets of the same main company)
       const orgsRef = collection(db, 'organizations');
       const q = query(orgsRef, where('parent_organization_id', '==', parentId));
       const querySnapshot = await getDocs(q);
       const outlets = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() } as Organization));
       
-      const allOrgs = [mainOrgData, ...outlets];
+      // Combine the main/parent organization with its outlets
+      const parentOrgRef = doc(db, 'organizations', parentId);
+      const parentOrgSnap = await getDoc(parentOrgRef);
+      const parentOrgData = parentOrgSnap.exists() ? {id: parentOrgSnap.id, ...parentOrgSnap.data()} as Organization : null;
+      
+      const allOrgs = parentOrgData ? [parentOrgData, ...outlets] : outlets;
       const uniqueOrgs = Array.from(new Map(allOrgs.map(item => [item.id, item])).values());
-
+      
       setOrganizations(uniqueOrgs);
 
     } catch (error) {
@@ -94,19 +100,12 @@ export default function DashboardLayout({
     }
   }, [profile, loading, fetchOrganizations]);
 
-  // Main loading state for the entire auth process
-  if (loading) {
+  // Main loading state for the entire auth process is handled by AuthProvider.
+  // This check is for when auth is done, but the user/profile is somehow still null (e.g., redirecting).
+  if (loading || !user || !profile) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user || !profile) {
-     return (
-      <div className="flex h-screen w-full items-center justify-center">
-         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }

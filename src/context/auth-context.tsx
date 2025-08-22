@@ -5,9 +5,10 @@ import React, { createContext, useState, useEffect, ReactNode, useContext, useCa
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import type { UserProfile, Organization } from '@/types/database'; 
+import Cookies from 'js-cookie';
 
 // Initialize Firebase services
 const auth = getAuth(firebaseApp);
@@ -30,7 +31,6 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
-  const pathname = usePathname();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,13 +68,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
-      const publicRoutes = ['/', '/signup', '/unauthorized'];
       
       if (firebaseUser) {
         setUser(firebaseUser);
         const userProfile = await fetchUserProfile(firebaseUser);
         setProfile(userProfile);
         
+        const idToken = await firebaseUser.getIdToken();
+        Cookies.set('firebase-session-token', idToken, { expires: 1, path: '/' }); // expires in 1 day
+
         const storedOrgId = localStorage.getItem('selectedOrgId');
         if (storedOrgId) {
             setSelectedOrganizationIdState(storedOrgId);
@@ -82,30 +84,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setSelectedOrganizationId(userProfile.organization_id);
         }
         
-        if (userProfile && userProfile.organizations && !userProfile.organizations.is_setup_complete && pathname !== '/dashboard/setup') {
+        if (userProfile && userProfile.organizations && !userProfile.organizations.is_setup_complete) {
             router.replace('/dashboard/setup');
-        } else if (publicRoutes.includes(pathname)) {
-            router.replace('/dashboard');
         }
 
       } else {
         setUser(null);
         setProfile(null);
         setSelectedOrganizationId(null);
-        if (!publicRoutes.includes(pathname) && !pathname.startsWith('/dashboard/test')) {
-            router.replace('/');
-        }
+        Cookies.remove('firebase-session-token');
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [router, fetchUserProfile, setSelectedOrganizationId, pathname]);
+  }, [router, fetchUserProfile, setSelectedOrganizationId]);
 
   const signup = async (values: any) => {
     const { email, password, fullName, organizationName } = values;
 
-    // --- Client-Side Validation ---
     const orgsRef = collection(db, "organizations");
     const orgQuery = query(orgsRef, where("name", "==", organizationName));
     const orgQuerySnapshot = await getDocs(orgQuery);
@@ -141,12 +138,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
         console.error("Client-side signup error:", error);
         if (userCredential) {
-            // Attempt to delete the user if follow-up actions fail
-            try {
-              await userCredential.user.delete();
-            } catch(deleteError) {
-              console.error("Failed to clean up created user", deleteError);
-            }
+            await userCredential.user.delete();
         }
         if (error.code === 'auth/email-already-in-use') {
              throw new Error("Email ini sudah terdaftar.");
@@ -161,6 +153,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     await signOut(auth);
+    router.push('/');
   };
   
   const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
@@ -194,7 +187,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     refreshProfile
   };
 
-  if (loading && !pathname.startsWith('/dashboard/test')) {
+  if (loading) {
      return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
