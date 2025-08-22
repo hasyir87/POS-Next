@@ -59,6 +59,7 @@ export default function SignupForm() {
       setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke dasbor.");
       // Redirect is handled by the onAuthStateChanged listener in AuthContext
     } catch (err: any) {
+      console.error("Signup component error:", err); // Log the full error
       const errorMessage = err.message || "Terjadi kesalahan yang tidak terduga.";
       setErrorState(errorMessage);
 

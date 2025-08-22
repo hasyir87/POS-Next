@@ -11,7 +11,7 @@ export const createOwner = functions.https.onCall(async (data, context) => {
 
     // --- Validation ---
     if (!email || !password || !fullName || !organizationName) {
-        throw new functions.https.HttpsError("invalid-argument", "Data tidak lengkap.");
+        throw new functions.https.HttpsError("invalid-argument", "Data tidak lengkap. Pastikan semua field terisi.");
     }
     if (password.length < 8) {
         throw new functions.https.HttpsError("invalid-argument", "Password harus minimal 8 karakter.");
@@ -69,7 +69,8 @@ export const createOwner = functions.https.onCall(async (data, context) => {
         if (error.code === 'auth/email-already-exists') {
             throw new functions.https.HttpsError("already-exists", "Email ini sudah terdaftar.");
         }
-        throw new functions.https.HttpsError("internal", "Gagal membuat pemilik baru. Silakan coba lagi.");
+        // Throw a more descriptive error message
+        throw new functions.https.HttpsError("internal", `Gagal membuat pemilik baru: ${error.message}`);
     }
 });
 
@@ -132,7 +133,7 @@ export const createUser = functions.https.onCall(async (data, context) => {
          if (error.code === 'auth/email-already-exists') {
             throw new functions.https.HttpsError("already-exists", "Email ini sudah terdaftar.");
         }
-        throw new functions.https.HttpsError("internal", "Gagal membuat pengguna baru.");
+        throw new functions.https.HttpsError("internal", `Gagal membuat pengguna baru: ${error.message}`);
     }
 });
 

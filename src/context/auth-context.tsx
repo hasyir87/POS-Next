@@ -138,6 +138,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const createOwner = httpsCallable(functions, 'createOwner');
     try {
       const result = await createOwner({ email, password, fullName, organizationName });
+      
+      // Log in the user immediately after successful signup
+      await signInWithEmailAndPassword(auth, email, password);
+
       return result.data;
     } catch (error: any) {
       console.error("Cloud function 'createOwner' error:", error);
