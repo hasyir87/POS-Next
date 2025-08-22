@@ -10,10 +10,13 @@ import { Loader2 } from 'lucide-react';
 import type { UserProfile, Organization } from '@/types/database';
 import Cookies from 'js-cookie';
 import { useToast } from '@/hooks/use-toast';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+
 
 // Initialize Firebase services
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
+const functions = getFunctions(firebaseApp);
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -21,7 +24,7 @@ interface AuthContextType {
   loading: boolean;
   selectedOrganizationId: string | null;
   setSelectedOrganizationId: (orgId: string | null) => void;
-  signup: (values: any) => Promise<void>;
+  signup: (values: any) => Promise<any>;
   login: ({ email, password }: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
   fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
@@ -132,48 +135,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signup = async (values: any) => {
     const { email, password, fullName, organizationName } = values;
-
-    const orgsRef = collection(db, "organizations");
-    const orgQuery = query(orgsRef, where("name", "==", organizationName));
-    const orgQuerySnapshot = await getDocs(orgQuery);
-    if (!orgQuerySnapshot.empty) {
-        throw new Error("Nama organisasi sudah digunakan.");
-    }
-    
-    let userCredential;
+    const createOwner = httpsCallable(functions, 'createOwner');
     try {
-        userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const newUser = userCredential.user;
-        
-        const orgCollectionRef = collection(db, 'organizations');
-        const orgDocRef = await addDoc(orgCollectionRef, {
-            name: organizationName,
-            owner_id: newUser.uid,
-            is_setup_complete: false,
-            created_at: serverTimestamp(),
-            updated_at: serverTimestamp()
-        });
-
-        const profileDocRef = doc(db, 'profiles', newUser.uid);
-        await setDoc(profileDocRef, {
-            id: newUser.uid,
-            email: newUser.email,
-            full_name: fullName,
-            organization_id: orgDocRef.id,
-            role: 'owner',
-            created_at: serverTimestamp(),
-            updated_at: serverTimestamp()
-        });
-        
+      const result = await createOwner({ email, password, fullName, organizationName });
+      return result.data;
     } catch (error: any) {
-        console.error("Client-side signup error:", error);
-        if (userCredential) {
-            await userCredential.user.delete();
-        }
-        if (error.code === 'auth/email-already-in-use') {
-             throw new Error("Email ini sudah terdaftar.");
-        }
-        throw new Error(error.message || "Gagal melakukan pendaftaran. Silakan coba lagi.");
+      console.error("Cloud function 'createOwner' error:", error);
+      throw new Error(error.message || "Gagal melakukan pendaftaran. Silakan coba lagi.");
     }
   };
 

@@ -59,15 +59,13 @@ export default function SignupForm() {
       setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke dasbor.");
       // Redirect is handled by the onAuthStateChanged listener in AuthContext
     } catch (err: any) {
-      let errorMessage = "Terjadi kesalahan yang tidak terduga.";
-      if (err.code === 'auth/email-already-in-use') {
-        errorMessage = 'Email ini sudah terdaftar. Silakan gunakan email lain.';
-        setError('email', { type: 'manual', message: errorMessage });
-      } else if (err.message) {
-        errorMessage = err.message;
-        setErrorState(errorMessage);
-      } else {
-        setErrorState(errorMessage);
+      const errorMessage = err.message || "Terjadi kesalahan yang tidak terduga.";
+      setErrorState(errorMessage);
+
+      if (errorMessage.toLowerCase().includes('email')) {
+          setError('email', { type: 'manual', message: errorMessage });
+      } else if (errorMessage.toLowerCase().includes('organisasi')) {
+           setError('organizationName', { type: 'manual', message: errorMessage });
       }
     } finally {
       setLoading(false);
