@@ -1,82 +1,96 @@
 
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import * as cors from "cors";
+
+const corsHandler = cors({origin: true});
 
 admin.initializeApp();
 const db = admin.firestore();
 
 // Cloud Function untuk mendaftar pemilik baru
-export const signupOwner = functions.https.onCall(async (data, context) => {
-  const {email, password, fullName, organizationName} = data;
-
-  if (!email || !password || !fullName || !organizationName) {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "Email, password, nama lengkap, dan nama organisasi harus diisi.",
-    );
-  }
-
-  // Periksa duplikasi nama organisasi
-  const orgsRef = db.collection("organizations");
-  const orgQuery = await orgsRef.where("name", "==", organizationName).get();
-  if (!orgQuery.empty) {
-    throw new functions.https.HttpsError(
-      "already-exists",
-      "Nama organisasi sudah digunakan.",
-      {error_code: "org-exists"},
-    );
-  }
-
-  try {
-    // Buat pengguna di Firebase Authentication
-    const userRecord = await admin.auth().createUser({
-      email: email,
-      password: password,
-      displayName: fullName,
-    });
-
-    // Buat organisasi di Firestore
-    const orgRef = db.collection("organizations").doc();
-    await orgRef.set({
-      name: organizationName,
-      owner_id: userRecord.uid,
-      is_setup_complete: false,
-      created_at: admin.firestore.FieldValue.serverTimestamp(),
-      updated_at: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    // Buat profil pengguna di Firestore
-    const profileRef = db.collection("profiles").doc(userRecord.uid);
-    await profileRef.set({
-      email,
-      full_name: fullName,
-      organization_id: orgRef.id,
-      role: "owner",
-      created_at: admin.firestore.FieldValue.serverTimestamp(),
-      updated_at: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    return {
-      status: "success",
-      message: "Pemilik berhasil didaftarkan.",
-      uid: userRecord.uid,
-      organizationId: orgRef.id,
-    };
-  } catch (error: any) {
-    if (error.code === "auth/email-already-exists") {
-      throw new functions.https.HttpsError(
-        "already-exists",
-        "Email ini sudah terdaftar.",
-        {error_code: "auth/email-already-in-use"},
-      );
+export const signupOwner = functions.https.onRequest(async (req, res) => {
+  corsHandler(req, res, async () => {
+    if (req.method !== "POST") {
+      res.status(405).send("Method Not Allowed");
+      return;
     }
-    throw new functions.https.HttpsError(
-      "internal",
-      "Terjadi kesalahan saat mendaftar.",
-      error,
-    );
-  }
+
+    const {email, password, fullName, organizationName} = req.body;
+
+    if (!email || !password || !fullName || !organizationName) {
+      res.status(400).json({
+        error: "Email, password, nama lengkap, dan nama organisasi harus diisi.",
+      });
+      return;
+    }
+
+    try {
+      // Periksa duplikasi email di Firebase Auth
+      try {
+        await admin.auth().getUserByEmail(email);
+        res.status(409).json({error: "Email ini sudah terdaftar."});
+        return;
+      } catch (error: any) {
+        if (error.code !== "auth/user-not-found") {
+          throw error; // Lemparkan error lain yang tidak terduga
+        }
+        // Jika user tidak ditemukan, lanjutkan proses
+      }
+
+      // Periksa duplikasi nama organisasi di Firestore
+      const orgsRef = db.collection("organizations");
+      const orgQuery = await orgsRef.where("name", "==", organizationName).get();
+      if (!orgQuery.empty) {
+        res.status(409).json({error: "Nama organisasi sudah digunakan."});
+        return;
+      }
+
+      // Buat pengguna di Firebase Authentication
+      const userRecord = await admin.auth().createUser({
+        email: email,
+        password: password,
+        displayName: fullName,
+      });
+
+      // Buat organisasi di Firestore
+      const orgRef = db.collection("organizations").doc();
+      await orgRef.set({
+        name: organizationName,
+        owner_id: userRecord.uid,
+        is_setup_complete: false,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        updated_at: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Buat profil pengguna di Firestore
+      const profileRef = db.collection("profiles").doc(userRecord.uid);
+      await profileRef.set({
+        id: userRecord.uid,
+        email,
+        full_name: fullName,
+        organization_id: orgRef.id,
+        role: "owner",
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        updated_at: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      res.status(201).json({
+        status: "success",
+        message: "Pemilik berhasil didaftarkan.",
+        uid: userRecord.uid,
+        organizationId: orgRef.id,
+      });
+    } catch (error: any) {
+      console.error("Error creating user/org/profile:", error);
+      res.status(500).json({
+        error: "Terjadi kesalahan internal saat membuat akun Anda.",
+        details: error.message,
+      });
+    }
+  });
 });
+
 
 // Cloud Function untuk membuat pengguna (kasir/admin) oleh owner/admin
 export const createUser = functions.https.onCall(async (data, context) => {
@@ -101,6 +115,7 @@ export const createUser = functions.https.onCall(async (data, context) => {
   try {
     const userRecord = await admin.auth().createUser({email, password, displayName: fullName});
     await db.collection("profiles").doc(userRecord.uid).set({
+      id: userRecord.uid,
       email,
       full_name: fullName,
       role: role, // 'cashier' or 'admin'
@@ -109,6 +124,9 @@ export const createUser = functions.https.onCall(async (data, context) => {
     });
     return {uid: userRecord.uid, message: "Pengguna berhasil dibuat."};
   } catch (error: any) {
+    if (error.code === 'auth/email-already-exists') {
+      throw new functions.https.HttpsError('already-exists', 'Email sudah digunakan oleh pengguna lain.');
+    }
     throw new functions.https.HttpsError("internal", error.message, error);
   }
 });

@@ -2,18 +2,19 @@
 "use client";
 
 import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback } from 'react';
-import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import type { UserProfile, Organization } from '@/types/database'; 
-import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // Initialize Firebase services
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
-const functions = getFunctions(firebaseApp, 'asia-southeast1'); // Specify region if needed
+
+// Dapatkan region dari environment variable atau default ke 'asia-southeast1'
+const functionsRegion = process.env.NEXT_PUBLIC_FIREBASE_FUNCTIONS_REGION || 'asia-southeast1';
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -106,22 +107,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [router, fetchUserProfile, setSelectedOrganizationId, pathname]);
 
   const signup = async (values: any) => {
-    const { email, password, fullName, organizationName } = values;
-    const signupOwner = httpsCallable(functions, 'signupOwner');
+    const { email, password } = values;
+    const functionUrl = `https://${functionsRegion}-${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net/signupOwner`;
+
     try {
-        await signupOwner({ email, password, fullName, organizationName });
-        // After the cloud function successfully creates the user, log them in on the client
+        const response = await fetch(functionUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(values),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Terjadi kesalahan saat mendaftar.');
+        }
+
+        // Jika pendaftaran di backend berhasil, login di client
         await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {
-        console.error("Cloud function error:", error);
-        // Check if it's a Firebase Functions-like error by looking for the 'code' property
-        if (error.code) {
-            // Pass the specific message from the function, which is in error.message for callable functions
-            const message = error.message || "Terjadi kesalahan.";
-            throw new Error(message);
-        }
-        // Throw a generic error for other issues
-        throw new Error("Gagal melakukan pendaftaran. Silakan coba lagi.");
+        console.error("Signup error:", error);
+        throw new Error(error.message || "Gagal melakukan pendaftaran. Silakan coba lagi.");
     }
   };
 
