@@ -5,10 +5,11 @@ import React, { createContext, useState, useEffect, ReactNode, useContext, useCa
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import type { UserProfile, Organization } from '@/types/database'; 
+import type { UserProfile, Organization } from '@/types/database';
 import Cookies from 'js-cookie';
+import { useToast } from '@/hooks/use-toast';
 
 // Initialize Firebase services
 const auth = getAuth(firebaseApp);
@@ -31,6 +32,8 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
+  const pathname = usePathname();
+  const { toast } = useToast();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,6 +47,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     setSelectedOrganizationIdState(orgId);
   }, []);
+  
+  const handleLogout = useCallback(async (message?: string) => {
+    await signOut(auth);
+    setUser(null);
+    setProfile(null);
+    setSelectedOrganizationId(null);
+    Cookies.remove('firebase-session-token');
+    router.push('/');
+    if (message) {
+      toast({
+        variant: "destructive",
+        title: "Sesi Tidak Valid",
+        description: message,
+      });
+    }
+  }, [router, setSelectedOrganizationId, toast]);
 
   const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser | null): Promise<UserProfile | null> => {
     if (!firebaseUser) return null;
@@ -68,14 +87,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
+      const publicRoutes = ['/', '/signup', '/unauthorized'];
       
       if (firebaseUser) {
-        setUser(firebaseUser);
         const userProfile = await fetchUserProfile(firebaseUser);
+
+        if (!userProfile) {
+            console.error("Auth user exists but profile data is missing. Logging out.");
+            await handleLogout("Data profil Anda tidak ditemukan. Sesi diakhiri.");
+            setLoading(false);
+            return;
+        }
+
+        setUser(firebaseUser);
         setProfile(userProfile);
         
         const idToken = await firebaseUser.getIdToken();
-        Cookies.set('firebase-session-token', idToken, { expires: 1, path: '/' }); // expires in 1 day
+        Cookies.set('firebase-session-token', idToken, { expires: 1, path: '/' });
 
         const storedOrgId = localStorage.getItem('selectedOrgId');
         if (storedOrgId) {
@@ -84,8 +112,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setSelectedOrganizationId(userProfile.organization_id);
         }
         
-        if (userProfile && userProfile.organizations && !userProfile.organizations.is_setup_complete) {
+        if (userProfile && userProfile.organizations && !userProfile.organizations.is_setup_complete && pathname !== '/dashboard/setup') {
             router.replace('/dashboard/setup');
+        } else if (publicRoutes.includes(pathname)) {
+            router.replace('/dashboard');
         }
 
       } else {
@@ -98,7 +128,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [router, fetchUserProfile, setSelectedOrganizationId]);
+  }, [router, fetchUserProfile, setSelectedOrganizationId, pathname, handleLogout]);
 
   const signup = async (values: any) => {
     const { email, password, fullName, organizationName } = values;
@@ -150,11 +180,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async ({ email, password }: { email: string, password: string }) => {
     await signInWithEmailAndPassword(auth, email, password);
   };
-
-  const logout = async () => {
-    await signOut(auth);
-    router.push('/');
-  };
   
   const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
       const idToken = await user?.getIdToken();
@@ -182,9 +207,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSelectedOrganizationId,
     signup,
     login,
-    logout,
+    logout: handleLogout,
     fetchWithAuth,
-    refreshProfile
+    refreshProfile,
   };
 
   if (loading) {
