@@ -1,3 +1,4 @@
+
 import * as admin from 'firebase-admin';
 
 // This file is for server-side operations only.
@@ -18,7 +19,12 @@ export const initAdminApp = () => {
       throw new Error("Firebase Admin credentials are not set. Check FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY in your environment variables.");
   }
 
-  return admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
+  try {
+    return admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+  } catch (error: any) {
+    console.error("Firebase admin initialization error", error);
+    throw new Error("Could not initialize Firebase Admin SDK. Check server credentials.");
+  }
 };

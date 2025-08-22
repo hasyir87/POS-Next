@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirestore, writeBatch, doc, updateDoc } from 'firebase/firestore';
+import { getFirestore, writeBatch, doc, collection, getDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { firebaseApp } from '@/lib/firebase/config';
 import { initAdminApp } from '@/lib/firebase/admin-config';
