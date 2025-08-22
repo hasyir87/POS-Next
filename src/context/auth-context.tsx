@@ -2,8 +2,8 @@
 "use client";
 
 import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback } from 'react';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
+import { getFirestore, doc, setDoc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
@@ -12,9 +12,6 @@ import type { UserProfile, Organization } from '@/types/database';
 // Initialize Firebase services
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
-
-// Dapatkan region dari environment variable atau default ke 'asia-southeast1'
-const functionsRegion = process.env.NEXT_PUBLIC_FIREBASE_FUNCTIONS_REGION || 'asia-southeast1';
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -27,7 +24,6 @@ interface AuthContextType {
   logout: () => Promise<void>;
   fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
   refreshProfile: () => Promise<void>;
-  supabase: null; // To maintain compatibility with old references, will be removed later
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -66,7 +62,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return profileData;
     }
     return null;
-  }, [db]);
+  }, []);
 
 
   useEffect(() => {
@@ -107,28 +103,54 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [router, fetchUserProfile, setSelectedOrganizationId, pathname]);
 
   const signup = async (values: any) => {
-    const { email, password } = values;
-    const functionUrl = `https://${functionsRegion}-${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net/signupOwner`;
+    const { email, password, fullName, organizationName } = values;
 
+    // --- Client-Side Validation ---
+    const orgsRef = collection(db, "organizations");
+    const orgQuery = query(orgsRef, where("name", "==", organizationName));
+    const orgQuerySnapshot = await getDocs(orgQuery);
+    if (!orgQuerySnapshot.empty) {
+        throw new Error("Nama organisasi sudah digunakan.");
+    }
+    
+    let userCredential;
     try {
-        const response = await fetch(functionUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(values),
+        userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const newUser = userCredential.user;
+        
+        const orgCollectionRef = collection(db, 'organizations');
+        const orgDocRef = await addDoc(orgCollectionRef, {
+            name: organizationName,
+            owner_id: newUser.uid,
+            is_setup_complete: false,
+            created_at: serverTimestamp(),
+            updated_at: serverTimestamp()
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || 'Terjadi kesalahan saat mendaftar.');
-        }
-
-        // Jika pendaftaran di backend berhasil, login di client
-        await signInWithEmailAndPassword(auth, email, password);
+        const profileDocRef = doc(db, 'profiles', newUser.uid);
+        await setDoc(profileDocRef, {
+            id: newUser.uid,
+            email: newUser.email,
+            full_name: fullName,
+            organization_id: orgDocRef.id,
+            role: 'owner',
+            created_at: serverTimestamp(),
+            updated_at: serverTimestamp()
+        });
+        
     } catch (error: any) {
-        console.error("Signup error:", error);
+        console.error("Client-side signup error:", error);
+        if (userCredential) {
+            // Attempt to delete the user if follow-up actions fail
+            try {
+              await userCredential.user.delete();
+            } catch(deleteError) {
+              console.error("Failed to clean up created user", deleteError);
+            }
+        }
+        if (error.code === 'auth/email-already-in-use') {
+             throw new Error("Email ini sudah terdaftar.");
+        }
         throw new Error(error.message || "Gagal melakukan pendaftaran. Silakan coba lagi.");
     }
   };
@@ -169,8 +191,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     login,
     logout,
     fetchWithAuth,
-    refreshProfile,
-    supabase: null // Explicitly set supabase to null
+    refreshProfile
   };
 
   if (loading && !pathname.startsWith('/dashboard/test')) {

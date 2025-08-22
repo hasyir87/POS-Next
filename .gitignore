@@ -1,3 +1,4 @@
+
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
@@ -24,11 +25,9 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
 
 # local env files
 .env*.local
-.env
 
 # vercel
 .vercel
@@ -37,14 +36,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Replit
-.replit
-replit.nix
-.config
-dump.sql
-seed-data.sql
-setup-rls.sql
-database.types.ts
-
-# Firebase
-firebase-debug.log
+# genkit
+.genkit/
+genkit.log
