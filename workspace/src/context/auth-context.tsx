@@ -114,10 +114,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {
         console.error("Cloud function error:", error);
-        // Check if it's a Firebase Functions error by looking for the 'code' property
+        // Check if it's a Firebase Functions-like error by looking for the 'code' property
         if (error.code) {
+            // Pass the specific message from the function, which is in error.message for callable functions
             const message = error.message || "Terjadi kesalahan.";
-            // Pass the specific message from the function
             throw new Error(message);
         }
         // Throw a generic error for other issues
