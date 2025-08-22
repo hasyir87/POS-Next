@@ -1,20 +1,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirestore, writeBatch, doc, collection, getDoc } from 'firebase/firestore';
+import { getFirestore, writeBatch, doc, collection } from 'firebase/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { firebaseApp } from '@/lib/firebase/config';
 import { initAdminApp } from '@/lib/firebase/admin-config';
-import type { UserProfile } from '@/types/database';
-
-// Helper function to get user profile and verify ownership/role
-async function getUserProfile(uid: string): Promise<UserProfile | null> {
-  const db = getFirestore(firebaseApp);
-  const profileDoc = await getDoc(doc(db, 'profiles', uid));
-  if (profileDoc.exists()) {
-    return profileDoc.data() as UserProfile;
-  }
-  return null;
-}
 
 // Initial data for seeding
 const initialCategories = [
@@ -29,13 +18,6 @@ const initialGrades = [
   { name: 'Premium', price_multiplier: 1.5, extra_essence_price: 3500 },
 ];
 
-const initialUnits = [
-    { name: 'ml' },
-    { name: 'g' },
-    { name: 'pcs' },
-];
-
-
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader) {
@@ -48,20 +30,17 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // Read organizationId from the request body
+    const body = await request.json();
+    const organizationId = body.organizationId;
+
+    if (!organizationId) {
+        return NextResponse.json({ error: 'Bad Request: organizationId is required in the request body.' }, { status: 400 });
+    }
+
     const adminApp = initAdminApp();
-    const decodedToken = await getAuth(adminApp).verifyIdToken(token);
-    const userId = decodedToken.uid;
+    await getAuth(adminApp).verifyIdToken(token);
     
-    const profile = await getUserProfile(userId);
-    if (!profile || !profile.organization_id) {
-        return NextResponse.json({ error: 'Profile or Organization ID not found for user.' }, { status: 404 });
-    }
-
-    if(profile.role !== 'owner') {
-        return NextResponse.json({ error: 'Forbidden: Only owners can perform initial setup.' }, { status: 403 });
-    }
-
-    const organizationId = profile.organization_id;
     const db = getFirestore(firebaseApp);
     const batch = writeBatch(db);
 
@@ -77,9 +56,6 @@ export async function POST(request: NextRequest) {
         batch.set(gradeRef, { ...grade, organization_id: organizationId });
     });
     
-    // NOTE: For simplicity, units and brands are managed client-side in settings for now.
-    // They can be added here if needed in the future.
-
     // Mark setup as complete
     const orgRef = doc(db, 'organizations', organizationId);
     batch.update(orgRef, { is_setup_complete: true });
