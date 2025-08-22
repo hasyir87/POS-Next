@@ -48,26 +48,33 @@ export default function DashboardLayout({
   const db = getFirestore(firebaseApp);
 
   const fetchOrganizations = useCallback(async () => {
-    if (!profile?.organization_id) return;
+    if (!profile || !profile.organization_id) return;
+    
     setIsLoadingOrgs(true);
     try {
-      // Find the parent organization ID from the user's main organization
       const mainOrgRef = doc(db, 'organizations', profile.organization_id);
       const mainOrgSnap = await getDoc(mainOrgRef);
       if (!mainOrgSnap.exists()) {
         throw new Error("Organisasi utama tidak ditemukan.");
       }
-      const mainOrgData = mainOrgSnap.data() as Organization;
+
+      const mainOrgData = { id: mainOrgSnap.id, ...mainOrgSnap.data() } as Organization;
       const parentId = mainOrgData.parent_organization_id || mainOrgData.id;
 
-      // Query for the parent and all its children
+      if (!parentId) {
+          // If parentId is still not available, we can't query.
+          // Set the main org as the only one and stop.
+          setOrganizations([mainOrgData]);
+          setIsLoadingOrgs(false);
+          return;
+      }
+      
       const orgsRef = collection(db, 'organizations');
       const q = query(orgsRef, where('parent_organization_id', '==', parentId));
       const querySnapshot = await getDocs(q);
       const outlets = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() } as Organization));
       
-      // Add the parent org to the list
-      const allOrgs = [{ id: mainOrgSnap.id, ...mainOrgSnap.data() } as Organization, ...outlets];
+      const allOrgs = [mainOrgData, ...outlets];
       const uniqueOrgs = Array.from(new Map(allOrgs.map(item => [item.id, item])).values());
 
       setOrganizations(uniqueOrgs);
