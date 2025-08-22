@@ -57,15 +57,16 @@ export default function SignupForm() {
     try {
       await signup(values);
       setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke dasbor.");
-      // Redirect is handled by the onAuthStateChanged listener in AuthContext
+      // Redirect is now handled by the onAuthStateChanged listener in AuthContext
     } catch (err: any) {
-      setErrorState(err.message || "Terjadi kesalahan yang tidak terduga.");
-      // Set specific form errors if the message indicates it
-      if (err.message.toLowerCase().includes('email')) {
-          setError('email', { type: 'manual', message: err.message });
-      }
-      if (err.message.toLowerCase().includes('organisasi')) {
-           setError('organizationName', { type: 'manual', message: err.message });
+      const errorMessage = err.message || "Terjadi kesalahan yang tidak terduga.";
+      setErrorState(errorMessage);
+
+      // Set specific form errors if the message from the context indicates it
+      if (errorMessage.toLowerCase().includes('email')) {
+          setError('email', { type: 'manual', message: errorMessage });
+      } else if (errorMessage.toLowerCase().includes('organisasi')) {
+           setError('organizationName', { type: 'manual', message: errorMessage });
       }
     } finally {
       setLoading(false);

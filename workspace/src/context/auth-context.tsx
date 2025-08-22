@@ -3,22 +3,15 @@
 
 import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback } from 'react';
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import type { UserProfile, Organization } from '@/types/database';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import cors from 'cors';
-
 
 // Initialize Firebase services
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
-
-// Dapatkan region dari environment variable atau default ke 'asia-southeast1'
-const functionsRegion = process.env.NEXT_PUBLIC_FIREBASE_FUNCTIONS_REGION || 'asia-southeast1';
-
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -31,7 +24,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
   refreshProfile: () => Promise<void>;
-  supabase: null; // To maintain compatibility with old references, will be removed later
+  supabase: null;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -70,7 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return profileData;
     }
     return null;
-  }, [db]);
+  }, []);
 
 
   useEffect(() => {
@@ -111,36 +104,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [router, fetchUserProfile, setSelectedOrganizationId, pathname]);
 
   const signup = async (values: any) => {
-    // Construct the correct URL for the HTTP-triggered Cloud Function
-    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-    if (!projectId) {
-        throw new Error("Konfigurasi Firebase (Project ID) tidak ditemukan.");
-    }
-    const functionUrl = `https://${functionsRegion}-${projectId}.cloudfunctions.net/signupOwner`;
+    const { email, password, fullName, organizationName } = values;
 
+    // --- Client-Side Validation ---
+    // 1. Check for duplicate organization name
+    const orgsRef = collection(db, "organizations");
+    const orgQuery = query(orgsRef, where("name", "==", organizationName));
+    const orgQuerySnapshot = await getDocs(orgQuery);
+    if (!orgQuerySnapshot.empty) {
+        throw new Error("Nama organisasi sudah digunakan.");
+    }
+    
+    // --- Client-Side Registration Logic ---
+    let userCredential;
     try {
-        const response = await fetch(functionUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(values),
+        // Step 1: Create user in Firebase Auth
+        userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const newUser = userCredential.user;
+        
+        // Step 2: Create organization document in Firestore
+        const orgCollectionRef = collection(db, 'organizations');
+        const orgDocRef = await addDoc(orgCollectionRef, {
+            name: organizationName,
+            owner_id: newUser.uid,
+            is_setup_complete: false,
+            created_at: serverTimestamp(),
+            updated_at: serverTimestamp()
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            // Throw the specific error message from the backend
-            throw new Error(data.error || 'Terjadi kesalahan saat mendaftar.');
-        }
-
-        // If the backend function is successful, log the user in on the client
-        await signInWithEmailAndPassword(auth, values.email, values.password);
+        // Step 3: Create user profile document in Firestore
+        const profileDocRef = doc(db, 'profiles', newUser.uid);
+        await setDoc(profileDocRef, {
+            id: newUser.uid,
+            email: newUser.email,
+            full_name: fullName,
+            organization_id: orgDocRef.id,
+            role: 'owner',
+            created_at: serverTimestamp(),
+            updated_at: serverTimestamp()
+        });
+        
+        // Login will be handled by onAuthStateChanged listener
     } catch (error: any) {
-        console.error("Signup error:", error);
-        // If the error is "Failed to fetch", it's likely a network or CORS issue. Provide a clearer message.
-        if (error instanceof TypeError && error.message === 'Failed to fetch') {
-            throw new Error('Gagal terhubung ke server. Periksa koneksi internet atau konfigurasi CORS.');
+        console.error("Client-side signup error:", error);
+        // If user was created but subsequent steps failed, delete the user for cleanup
+        if (userCredential) {
+            await userCredential.user.delete();
         }
-        // Rethrow the original or processed error message
+        if (error.code === 'auth/email-already-in-use') {
+             throw new Error("Email ini sudah terdaftar.");
+        }
         throw new Error(error.message || "Gagal melakukan pendaftaran. Silakan coba lagi.");
     }
   };
@@ -182,7 +195,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logout,
     fetchWithAuth,
     refreshProfile,
-    supabase: null // Explicitly set supabase to null
+    supabase: null
   };
 
   if (loading && !pathname.startsWith('/dashboard/test')) {
