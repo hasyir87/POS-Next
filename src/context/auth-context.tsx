@@ -8,12 +8,12 @@ import { firebaseApp } from '@/lib/firebase/config';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import type { UserProfile, Organization } from '@/types/database'; 
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getFunctions, httpsCallable, FunctionsError } from 'firebase/functions';
 
 // Initialize Firebase services
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
-const functions = getFunctions(firebaseApp);
+const functions = getFunctions(firebaseApp, 'asia-southeast1'); // Specify region if needed
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -26,6 +26,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
   refreshProfile: () => Promise<void>;
+  supabase: null; // To maintain compatibility with old references, will be removed later
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,9 +53,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const profileDocRef = doc(db, 'profiles', firebaseUser.uid);
     const profileDocSnap = await getDoc(profileDocRef);
     if (profileDocSnap.exists()) {
-        const profileData = profileDocSnap.data() as UserProfile;
+        const profileData = { id: profileDocSnap.id, ...profileDocSnap.data() } as UserProfile;
         
-        // Fetch organization details if organization_id exists
         if (profileData.organization_id) {
             const orgDocRef = doc(db, 'organizations', profileData.organization_id);
             const orgDocSnap = await getDoc(orgDocRef);
@@ -95,7 +95,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setProfile(null);
         setSelectedOrganizationId(null);
-        if (!publicRoutes.includes(pathname)) {
+        if (!publicRoutes.includes(pathname) && !pathname.startsWith('/dashboard/test')) {
             router.replace('/');
         }
       }
@@ -110,17 +110,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const signupOwner = httpsCallable(functions, 'signupOwner');
     try {
         await signupOwner({ email, password, fullName, organizationName });
+        // After the cloud function successfully creates the user, log them in on the client
+        await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
-        console.error("Cloud function error:", error);
-        // Translate Firebase error codes to user-friendly messages
-        if (error instanceof Error) {
-           if (error.message.includes('auth/email-already-in-use')) {
-             throw new Error("Email ini sudah terdaftar.");
-           }
-            if (error.message.includes('org-exists')) {
-             throw new Error("Nama organisasi sudah digunakan.");
-           }
+        console.error("Signup Error Context:", error);
+        if (error instanceof FunctionsError) {
+             // These are the clean messages we set up in the Cloud Function.
+             // We pass them directly to the form.
+             throw new Error(error.message);
         }
+        // Fallback for any other unexpected errors
         throw new Error("Gagal melakukan pendaftaran. Silakan coba lagi.");
     }
   };
@@ -131,7 +130,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     await signOut(auth);
-    router.push('/');
   };
   
   const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
@@ -166,7 +164,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     supabase: null // Explicitly set supabase to null
   };
 
-  if (loading) {
+  if (loading && !pathname.startsWith('/dashboard/test')) {
      return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
