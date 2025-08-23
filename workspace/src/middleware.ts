@@ -1,26 +1,5 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { getAuth } from 'firebase-admin/auth';
-import { initAdminApp } from '@/lib/firebase/admin-config';
-
-// Initialize the Firebase Admin App
-initAdminApp();
-
-async function verifySessionCookie(request: NextRequest) {
-  const sessionCookie = request.cookies.get('session')?.value;
-  if (!sessionCookie) {
-    return null;
-  }
-  try {
-    // We can use the Firebase Admin SDK to verify the session cookie.
-    // Note: This requires the app to be initialized.
-    const decodedClaims = await getAuth().verifySessionCookie(sessionCookie, true);
-    return decodedClaims;
-  } catch (error) {
-    // Session cookie is invalid or expired.
-    return null;
-  }
-}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
