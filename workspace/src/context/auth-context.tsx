@@ -57,8 +57,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: message,
       });
     }
-    // The middleware will handle redirection to '/'
-  }, [setSelectedOrganizationId, toast]);
+    router.push('/');
+  }, [setSelectedOrganizationId, toast, router]);
 
   const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser): Promise<UserProfile | null> => {
     const profileDocRef = doc(db, 'profiles', firebaseUser.uid);
@@ -88,16 +88,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (userProfile) {
           setProfile(userProfile);
           const storedOrgId = localStorage.getItem('selectedOrgId');
-          // Ensure the stored orgId belongs to the user's main organization tree if needed.
-          // For now, we trust the stored ID but default to the user's own org ID if not present.
           setSelectedOrganizationIdState(storedOrgId || userProfile.organization_id);
 
-          // Check if setup is complete. If not, force redirect to setup page.
           if (userProfile.organizations && !userProfile.organizations.is_setup_complete && pathname !== '/dashboard/setup') {
             router.replace('/dashboard/setup');
           }
         } else {
-          // If user exists in Auth but not in Firestore, it's an invalid state.
           await handleLogout("Data profil Anda tidak ditemukan. Sesi diakhiri.");
         }
       } else {
@@ -109,7 +105,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [fetchUserProfile, handleLogout, router, pathname]);
+  }, [fetchUserProfile, handleLogout, router, pathname, setSelectedOrganizationId]);
 
   const login = async ({ email, password }: { email: string, password: string }) => {
     await signInWithEmailAndPassword(auth, email, password);
@@ -133,7 +129,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     refreshProfile,
   };
   
-  // Render a global loader while the initial auth state is being determined.
   if (loading) {
      return (
       <div className="flex h-screen w-full items-center justify-center bg-background">

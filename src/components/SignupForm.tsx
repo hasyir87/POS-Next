@@ -5,8 +5,6 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -16,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MPerfumeAmalLogo } from "./m-perfume-amal-logo";
 import { AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { firebaseApp } from "@/lib/firebase/config";
+import { useAuth } from "@/context/auth-context";
 
 const formSchema = z.object({
   fullName: z.string().min(3, { message: "Nama lengkap minimal 3 karakter." }),
@@ -34,6 +32,7 @@ export default function SignupForm() {
   const [error, setErrorState] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const { signup } = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -54,21 +53,8 @@ export default function SignupForm() {
     setLoading(true);
 
     try {
-      const functions = getFunctions(firebaseApp);
-      const createOwner = httpsCallable(functions, 'createOwner');
-      
-      await createOwner({
-          email: values.email,
-          password: values.password,
-          fullName: values.fullName,
-          organizationName: values.organizationName
-      });
-      
-      // If the cloud function is successful, automatically log the user in
-      const auth = getAuth(firebaseApp);
-      await signInWithEmailAndPassword(auth, values.email, values.password);
-
-      setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke dasbor.");
+      await signup(values);
+      setSuccess("Pendaftaran berhasil! Anda akan diarahkan...");
       // Redirect is handled by the onAuthStateChanged listener in AuthContext
     } catch (err: any) {
       console.error("Signup component error:", err);

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -15,6 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MPerfumeAmalLogo } from "./m-perfume-amal-logo";
 import { AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { firebaseApp } from "@/lib/firebase/config";
 import { useAuth } from "@/context/auth-context";
 
 const formSchema = z.object({
@@ -34,7 +36,7 @@ export default function SignupForm() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
-  const { signup } = useAuth();
+  const { login } = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -55,14 +57,25 @@ export default function SignupForm() {
     setLoading(true);
 
     try {
-      await signup(values);
-      setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke dasbor.");
-      // Redirect is now handled by the onAuthStateChanged listener in AuthContext
+      const functions = getFunctions(firebaseApp);
+      const createOwner = httpsCallable(functions, 'createOwner');
+      
+      await createOwner({
+          email: values.email,
+          password: values.password,
+          fullName: values.fullName,
+          organizationName: values.organizationName
+      });
+      
+      await login({ email: values.email, password: values.password });
+
+      setSuccess("Pendaftaran berhasil! Anda akan diarahkan...");
+      // Redirect is handled by the onAuthStateChanged listener in AuthContext
     } catch (err: any) {
-      const errorMessage = err.message || "Terjadi kesalahan yang tidak terduga.";
+      console.error("Signup component error:", err);
+      const errorMessage = err.details?.message || err.message || "Terjadi kesalahan yang tidak terduga.";
       setErrorState(errorMessage);
 
-      // Set specific form errors if the message from the context indicates it
       if (errorMessage.toLowerCase().includes('email')) {
           setError('email', { type: 'manual', message: errorMessage });
       } else if (errorMessage.toLowerCase().includes('organisasi')) {

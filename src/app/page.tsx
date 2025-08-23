@@ -5,12 +5,20 @@ import { LoginForm } from '@/components/login-form';
 import { MPerfumeAmalLogo } from '@/components/m-perfume-amal-logo';
 import { useAuth } from '@/context/auth-context';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function Home() {
   const { loading, user } = useAuth();
+  const router = useRouter();
 
-  // The AuthProvider now handles redirection, so this component can be simpler.
-  // We don't want to show the login page if the user is already logged in.
+  useEffect(() => {
+    if(!loading && user) {
+        router.replace('/dashboard');
+    }
+  }, [loading, user, router]);
+
+  // Don't show the login page if the user is already logged in or we are still checking.
   if (loading || user) {
     return null; // or a loading spinner
   }

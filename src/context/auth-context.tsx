@@ -3,7 +3,7 @@
 
 import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback } from 'react';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, doc, getDoc, collection, query, where, getDocs, Firestore } from 'firebase/firestore';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
@@ -27,7 +27,6 @@ interface AuthContextType {
   signup: (values: any) => Promise<any>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-  db: Firestore;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -62,8 +61,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: message,
       });
     }
-    // The middleware will handle redirection to '/'
-  }, [setSelectedOrganizationId, toast]);
+    router.push('/');
+  }, [setSelectedOrganizationId, toast, router]);
 
   const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser): Promise<UserProfile | null> => {
     const profileDocRef = doc(db, 'profiles', firebaseUser.uid);
@@ -110,7 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [fetchUserProfile, handleLogout, router, pathname]);
+  }, [fetchUserProfile, handleLogout, router, pathname, setSelectedOrganizationId]);
 
   const login = async ({ email, password }: { email: string, password: string }) => {
     await signInWithEmailAndPassword(auth, email, password);
@@ -145,10 +144,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signup,
     logout: handleLogout,
     refreshProfile,
-    db
   };
   
-  if (loading && !user) {
+  if (loading) {
      return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

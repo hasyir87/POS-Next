@@ -7,17 +7,17 @@ export async function middleware(request: NextRequest) {
   // This is a simplified check. A more robust implementation might involve
   // actually verifying the session cookie on the server.
   // For now, we check for the presence of the cookie as a hint of being logged in.
-  const hasSession = request.cookies.has('session');
+  const hasSession = request.cookies.getAll().some(c => c.name.includes('firebase'));
 
-  const isPublicRoute = ['/', '/signup', '/unauthorized'].some(p => pathname === p);
+  const isPublicRoute = ['/', '/signup', '/unauthorized'].includes(pathname);
   const isDashboardRoute = pathname.startsWith('/dashboard');
 
-  // If user is logged in and tries to access a public route, redirect to dashboard
+  // If user seems to be logged in and tries to access a public route, redirect to dashboard
   if (hasSession && isPublicRoute) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  // If user is not logged in and tries to access a protected dashboard route, redirect to login
+  // If user seems to be logged out and tries to access a protected dashboard route, redirect to login
   if (!hasSession && isDashboardRoute) {
     return NextResponse.redirect(new URL('/', request.url));
   }
