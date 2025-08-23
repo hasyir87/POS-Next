@@ -1,8 +1,6 @@
 
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -14,16 +12,7 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Add a check to ensure all required environment variables are set.
-if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-  throw new Error(
-    "Firebase config is missing. Make sure you have a .env.local file with all the required NEXT_PUBLIC_FIREBASE_... variables."
-  );
-}
-
 // Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
-const db = getFirestore(app);
+const firebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-export { app as firebaseApp, auth as firebaseAuth, db as firebaseDb };
+export { firebaseApp };

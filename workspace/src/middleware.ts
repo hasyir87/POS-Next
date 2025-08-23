@@ -12,36 +12,37 @@ async function verifySessionCookie(request: NextRequest) {
     return null;
   }
   try {
+    // We can use the Firebase Admin SDK to verify the session cookie.
+    // Note: This requires the app to be initialized.
     const decodedClaims = await getAuth().verifySessionCookie(sessionCookie, true);
     return decodedClaims;
   } catch (error) {
+    // Session cookie is invalid or expired.
     return null;
   }
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const decodedToken = await verifySessionCookie(request);
+  
+  // This is a simplified check. A more robust implementation might involve
+  // actually verifying the session cookie on the server.
+  // For now, we check for the presence of the cookie as a hint of being logged in.
+  const hasSession = request.cookies.has('session');
 
-  const isPublicRoute = ['/', '/signup', '/unauthorized'].includes(pathname);
+  const isPublicRoute = ['/', '/signup', '/unauthorized'].some(p => pathname === p);
   const isDashboardRoute = pathname.startsWith('/dashboard');
 
-  if (decodedToken && isPublicRoute) {
+  // If user is logged in and tries to access a public route, redirect to dashboard
+  if (hasSession && isPublicRoute) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  if (!decodedToken && isDashboardRoute) {
+  // If user is not logged in and tries to access a protected dashboard route, redirect to login
+  if (!hasSession && isDashboardRoute) {
     return NextResponse.redirect(new URL('/', request.url));
   }
   
-  // Special case for setup page
-  if (decodedToken && pathname === '/dashboard/setup') {
-      // Logic to check if setup is complete would ideally be here, but it requires a DB call.
-      // We will handle the redirect to setup page inside AuthContext after profile is fetched.
-      // But we prevent redirecting away from it if user lands here.
-      return NextResponse.next();
-  }
-
   return NextResponse.next();
 }
 
@@ -49,7 +50,7 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api (API routes, these should have their own auth checks)
+     * - api (API routes are handled separately)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)

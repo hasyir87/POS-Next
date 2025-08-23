@@ -2,12 +2,13 @@
 "use client";
 
 import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback } from 'react';
-import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import type { UserProfile, Organization } from '@/types/database';
+import { useToast } from '@/hooks/use-toast';
 
 // Initialize Firebase services
 const auth = getAuth(firebaseApp);
@@ -19,10 +20,8 @@ interface AuthContextType {
   loading: boolean;
   selectedOrganizationId: string | null;
   setSelectedOrganizationId: (orgId: string | null) => void;
-  signup: (values: any) => Promise<void>;
   login: ({ email, password }: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
-  fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -31,6 +30,7 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
+  const { toast } = useToast();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,9 +44,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     setSelectedOrganizationIdState(orgId);
   }, []);
+  
+  const handleLogout = useCallback(async (message?: string) => {
+    await signOut(auth);
+    setUser(null);
+    setProfile(null);
+    setSelectedOrganizationId(null);
+    if (message) {
+      toast({
+        variant: "destructive",
+        title: "Sesi Tidak Valid",
+        description: message,
+      });
+    }
+    // The middleware will handle redirection to '/'
+  }, [setSelectedOrganizationId, toast]);
 
-  const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser | null): Promise<UserProfile | null> => {
-    if (!firebaseUser) return null;
+  const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser): Promise<UserProfile | null> => {
     const profileDocRef = doc(db, 'profiles', firebaseUser.uid);
     const profileDocSnap = await getDoc(profileDocRef);
     if (profileDocSnap.exists()) {
@@ -64,108 +78,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return null;
   }, []);
 
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
-      const publicRoutes = ['/', '/signup', '/unauthorized'];
-      
       if (firebaseUser) {
         setUser(firebaseUser);
         const userProfile = await fetchUserProfile(firebaseUser);
-        setProfile(userProfile);
-        
-        const storedOrgId = localStorage.getItem('selectedOrgId');
-        if (storedOrgId) {
-            setSelectedOrganizationIdState(storedOrgId);
-        } else if (userProfile?.organization_id) {
-            setSelectedOrganizationId(userProfile.organization_id);
-        }
-        
-        if (userProfile && userProfile.organizations && !userProfile.organizations.is_setup_complete && pathname !== '/dashboard/setup') {
-            router.replace('/dashboard/setup');
-        } else if (publicRoutes.includes(pathname)) {
-            router.replace('/dashboard');
-        }
 
+        if (userProfile) {
+          setProfile(userProfile);
+          const storedOrgId = localStorage.getItem('selectedOrgId');
+          // Ensure the stored orgId belongs to the user's main organization tree if needed.
+          // For now, we trust the stored ID but default to the user's own org ID if not present.
+          setSelectedOrganizationIdState(storedOrgId || userProfile.organization_id);
+
+          // Check if setup is complete. If not, force redirect to setup page.
+          if (userProfile.organizations && !userProfile.organizations.is_setup_complete && pathname !== '/dashboard/setup') {
+            router.replace('/dashboard/setup');
+          }
+        } else {
+          // If user exists in Auth but not in Firestore, it's an invalid state.
+          await handleLogout("Data profil Anda tidak ditemukan. Sesi diakhiri.");
+        }
       } else {
         setUser(null);
         setProfile(null);
         setSelectedOrganizationId(null);
-        if (!publicRoutes.includes(pathname) && !pathname.startsWith('/dashboard/test')) {
-            router.replace('/');
-        }
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [router, fetchUserProfile, setSelectedOrganizationId, pathname]);
-
-  const signup = async (values: any) => {
-    const { email, password, fullName, organizationName } = values;
-
-    // --- Client-Side Validation ---
-    const orgsRef = collection(db, "organizations");
-    const orgQuery = query(orgsRef, where("name", "==", organizationName));
-    const orgQuerySnapshot = await getDocs(orgQuery);
-    if (!orgQuerySnapshot.empty) {
-        throw new Error("Nama organisasi sudah digunakan.");
-    }
-    
-    let userCredential;
-    try {
-        userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const newUser = userCredential.user;
-        
-        const orgCollectionRef = collection(db, 'organizations');
-        const orgDocRef = await addDoc(orgCollectionRef, {
-            name: organizationName,
-            owner_id: newUser.uid,
-            is_setup_complete: false,
-            created_at: serverTimestamp(),
-            updated_at: serverTimestamp()
-        });
-
-        const profileDocRef = doc(db, 'profiles', newUser.uid);
-        await setDoc(profileDocRef, {
-            id: newUser.uid,
-            email: newUser.email,
-            full_name: fullName,
-            organization_id: orgDocRef.id,
-            role: 'owner',
-            created_at: serverTimestamp(),
-            updated_at: serverTimestamp()
-        });
-        
-    } catch (error: any) {
-        console.error("Client-side signup error:", error);
-        if (userCredential) {
-            await userCredential.user.delete();
-        }
-        if (error.code === 'auth/email-already-in-use') {
-             throw new Error("Email ini sudah terdaftar.");
-        }
-        throw new Error(error.message || "Gagal melakukan pendaftaran. Silakan coba lagi.");
-    }
-  };
+  }, [fetchUserProfile, handleLogout, router, pathname]);
 
   const login = async ({ email, password }: { email: string, password: string }) => {
     await signInWithEmailAndPassword(auth, email, password);
-  };
-
-  const logout = async () => {
-    await signOut(auth);
-  };
-  
-  const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
-      const idToken = await user?.getIdToken();
-      
-      const headers = new Headers(options.headers || {});
-      if (idToken) {
-          headers.set('Authorization', `Bearer ${idToken}`);
-      }
-      return fetch(url, { ...options, headers });
   };
   
   const refreshProfile = useCallback(async () => {
@@ -175,22 +122,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user, fetchUserProfile]);
 
-
-  const value = {
+  const value: AuthContextType = {
     user,
     profile,
     loading,
     selectedOrganizationId,
     setSelectedOrganizationId,
-    signup,
     login,
-    logout,
-    fetchWithAuth,
+    logout: handleLogout,
     refreshProfile,
-    supabase: null
   };
-
-  if (loading && !pathname.startsWith('/dashboard/test')) {
+  
+  // Render a global loader while the initial auth state is being determined.
+  if (loading) {
      return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

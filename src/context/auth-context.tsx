@@ -3,17 +3,19 @@
 
 import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback } from 'react';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, collection, query, where, getDocs, Firestore } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import type { UserProfile, Organization } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
-
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // Initialize Firebase services
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
+const functions = getFunctions(firebaseApp);
+
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -22,8 +24,10 @@ interface AuthContextType {
   selectedOrganizationId: string | null;
   setSelectedOrganizationId: (orgId: string | null) => void;
   login: ({ email, password }: { email: string; password: string }) => Promise<void>;
+  signup: (values: any) => Promise<any>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  db: Firestore;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,7 +55,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     setProfile(null);
     setSelectedOrganizationId(null);
-    router.push('/');
     if (message) {
       toast({
         variant: "destructive",
@@ -59,10 +62,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: message,
       });
     }
-  }, [router, setSelectedOrganizationId, toast]);
+    // The middleware will handle redirection to '/'
+  }, [setSelectedOrganizationId, toast]);
 
-  const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser | null): Promise<UserProfile | null> => {
-    if (!firebaseUser) return null;
+  const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser): Promise<UserProfile | null> => {
     const profileDocRef = doc(db, 'profiles', firebaseUser.uid);
     const profileDocSnap = await getDoc(profileDocRef);
     if (profileDocSnap.exists()) {
@@ -80,54 +83,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return null;
   }, []);
 
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
-      const publicRoutes = ['/', '/signup', '/unauthorized'];
-      
       if (firebaseUser) {
+        setUser(firebaseUser);
         const userProfile = await fetchUserProfile(firebaseUser);
 
-        if (!userProfile) {
-            console.error("Auth user exists but profile data is missing. Logging out.");
-            await handleLogout("Data profil Anda tidak ditemukan. Sesi diakhiri.");
-            setLoading(false);
-            return;
-        }
+        if (userProfile) {
+          setProfile(userProfile);
+          const storedOrgId = localStorage.getItem('selectedOrgId');
+          setSelectedOrganizationIdState(storedOrgId || userProfile.organization_id);
 
-        setUser(firebaseUser);
-        setProfile(userProfile);
-        
-        const storedOrgId = localStorage.getItem('selectedOrgId');
-        if (storedOrgId) {
-            setSelectedOrganizationIdState(storedOrgId);
-        } else if (userProfile?.organization_id) {
-            setSelectedOrganizationId(userProfile.organization_id);
-        }
-        
-        if (userProfile && userProfile.organizations && !userProfile.organizations.is_setup_complete && pathname !== '/dashboard/setup') {
+          if (userProfile.organizations && !userProfile.organizations.is_setup_complete && pathname !== '/dashboard/setup') {
             router.replace('/dashboard/setup');
-        } else if (publicRoutes.includes(pathname)) {
-            router.replace('/dashboard');
+          }
+        } else {
+          await handleLogout("Data profil Anda tidak ditemukan. Sesi diakhiri.");
         }
-
       } else {
         setUser(null);
         setProfile(null);
         setSelectedOrganizationId(null);
-        if (!publicRoutes.includes(pathname)) {
-            router.replace('/');
-        }
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [router, fetchUserProfile, setSelectedOrganizationId, pathname, handleLogout]);
+  }, [fetchUserProfile, handleLogout, router, pathname]);
 
   const login = async ({ email, password }: { email: string, password: string }) => {
     await signInWithEmailAndPassword(auth, email, password);
+  };
+  
+  const signup = async (values: any) => {
+    const createOwner = httpsCallable(functions, 'createOwner');
+    await createOwner({
+      email: values.email,
+      password: values.password,
+      fullName: values.fullName,
+      organizationName: values.organizationName
+    });
+    // After the function successfully creates the user, log them in
+    await login({ email: values.email, password: values.password });
   };
   
   const refreshProfile = useCallback(async () => {
@@ -137,19 +135,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user, fetchUserProfile]);
 
-
-  const value = {
+  const value: AuthContextType = {
     user,
     profile,
     loading,
     selectedOrganizationId,
     setSelectedOrganizationId,
     login,
+    signup,
     logout: handleLogout,
     refreshProfile,
-  } as AuthContextType;
-
-  if (loading) {
+    db
+  };
+  
+  if (loading && !user) {
      return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

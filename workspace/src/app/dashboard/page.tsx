@@ -3,11 +3,15 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, DollarSign, Loader2, Package, TrendingUp, Users } from 'lucide-react';
+import { AlertTriangle, DollarSign, Loader2, Package, Users } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from '@/components/ui/table';
-import { Droplets, Trophy } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { useCallback, useEffect, useState } from 'react';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { firebaseApp } from '@/lib/firebase/config';
+
+const functions = getFunctions(firebaseApp);
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
@@ -21,7 +25,7 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
-  const { loading: authLoading, selectedOrganizationId, fetchWithAuth } = useAuth();
+  const { loading: authLoading, selectedOrganizationId } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,22 +40,17 @@ export default function DashboardPage() {
     setError(null);
 
     try {
-        const response = await fetchWithAuth(`/api/dashboard?organizationId=${selectedOrganizationId}`);
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.error || "Gagal memuat data dasbor.");
-        }
-        
+        const getDashboardAnalytics = httpsCallable(functions, 'get_dashboard_analytics');
+        const result = await getDashboardAnalytics({ organizationId: selectedOrganizationId });
+        const data = result.data as DashboardData;
         setDashboardData(data);
-
     } catch (err: any) {
         console.error("Error fetching dashboard data:", err);
-        setError(err.message);
+        setError(err.message || "Gagal memuat data dasbor.");
     } finally {
         setIsLoading(false);
     }
-  }, [selectedOrganizationId, fetchWithAuth]);
+  }, [selectedOrganizationId]);
 
   useEffect(() => {
     if (!authLoading && selectedOrganizationId) {
@@ -61,7 +60,7 @@ export default function DashboardPage() {
     }
   }, [authLoading, selectedOrganizationId, fetchDashboardData]);
   
-  if (authLoading || isLoading) {
+  if (authLoading) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -79,6 +78,14 @@ export default function DashboardPage() {
           </CardDescription>
         </CardHeader>
       </Card>
+    );
+  }
+  
+   if (isLoading) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
     );
   }
   

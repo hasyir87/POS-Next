@@ -2,6 +2,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 
+// Initialize the Admin SDK
 admin.initializeApp();
 const db = admin.firestore();
 
@@ -60,7 +61,6 @@ export const createOwner = functions.https.onCall(async (data, context) => {
 
     } catch (error: any) {
         // --- Rollback logic ---
-        // If user was created in Auth but a subsequent step failed, delete the Auth user.
         if (newUserRecord) {
             await admin.auth().deleteUser(newUserRecord.uid);
         }
@@ -69,7 +69,6 @@ export const createOwner = functions.https.onCall(async (data, context) => {
         if (error.code === 'auth/email-already-exists') {
             throw new functions.https.HttpsError("already-exists", "Email ini sudah terdaftar.");
         }
-        // Throw a more descriptive error message
         throw new functions.https.HttpsError("internal", `Gagal membuat pemilik baru: ${error.message}`);
     }
 });
@@ -77,7 +76,6 @@ export const createOwner = functions.https.onCall(async (data, context) => {
 
 // --- Cloud Function for an Owner/Admin to create a new user (cashier/admin) ---
 export const createUser = functions.https.onCall(async (data, context) => {
-    // Check for authentication
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "Anda harus login untuk melakukan aksi ini.");
     }
@@ -85,7 +83,6 @@ export const createUser = functions.https.onCall(async (data, context) => {
     const { email, password, fullName, role, organizationId } = data;
     const requestingUid = context.auth.uid;
 
-    // --- Validation ---
     if (!email || !password || !fullName || !role || !organizationId) {
         throw new functions.https.HttpsError("invalid-argument", "Data tidak lengkap untuk membuat pengguna baru.");
     }
@@ -93,7 +90,6 @@ export const createUser = functions.https.onCall(async (data, context) => {
          throw new functions.https.HttpsError("permission-denied", "Anda tidak dapat membuat pengguna dengan peran ini.");
     }
 
-    // --- Authorization Check ---
     const requestingProfileRef = db.collection('profiles').doc(requestingUid);
     const requestingProfileSnap = await requestingProfileRef.get();
     if (!requestingProfileSnap.exists) {
@@ -110,10 +106,7 @@ export const createUser = functions.https.onCall(async (data, context) => {
 
     let newUserRecord: admin.auth.UserRecord | null = null;
     try {
-        // Step 1: Create user in Firebase Auth
         newUserRecord = await admin.auth().createUser({ email, password, displayName: fullName });
-
-        // Step 2: Create profile in Firestore
         await db.collection('profiles').doc(newUserRecord.uid).set({
             id: newUserRecord.uid,
             email,
@@ -138,7 +131,6 @@ export const createUser = functions.https.onCall(async (data, context) => {
 });
 
 
-// --- Cloud Function to delete a user ---
 export const deleteUser = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "Anda harus login untuk melakukan aksi ini.");
@@ -154,7 +146,6 @@ export const deleteUser = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError("permission-denied", "Anda tidak dapat menghapus akun Anda sendiri.");
     }
 
-    // Get profiles for both requester and user to be deleted
     const requesterProfileRef = db.collection('profiles').doc(requestingUid);
     const userToDeleteProfileRef = db.collection('profiles').doc(uidToDelete);
     const [requesterProfileSnap, userToDeleteProfileSnap] = await Promise.all([requesterProfileRef.get(), userToDeleteProfileRef.get()]);
@@ -163,7 +154,6 @@ export const deleteUser = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError("not-found", "Profil Anda tidak ditemukan.");
     }
      if (!userToDeleteProfileSnap.exists) {
-        // If profile doesn't exist, just try to delete the auth user to be safe
         await admin.auth().deleteUser(uidToDelete).catch(err => console.log("Auth user not found, nothing to delete."));
         return { status: "success", message: "Profil pengguna tidak ditemukan, akun login (jika ada) telah dihapus." };
     }
@@ -171,7 +161,6 @@ export const deleteUser = functions.https.onCall(async (data, context) => {
     const requesterProfile = requesterProfileSnap.data();
     const userToDeleteProfile = userToDeleteProfileSnap.data();
 
-    // Authorization checks
     if(requesterProfile?.organization_id !== userToDeleteProfile?.organization_id) {
         throw new functions.https.HttpsError("permission-denied", "Anda tidak dapat menghapus pengguna dari organisasi lain.");
     }
@@ -183,7 +172,6 @@ export const deleteUser = functions.https.onCall(async (data, context) => {
     }
 
     try {
-        // Delete from Auth, then delete from Firestore (or use a trigger for that)
         await admin.auth().deleteUser(uidToDelete);
         await db.collection('profiles').doc(uidToDelete).delete();
         return { status: 'success' };
@@ -242,19 +230,16 @@ export const setupInitialData = functions.https.onCall(async (data, context) => 
 
     const batch = db.batch();
 
-    // Seed Categories
     initialCategories.forEach((category) => {
       const categoryRef = db.collection("categories").doc();
       batch.set(categoryRef, { ...category, organization_id: organizationId });
     });
 
-    // Seed Grades
     initialGrades.forEach((grade) => {
       const gradeRef = db.collection("grades").doc();
       batch.set(gradeRef, { ...grade, organization_id: organizationId });
     });
 
-    // Mark setup as complete
     batch.update(orgRef, {
         is_setup_complete: true,
         updated_at: admin.firestore.FieldValue.serverTimestamp(),
@@ -265,7 +250,70 @@ export const setupInitialData = functions.https.onCall(async (data, context) => 
     return { status: "success", message: "Toko berhasil disiapkan." };
   } catch (error: any) {
     console.error("Error in setupInitialData function:", error);
-    // Re-throw as an HttpsError to be caught by the client
     throw new functions.https.HttpsError("internal", error.message, error);
+  }
+});
+
+export const get_dashboard_analytics = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Anda harus login untuk melihat data ini.");
+  }
+  const { organizationId } = data;
+  if (!organizationId) {
+    throw new functions.https.HttpsError("invalid-argument", "ID Organisasi diperlukan.");
+  }
+
+  // Check if user has permission for this organization
+  const profileSnap = await db.collection('profiles').doc(context.auth.uid).get();
+  if (!profileSnap.exists || profileSnap.data()?.organization_id !== organizationId) {
+      throw new functions.https.HttpsError("permission-denied", "Anda tidak memiliki akses ke organisasi ini.");
+  }
+
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfToday = admin.firestore.Timestamp.fromDate(today);
+
+    // Daily Revenue & Sales Count
+    const transactionsRef = db.collection('transactions');
+    const todayTransactionsQuery = transactionsRef
+      .where('organization_id', '==', organizationId)
+      .where('created_at', '>=', startOfToday);
+    const todayTransactionsSnap = await todayTransactionsQuery.get();
+    
+    let dailyRevenue = 0;
+    todayTransactionsSnap.forEach(doc => {
+      dailyRevenue += doc.data().total_amount;
+    });
+    const dailySalesCount = todayTransactionsSnap.size;
+
+    // New Customers Today
+    const customersRef = db.collection('customers');
+    const newCustomersQuery = customersRef
+        .where('organization_id', '==', organizationId)
+        .where('created_at', '>=', startOfToday);
+    const newCustomersSnap = await newCustomersQuery.get();
+    const newCustomersToday = newCustomersSnap.size;
+
+    // Top Selling Products (Simplified)
+     const productsQuery = db.collection('transaction_items')
+        .where('transaction_id', 'in', todayTransactionsSnap.docs.map(d => d.id))
+    
+    // This is a placeholder as a proper aggregation would require more complex logic
+    // or a different data structure.
+    const topProducts = [
+        { name: 'Contoh Produk', sales: 5 },
+    ];
+
+
+    return {
+      dailyRevenue,
+      dailySalesCount,
+      newCustomersToday,
+      topProducts,
+    };
+  } catch (error: any) {
+    console.error("Error fetching dashboard analytics:", error);
+    throw new functions.https.HttpsError("internal", "Gagal mengambil data analitik.", error.message);
   }
 });

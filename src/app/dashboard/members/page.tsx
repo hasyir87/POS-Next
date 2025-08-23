@@ -101,6 +101,7 @@ export default function MembersPage() {
     };
     
     const handleDeleteMember = async (id: string) => {
+        if(!confirm("Apakah Anda yakin ingin menghapus anggota ini?")) return;
         try {
             await deleteDoc(doc(db, 'customers', id));
             toast({ title: "Sukses", description: "Data anggota berhasil dihapus." });

@@ -4,14 +4,15 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle, DollarSign, Loader2, Package, TrendingUp, Users } from 'lucide-react';
-import { SalesChart } from '@/components/sales-chart';
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from '@/components/ui/table';
-import { Droplets, Trophy } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { useCallback, useEffect, useState } from 'react';
-import type { Product } from '@/types/database';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { firebaseApp } from '@/lib/firebase/config';
 
-// Helper function to format currency
+const functions = getFunctions(firebaseApp);
+
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
 };
@@ -24,13 +25,13 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
-  const { loading: authLoading, profile, selectedOrganizationId, supabase } = useAuth();
+  const { loading: authLoading, selectedOrganizationId } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchDashboardData = useCallback(async () => {
-    if (!selectedOrganizationId || !supabase) {
+    if (!selectedOrganizationId) {
         setIsLoading(false);
         return;
     }
@@ -39,37 +40,17 @@ export default function DashboardPage() {
     setError(null);
 
     try {
-        const { data, error } = await supabase.rpc('get_dashboard_analytics', {
-            p_organization_id: selectedOrganizationId
-        });
-
-        if (error) {
-            throw error;
-        }
-
-        if (data && data.length > 0) {
-            setDashboardData({
-                dailyRevenue: data[0].daily_revenue || 0,
-                dailySalesCount: data[0].daily_sales_count || 0,
-                newCustomersToday: data[0].new_customers_today || 0,
-                topProducts: data[0].top_selling_products || [],
-            });
-        } else {
-             setDashboardData({
-                dailyRevenue: 0,
-                dailySalesCount: 0,
-                newCustomersToday: 0,
-                topProducts: [],
-            });
-        }
-
+        const getDashboardAnalytics = httpsCallable(functions, 'get_dashboard_analytics');
+        const result = await getDashboardAnalytics({ organizationId: selectedOrganizationId });
+        const data = result.data as DashboardData;
+        setDashboardData(data);
     } catch (err: any) {
         console.error("Error fetching dashboard data:", err);
-        setError("Gagal memuat data dasbor. Silakan coba lagi.");
+        setError(err.message || "Gagal memuat data dasbor.");
     } finally {
         setIsLoading(false);
     }
-  }, [selectedOrganizationId, supabase]);
+  }, [selectedOrganizationId]);
 
   useEffect(() => {
     if (!authLoading && selectedOrganizationId) {
@@ -79,7 +60,7 @@ export default function DashboardPage() {
     }
   }, [authLoading, selectedOrganizationId, fetchDashboardData]);
   
-  if (authLoading || isLoading) {
+  if (authLoading) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -100,6 +81,14 @@ export default function DashboardPage() {
     );
   }
   
+   if (isLoading) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
    if (error) {
     return (
       <Alert variant="destructive">
@@ -113,7 +102,6 @@ export default function DashboardPage() {
   }
 
 
-  // Main dashboard content
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
