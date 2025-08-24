@@ -53,9 +53,14 @@ export default function SignupForm() {
     setLoading(true);
 
     try {
-      const region = "us-central1";
-      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
       // This MUST be the URL of the onRequest HTTP function
+      const region = "us-central1"; // Ganti jika region Anda berbeda
+      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+
+      if (!projectId) {
+        throw new Error("ID Proyek Firebase tidak dikonfigurasi di variabel lingkungan.");
+      }
+      
       const functionUrl = `https://${region}-${projectId}.cloudfunctions.net/createOwner`;
 
       const response = await fetch(functionUrl, {
@@ -75,7 +80,7 @@ export default function SignupForm() {
 
       if (!response.ok) {
         // Use the error message from the backend if available
-        throw new Error(result.error?.message || 'Pendaftaran gagal. Server merespons dengan error.');
+        throw new Error(result.error?.message || `Error ${response.status}: Pendaftaran gagal.`);
       }
       
       setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke halaman login.");
@@ -85,8 +90,11 @@ export default function SignupForm() {
 
     } catch (err: any) {
       console.error("Signup component error:", err);
-      // Display the actual error message
-      const errorMessage = err.message || "Terjadi kesalahan yang tidak terduga. Periksa koneksi Anda.";
+      // Display a more user-friendly message for generic fetch errors
+      const errorMessage = err.message.includes('Failed to fetch') 
+        ? "Gagal terhubung ke server. Periksa koneksi internet Anda atau hubungi dukungan jika masalah berlanjut."
+        : err.message || "Terjadi kesalahan yang tidak terduga.";
+        
       setErrorState(errorMessage);
 
       if (errorMessage.toLowerCase().includes('email')) {

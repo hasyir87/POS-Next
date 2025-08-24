@@ -7,17 +7,30 @@ const corsHandler = cors({ origin: true });
 
 console.log("----- CLOUD FUNCTIONS DEPLOYMENT VERSION: ", new Date().toISOString(), " -----");
 
-if (admin.apps.length === 0) {
-  admin.initializeApp();
+try {
+  if (admin.apps.length === 0) {
+    admin.initializeApp();
+  }
+} catch (e) {
+  console.error("Firebase admin initialization error", e);
 }
+
 const db = admin.firestore();
 
 export const createOwner = functions.https.onRequest(async (req, res) => {
     corsHandler(req, res, async () => {
+        // Handle preflight OPTIONS request
+        if (req.method === 'OPTIONS') {
+            res.status(204).send('');
+            return;
+        }
+
         if (req.method !== 'POST') {
             res.status(405).send('Method Not Allowed');
             return;
         }
+        
+        functions.logger.info("createOwner function triggered", { body: req.body });
 
         const { email, password, fullName, organizationName } = req.body.data;
 
