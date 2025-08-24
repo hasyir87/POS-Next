@@ -10,8 +10,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
-    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
-    "setup-db": "node setup-database.js"
+    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.14.1",

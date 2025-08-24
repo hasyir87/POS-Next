@@ -2,11 +2,9 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 
-// Initialize the Admin SDK
-try {
+// Initialize the Admin SDK safely
+if (admin.apps.length === 0) {
   admin.initializeApp();
-} catch (e) {
-  console.log("Admin SDK already initialized.");
 }
 const db = admin.firestore();
 
@@ -22,16 +20,16 @@ export const createOwner = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError("invalid-argument", "Password harus minimal 8 karakter.");
     }
 
-    // --- Check for duplicate organization name ---
-    const orgsRef = db.collection("organizations");
-    const orgQuery = orgsRef.where("name", "==", organizationName);
-    const orgQuerySnapshot = await orgQuery.get();
-    if (!orgQuerySnapshot.empty) {
-        throw new functions.https.HttpsError("already-exists", "Nama organisasi sudah digunakan.");
-    }
-
     let newUserRecord: admin.auth.UserRecord | null = null;
     try {
+        // --- Check for duplicate organization name ---
+        const orgsRef = db.collection("organizations");
+        const orgQuery = orgsRef.where("name", "==", organizationName);
+        const orgQuerySnapshot = await orgQuery.get();
+        if (!orgQuerySnapshot.empty) {
+            throw new functions.https.HttpsError("already-exists", "Nama organisasi sudah digunakan.");
+        }
+
         // Step 1: Create user in Firebase Auth
         newUserRecord = await admin.auth().createUser({
             email: email,
@@ -66,14 +64,16 @@ export const createOwner = functions.https.onCall(async (data, context) => {
     } catch (error: any) {
         // --- Rollback logic ---
         if (newUserRecord) {
-            await admin.auth().deleteUser(newUserRecord.uid);
+            await admin.auth().deleteUser(newUserRecord.uid).catch(err => functions.logger.error("Failed to rollback auth user creation:", err));
         }
 
-        console.error("ERROR IN createOwner:", error);
-        if (error.code === 'auth/email-already-exists') {
+        functions.logger.error("ERROR IN createOwner:", error);
+        if (error.code === 'auth/email-already-exists' || error.message.includes("email-already-exists")) {
             throw new functions.https.HttpsError("already-exists", "Email ini sudah terdaftar.");
         }
-        // Send a more descriptive error back to the client
+        if (error instanceof functions.https.HttpsError) {
+            throw error; // Re-throw HttpsError directly
+        }
         throw new functions.https.HttpsError("internal", `Gagal membuat pemilik baru: ${error.message}`, error);
     }
 });
@@ -95,22 +95,22 @@ export const createUser = functions.https.onCall(async (data, context) => {
          throw new functions.https.HttpsError("permission-denied", "Anda tidak dapat membuat pengguna dengan peran ini.");
     }
 
-    const requestingProfileRef = db.collection('profiles').doc(requestingUid);
-    const requestingProfileSnap = await requestingProfileRef.get();
-    if (!requestingProfileSnap.exists) {
-        throw new functions.https.HttpsError("not-found", "Profil Anda tidak ditemukan.");
-    }
-    const requestingProfile = requestingProfileSnap.data();
-
-    if (requestingProfile?.organization_id !== organizationId) {
-         throw new functions.https.HttpsError("permission-denied", "Anda tidak dapat membuat pengguna untuk organisasi lain.");
-    }
-    if (requestingProfile?.role !== 'owner' && requestingProfile?.role !== 'admin' && requestingProfile?.role !== 'superadmin') {
-        throw new functions.https.HttpsError("permission-denied", "Anda tidak memiliki izin untuk membuat pengguna.");
-    }
-
     let newUserRecord: admin.auth.UserRecord | null = null;
     try {
+        const requestingProfileRef = db.collection('profiles').doc(requestingUid);
+        const requestingProfileSnap = await requestingProfileRef.get();
+        if (!requestingProfileSnap.exists) {
+            throw new functions.https.HttpsError("not-found", "Profil Anda tidak ditemukan.");
+        }
+        const requestingProfile = requestingProfileSnap.data();
+
+        if (requestingProfile?.organization_id !== organizationId && requestingProfile?.role !== 'superadmin') {
+             throw new functions.https.HttpsError("permission-denied", "Anda tidak dapat membuat pengguna untuk organisasi lain.");
+        }
+        if (requestingProfile?.role !== 'owner' && requestingProfile?.role !== 'admin' && requestingProfile?.role !== 'superadmin') {
+            throw new functions.https.HttpsError("permission-denied", "Anda tidak memiliki izin untuk membuat pengguna.");
+        }
+
         newUserRecord = await admin.auth().createUser({ email, password, displayName: fullName });
         await db.collection('profiles').doc(newUserRecord.uid).set({
             id: newUserRecord.uid,
@@ -125,9 +125,9 @@ export const createUser = functions.https.onCall(async (data, context) => {
         return { status: "success", uid: newUserRecord.uid };
     } catch (error: any) {
         if (newUserRecord) {
-            await admin.auth().deleteUser(newUserRecord.uid);
+            await admin.auth().deleteUser(newUserRecord.uid).catch(err => functions.logger.error("Failed to rollback auth user creation:", err));
         }
-        console.error("ERROR IN createUser:", error);
+        functions.logger.error("ERROR IN createUser:", error);
          if (error.code === 'auth/email-already-exists') {
             throw new functions.https.HttpsError("already-exists", "Email ini sudah terdaftar.");
         }
@@ -151,37 +151,37 @@ export const deleteUser = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError("permission-denied", "Anda tidak dapat menghapus akun Anda sendiri.");
     }
 
-    const requesterProfileRef = db.collection('profiles').doc(requestingUid);
-    const userToDeleteProfileRef = db.collection('profiles').doc(uidToDelete);
-    const [requesterProfileSnap, userToDeleteProfileSnap] = await Promise.all([requesterProfileRef.get(), userToDeleteProfileRef.get()]);
-
-    if (!requesterProfileSnap.exists) {
-        throw new functions.https.HttpsError("not-found", "Profil Anda tidak ditemukan.");
-    }
-     if (!userToDeleteProfileSnap.exists) {
-        await admin.auth().deleteUser(uidToDelete).catch(err => console.log("Auth user not found, nothing to delete."));
-        return { status: "success", message: "Profil pengguna tidak ditemukan, akun login (jika ada) telah dihapus." };
-    }
-    
-    const requesterProfile = requesterProfileSnap.data();
-    const userToDeleteProfile = userToDeleteProfileSnap.data();
-
-    if(requesterProfile?.organization_id !== userToDeleteProfile?.organization_id) {
-        throw new functions.https.HttpsError("permission-denied", "Anda tidak dapat menghapus pengguna dari organisasi lain.");
-    }
-    if (requesterProfile?.role !== 'owner' && requesterProfile?.role !== 'admin' && requesterProfile?.role !== 'superadmin') {
-         throw new functions.https.HttpsError("permission-denied", "Anda tidak memiliki izin untuk menghapus pengguna.");
-    }
-    if (userToDeleteProfile?.role === 'owner') {
-        throw new functions.https.HttpsError("permission-denied", "Akun pemilik tidak dapat dihapus melalui cara ini.");
-    }
-
     try {
+        const requesterProfileRef = db.collection('profiles').doc(requestingUid);
+        const userToDeleteProfileRef = db.collection('profiles').doc(uidToDelete);
+        const [requesterProfileSnap, userToDeleteProfileSnap] = await Promise.all([requesterProfileRef.get(), userToDeleteProfileRef.get()]);
+
+        if (!requesterProfileSnap.exists()) {
+            throw new functions.https.HttpsError("not-found", "Profil Anda tidak ditemukan.");
+        }
+         if (!userToDeleteProfileSnap.exists) {
+            await admin.auth().deleteUser(uidToDelete).catch(err => functions.logger.warn("Auth user not found, nothing to delete.", err));
+            return { status: "success", message: "Profil pengguna tidak ditemukan, akun login (jika ada) telah dihapus." };
+        }
+        
+        const requesterProfile = requesterProfileSnap.data();
+        const userToDeleteProfile = userToDeleteProfileSnap.data();
+
+        if(requesterProfile?.organization_id !== userToDeleteProfile?.organization_id && requesterProfile?.role !== 'superadmin') {
+            throw new functions.https.HttpsError("permission-denied", "Anda tidak dapat menghapus pengguna dari organisasi lain.");
+        }
+        if (requesterProfile?.role !== 'owner' && requesterProfile?.role !== 'admin' && requesterProfile?.role !== 'superadmin') {
+             throw new functions.https.HttpsError("permission-denied", "Anda tidak memiliki izin untuk menghapus pengguna.");
+        }
+        if (userToDeleteProfile?.role === 'owner') {
+            throw new functions.https.HttpsError("permission-denied", "Akun pemilik tidak dapat dihapus melalui cara ini.");
+        }
+
         await admin.auth().deleteUser(uidToDelete);
         await db.collection('profiles').doc(uidToDelete).delete();
         return { status: 'success' };
     } catch (error: any) {
-        console.error("ERROR IN deleteUser:", error);
+        functions.logger.error("ERROR IN deleteUser:", error);
         throw new functions.https.HttpsError("internal", `Gagal menghapus pengguna: ${error.message}`, error);
     }
 });
@@ -254,7 +254,7 @@ export const setupInitialData = functions.https.onCall(async (data, context) => 
 
     return { status: "success", message: "Toko berhasil disiapkan." };
   } catch (error: any) {
-    console.error("ERROR IN setupInitialData:", error);
+    functions.logger.error("ERROR IN setupInitialData:", error);
     throw new functions.https.HttpsError("internal", `Gagal melakukan setup: ${error.message}`, error);
   }
 });
@@ -318,7 +318,7 @@ export const get_dashboard_analytics = functions.https.onCall(async (data, conte
       topProducts,
     };
   } catch (error: any) {
-    console.error("ERROR IN get_dashboard_analytics:", error);
+    functions.logger.error("ERROR IN get_dashboard_analytics:", error);
     throw new functions.https.HttpsError("internal", `Gagal mengambil data analitik: ${error.message}`, error);
   }
 });

@@ -2,9 +2,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -14,7 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MPerfumeAmalLogo } from "./m-perfume-amal-logo";
 import { AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useAuth } from "@/context/auth-context";
+import { firebaseApp } from "@/lib/firebase/config";
 
 const formSchema = z.object({
   fullName: z.string().min(3, { message: "Nama lengkap minimal 3 karakter." }),
@@ -32,7 +34,7 @@ export default function SignupForm() {
   const [error, setErrorState] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
-  const { signup } = useAuth();
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -53,9 +55,21 @@ export default function SignupForm() {
     setLoading(true);
 
     try {
-      await signup(values);
-      setSuccess("Pendaftaran berhasil! Anda akan diarahkan...");
-      // Redirect is handled by the onAuthStateChanged listener in AuthContext
+      const functions = getFunctions(firebaseApp);
+      const createOwner = httpsCallable(functions, 'createOwner');
+      
+      await createOwner({
+          email: values.email,
+          password: values.password,
+          fullName: values.fullName,
+          organizationName: values.organizationName
+      });
+      
+      setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke halaman login.");
+      setTimeout(() => {
+        router.push('/');
+      }, 2000);
+
     } catch (err: any) {
       console.error("Signup component error:", err);
       const errorMessage = err.details?.message || err.message || "Terjadi kesalahan yang tidak terduga.";
@@ -72,7 +86,7 @@ export default function SignupForm() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
             <MPerfumeAmalLogo className="w-12 h-12 mx-auto text-primary" />

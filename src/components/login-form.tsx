@@ -1,7 +1,7 @@
 
 "use client";
 import React from "react";
-
+import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -34,6 +34,7 @@ const formSchema = z.object({
 
 export function LoginForm() {
   const { login } = useAuth();
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -52,7 +53,9 @@ export function LoginForm() {
     
     try {
       await login({ email: values.email, password: values.password });
-      // Redirect is handled by the onAuthStateChanged listener in AuthContext
+      // Redirect is handled by the onAuthStateChanged listener in AuthContext,
+      // which will detect the new user and redirect to /dashboard.
+      router.push('/dashboard');
     } catch (error: any) {
       let msg = "Login gagal. Silakan coba lagi.";
       if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {

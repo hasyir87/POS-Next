@@ -45,7 +45,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSelectedOrganizationIdState(orgId);
   }, []);
   
-  const handleLogout = useCallback(async (message?: string) => {
+  const handleLogout = useCallback(async (message?: {title: string, description: string}) => {
     await signOut(auth);
     setUser(null);
     setProfile(null);
@@ -53,8 +53,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (message) {
       toast({
         variant: "destructive",
-        title: "Sesi Tidak Valid",
-        description: message,
+        title: message.title,
+        description: message.description,
       });
     }
     router.push('/');
@@ -94,7 +94,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             router.replace('/dashboard/setup');
           }
         } else {
-          await handleLogout("Data profil Anda tidak ditemukan. Sesi diakhiri.");
+          await handleLogout({title: "Sesi Tidak Valid", description: "Data profil Anda tidak ditemukan. Sesi diakhiri."});
         }
       } else {
         setUser(null);
@@ -125,7 +125,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     selectedOrganizationId,
     setSelectedOrganizationId,
     login,
-    logout: handleLogout,
+    logout: () => handleLogout(),
     refreshProfile,
   };
   

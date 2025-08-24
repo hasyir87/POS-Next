@@ -9,13 +9,10 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import type { UserProfile, Organization } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // Initialize Firebase services
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
-const functions = getFunctions(firebaseApp);
-
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -24,7 +21,6 @@ interface AuthContextType {
   selectedOrganizationId: string | null;
   setSelectedOrganizationId: (orgId: string | null) => void;
   login: ({ email, password }: { email: string; password: string }) => Promise<void>;
-  signup: (values: any) => Promise<any>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -49,7 +45,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSelectedOrganizationIdState(orgId);
   }, []);
   
-  const handleLogout = useCallback(async (message?: string) => {
+  const handleLogout = useCallback(async (message?: {title: string, description: string}) => {
     await signOut(auth);
     setUser(null);
     setProfile(null);
@@ -57,8 +53,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (message) {
       toast({
         variant: "destructive",
-        title: "Sesi Tidak Valid",
-        description: message,
+        title: message.title,
+        description: message.description,
       });
     }
     router.push('/');
@@ -98,7 +94,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             router.replace('/dashboard/setup');
           }
         } else {
-          await handleLogout("Data profil Anda tidak ditemukan. Sesi diakhiri.");
+          await handleLogout({title: "Sesi Tidak Valid", description: "Data profil Anda tidak ditemukan. Sesi diakhiri."});
         }
       } else {
         setUser(null);
@@ -115,18 +111,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await signInWithEmailAndPassword(auth, email, password);
   };
   
-  const signup = async (values: any) => {
-    const createOwner = httpsCallable(functions, 'createOwner');
-    await createOwner({
-      email: values.email,
-      password: values.password,
-      fullName: values.fullName,
-      organizationName: values.organizationName
-    });
-    // After the function successfully creates the user, log them in
-    await login({ email: values.email, password: values.password });
-  };
-  
   const refreshProfile = useCallback(async () => {
     if (user) {
         const refreshedProfile = await fetchUserProfile(user);
@@ -141,12 +125,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     selectedOrganizationId,
     setSelectedOrganizationId,
     login,
-    signup,
-    logout: handleLogout,
+    logout: () => handleLogout(),
     refreshProfile,
   };
   
-  if (loading) {
+  if (loading && ['/','/signup'].includes(pathname)) {
      return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
