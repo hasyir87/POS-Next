@@ -58,22 +58,29 @@ export default function SignupForm() {
 
     try {
       const functions = getFunctions(firebaseApp);
-      const createOwner = httpsCallable(functions, 'createOwner');
+      // NOTE: We are now calling an onRequest function, not an onCall function.
+      const createOwnerFunction = httpsCallable(functions, 'createOwner');
       
-      await createOwner({
+      const result = await createOwnerFunction({
           email: values.email,
           password: values.password,
           fullName: values.fullName,
           organizationName: values.organizationName
       });
       
+      const resultData = result.data as { status: string, message: string, uid: string };
+      if (resultData.status !== 'success') {
+          throw new Error(resultData.message || 'Pendaftaran gagal.');
+      }
+
       await login({ email: values.email, password: values.password });
 
       setSuccess("Pendaftaran berhasil! Anda akan diarahkan...");
       // Redirect is handled by the onAuthStateChanged listener in AuthContext
     } catch (err: any) {
       console.error("Signup component error:", err);
-      const errorMessage = err.details?.message || err.message || "Terjadi kesalahan yang tidak terduga.";
+      // The error from an onRequest function is often in err.response.data.error.message
+      const errorMessage = err.response?.data?.error?.message || err.message || "Terjadi kesalahan yang tidak terduga.";
       setErrorState(errorMessage);
 
       if (errorMessage.toLowerCase().includes('email')) {

@@ -1,6 +1,9 @@
 
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import * as cors from "cors";
+
+const corsHandler = cors({ origin: true });
 
 // Initialize the Admin SDK safely
 if (admin.apps.length === 0) {
@@ -9,73 +12,82 @@ if (admin.apps.length === 0) {
 const db = admin.firestore();
 
 // --- Cloud Function to create a new Owner and their Organization ---
-export const createOwner = functions.https.onCall(async (data, context) => {
-    const { email, password, fullName, organizationName } = data;
+export const createOwner = functions.https.onRequest((req, res) => {
+  corsHandler(req, res, async () => {
+    if (req.method !== 'POST') {
+        res.status(405).send('Method Not Allowed');
+        return;
+    }
+
+    const { email, password, fullName, organizationName } = req.body.data;
 
     // --- Validation ---
     if (!email || !password || !fullName || !organizationName) {
-        throw new functions.https.HttpsError("invalid-argument", "Data tidak lengkap. Pastikan semua field terisi.");
+      functions.logger.error("Validation failed: Missing data.", req.body.data);
+      res.status(400).send({ error: { message: "Data tidak lengkap. Pastikan semua field terisi." } });
+      return;
     }
     if (password.length < 8) {
-        throw new functions.https.HttpsError("invalid-argument", "Password harus minimal 8 karakter.");
+      res.status(400).send({ error: { message: "Password harus minimal 8 karakter." } });
+      return;
     }
 
     let newUserRecord: admin.auth.UserRecord | null = null;
     try {
-        // --- Check for duplicate organization name ---
-        const orgsRef = db.collection("organizations");
-        const orgQuery = orgsRef.where("name", "==", organizationName);
-        const orgQuerySnapshot = await orgQuery.get();
-        if (!orgQuerySnapshot.empty) {
-            throw new functions.https.HttpsError("already-exists", "Nama organisasi sudah digunakan.");
-        }
+      // --- Check for duplicate organization name ---
+      const orgsRef = db.collection("organizations");
+      const orgQuery = orgsRef.where("name", "==", organizationName);
+      const orgQuerySnapshot = await orgQuery.get();
+      if (!orgQuerySnapshot.empty) {
+        res.status(409).send({ error: { message: "Nama organisasi sudah digunakan." } });
+        return;
+      }
 
-        // Step 1: Create user in Firebase Auth
-        newUserRecord = await admin.auth().createUser({
-            email: email,
-            password: password,
-            displayName: fullName,
-            emailVerified: false,
-        });
+      // Step 1: Create user in Firebase Auth
+      newUserRecord = await admin.auth().createUser({
+        email: email,
+        password: password,
+        displayName: fullName,
+        emailVerified: false,
+      });
 
-        // Step 2: Create the organization document
-        const orgDocRef = await db.collection('organizations').add({
-            name: organizationName,
-            owner_id: newUserRecord.uid,
-            is_setup_complete: false,
-            created_at: admin.firestore.FieldValue.serverTimestamp(),
-            updated_at: admin.firestore.FieldValue.serverTimestamp()
-        });
+      // Step 2: Create the organization document
+      const orgDocRef = await db.collection('organizations').add({
+        name: organizationName,
+        owner_id: newUserRecord.uid,
+        is_setup_complete: false,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
 
-        // Step 3: Create the user's profile document
-        const profileDocRef = db.collection('profiles').doc(newUserRecord.uid);
-        await profileDocRef.set({
-            id: newUserRecord.uid,
-            email: email,
-            full_name: fullName,
-            organization_id: orgDocRef.id,
-            role: 'owner',
-            created_at: admin.firestore.FieldValue.serverTimestamp(),
-            updated_at: admin.firestore.FieldValue.serverTimestamp()
-        });
-
-        return { status: "success", message: "Pemilik dan organisasi berhasil dibuat.", uid: newUserRecord.uid };
+      // Step 3: Create the user's profile document
+      const profileDocRef = db.collection('profiles').doc(newUserRecord.uid);
+      await profileDocRef.set({
+        id: newUserRecord.uid,
+        email: email,
+        full_name: fullName,
+        organization_id: orgDocRef.id,
+        role: 'owner',
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      res.status(200).send({ data: { status: "success", message: "Pemilik dan organisasi berhasil dibuat.", uid: newUserRecord.uid } });
 
     } catch (error: any) {
-        // --- Rollback logic ---
-        if (newUserRecord) {
-            await admin.auth().deleteUser(newUserRecord.uid).catch(err => functions.logger.error("Failed to rollback auth user creation:", err));
-        }
+      // --- Rollback logic ---
+      if (newUserRecord) {
+        await admin.auth().deleteUser(newUserRecord.uid).catch(err => functions.logger.error("Failed to rollback auth user creation:", err));
+      }
 
-        functions.logger.error("ERROR IN createOwner:", error);
-        if (error.code === 'auth/email-already-exists' || error.message.includes("email-already-exists")) {
-            throw new functions.https.HttpsError("already-exists", "Email ini sudah terdaftar.");
-        }
-        if (error instanceof functions.https.HttpsError) {
-            throw error; // Re-throw HttpsError directly
-        }
-        throw new functions.https.HttpsError("internal", `Gagal membuat pemilik baru: ${error.message}`, error);
+      functions.logger.error("ERROR IN createOwner:", error);
+      if (error.code === 'auth/email-already-exists') {
+        res.status(409).send({ error: { message: "Email ini sudah terdaftar." }});
+        return;
+      }
+      res.status(500).send({ error: { message: `Gagal membuat pemilik baru: ${error.message}` }});
     }
+  });
 });
 
 
