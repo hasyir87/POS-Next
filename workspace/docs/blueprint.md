@@ -16,13 +16,13 @@ ScentPOS adalah solusi Point of Sale (POS) multi-tenant berbasis cloud yang dira
 -   **Otentikasi & Keamanan**:
     -   Pendaftaran pemilik toko (multi-tenant).
     -   Manajemen pengguna berbasis peran (Owner, Admin, Cashier).
-    -   Isolasi data antar toko dijamin oleh Row-Level Security (RLS) di tingkat database.
+    -   Isolasi data antar toko dijamin oleh Aturan Keamanan Firestore.
 -   **Manajemen Dasbor & Outlet**:
     -   Dasbor utama untuk ringkasan bisnis (KPI, penjualan, notifikasi).
     -   Kemampuan untuk beralih antar outlet/cabang yang dimiliki.
 -   **Point of Sale (POS)**:
     -   Antarmuka kasir terpadu.
-    -   Penjualan produk jadi dengan pencarian dan pemindai barcode.
+    -   Penjualan produk jadi dengan pencarian.
     -   Formulir isi ulang dinamis untuk parfum kustom.
     -   Manajemen keranjang belanja.
     -   Integrasi dengan data pelanggan dan promosi.
@@ -46,7 +46,7 @@ ScentPOS adalah solusi Point of Sale (POS) multi-tenant berbasis cloud yang dira
 
 -   **Framework**: Next.js 15+ (App Router)
 -   **Bahasa**: TypeScript
--   **Backend**: Supabase (Auth, PostgreSQL, Storage, Functions)
+-   **Backend**: **Firebase** (Firestore, Authentication, Cloud Functions, Storage)
 -   **Styling**: Tailwind CSS
 -   **UI**: ShadCN UI
 -   **State Management**: React Context API
@@ -54,95 +54,110 @@ ScentPOS adalah solusi Point of Sale (POS) multi-tenant berbasis cloud yang dira
 
 ---
 
-## 4. Skema Database (PostgreSQL di Supabase)
+## 4. Model Data (Firestore)
 
-Ini adalah representasi dari arsitektur data inti aplikasi.
+Ini adalah representasi dari arsitektur data inti aplikasi di Firestore. Setiap model merepresentasikan sebuah **koleksi**.
 
-### 4.1. Tabel Inti & Otentikasi
+### 4.1. Koleksi Inti & Otentikasi
 
 **`organizations`**
 Menyimpan data setiap entitas bisnis (toko induk atau cabang).
 
-| Kolom                  | Tipe      | Deskripsi                                                        |
+| Field                  | Tipe      | Deskripsi                                                        |
 | ---------------------- | --------- | ---------------------------------------------------------------- |
-| **`id`** (PK)          | `uuid`    | Kunci utama, auto-generate.                                      |
-| `name`                 | `text`    | Nama unik dari organisasi atau outlet.                           |
-| `address`              | `text`    | Alamat fisik.                                                    |
-| `phone`                | `text`    | Nomor telepon.                                                   |
-| `logo_url`             | `text`    | URL ke file logo di Supabase Storage.                            |
-| `parent_organization_id` | `uuid` (FK) | Merujuk ke `organizations.id`. `NULL` jika ini adalah toko induk. |
+| **`(Document ID)`**    | `string`  | ID unik, auto-generate.                                        |
+| `name`                 | `string`  | Nama unik dari organisasi atau outlet.                           |
+| `address`              | `string`  | Alamat fisik.                                                    |
+| `phone`                | `string`  | Nomor telepon.                                                   |
+| `logo_url`             | `string`  | URL ke file logo di Firebase Storage.                            |
+| `parent_organization_id`| `string`  | Merujuk ke ID dokumen lain di `organizations`. `null` jika induk.|
 | `is_setup_complete`    | `boolean` | Menandai apakah setup awal untuk outlet ini sudah selesai.       |
-| `created_at`           | `timestamptz` | Waktu pembuatan record.                                          |
-| `updated_at`           | `timestamptz` | Waktu pembaruan terakhir.                                        |
+| `created_at`           | `Timestamp` | Waktu pembuatan record.                                          |
+| `updated_at`           | `Timestamp` | Waktu pembaruan terakhir.                                        |
 
 **`profiles`**
-Menghubungkan pengguna di `auth.users` dengan organisasi dan peran mereka.
+Menghubungkan pengguna di Firebase Auth dengan organisasi dan peran mereka. ID dokumen sama dengan UID Firebase Auth.
 
-| Kolom             | Tipe          | Deskripsi                                                     |
-| ----------------- | ------------- | ------------------------------------------------------------- |
-| **`id`** (PK, FK) | `uuid`        | Kunci utama, sama dengan `auth.users.id`.                     |
-| `email`           | `text`        | Email pengguna (duplikasi untuk kemudahan query).             |
-| `full_name`       | `text`        | Nama lengkap pengguna.                                        |
-| `avatar_url`      | `text`        | URL ke foto profil di Supabase Storage.                       |
-| `organization_id` | `uuid` (FK)   | Menghubungkan pengguna ke `organizations.id` mereka.          |
-| `role`            | `user_role` (Enum) | Peran pengguna: `owner`, `admin`, `cashier`, `superadmin`. |
-| `created_at`      | `timestamptz` | Waktu pembuatan record.                                       |
-| `updated_at`      | `timestamptz` | Waktu pembaruan terakhir.                                     |
+| Field             | Tipe        | Deskripsi                                                     |
+| ----------------- | ----------- | ------------------------------------------------------------- |
+| **`(Document ID)`**| `string`    | ID unik, sama dengan `Firebase Auth UID`.                     |
+| `email`           | `string`    | Email pengguna (duplikasi untuk kemudahan query).             |
+| `full_name`       | `string`    | Nama lengkap pengguna.                                        |
+| `avatar_url`      | `string`    | URL ke foto profil di Firebase Storage.                       |
+| `organization_id` | `string`    | Menghubungkan pengguna ke dokumen di `organizations`.         |
+| `role`            | `string`    | Peran pengguna: `owner`, `admin`, `cashier`, `superadmin`. |
+| `created_at`      | `Timestamp` | Waktu pembuatan record.                                       |
+| `updated_at`      | `Timestamp` | Waktu pembaruan terakhir.                                     |
 
-### 4.2. Tabel Data Operasional
+### 4.2. Koleksi Data Operasional
 
-Semua tabel berikut memiliki kolom `organization_id` (FK) untuk memastikan isolasi data melalui RLS.
+Semua koleksi berikut memiliki field `organization_id` untuk menegakkan aturan keamanan.
 
 **`products`**: Produk jadi yang siap dijual.
-- `id`, `organization_id`, `name`, `description`, `price`, `stock`, `category_id` (FK ke `categories`), `image_url`
+- `organization_id`, `name`, `description`, `price`, `stock`, `category_id`, `image_url`
 
 **`raw_materials`**: Bahan baku untuk parfum refill.
-- `id`, `organization_id`, `name`, `brand`, `quantity`, `unit`, `category`, `purchase_price`
+- `organization_id`, `name`, `brand`, `quantity`, `unit`, `category`, `purchase_price`
 
 **`customers`**: Database pelanggan.
-- `id`, `organization_id`, `name`, `email`, `phone`, `loyalty_points`, `transaction_count`
+- `organization_id`, `name`, `email`, `phone`, `loyalty_points`, `transaction_count`
 
 **`transactions`**: Header untuk setiap transaksi penjualan.
-- `id`, `organization_id`, `cashier_id` (FK ke `profiles`), `customer_id` (FK ke `customers`), `total_amount`, `payment_method`, `status`
+- `organization_id`, `cashier_id` (UID dari `profiles`), `customer_id`, `total_amount`, `payment_method`, `status`
 
 **`transaction_items`**: Detail item dalam sebuah transaksi.
-- `id`, `transaction_id` (FK ke `transactions`), `product_id` (FK ke `products`), `quantity`, `price`
+- `transaction_id`, `product_id`, `quantity`, `price`
 
 **`promotions`**: Aturan promosi yang bisa diterapkan.
-- `id`, `organization_id`, `name`, `type` (Enum: Persentase, Nominal, BOGO), `value`, `get_product_id` (FK ke `products`), `is_active`
+- `organization_id`, `name`, `type` (`Persentase`, `Nominal`, `BOGO`), `value`, `get_product_id`, `is_active`
 
 **`expenses`**: Pencatatan beban operasional.
-- `id`, `organization_id`, `date`, `category`, `description`, `amount`
+- `organization_id`, `date`, `category`, `description`, `amount`
 
-### 4.3. Tabel Konfigurasi & Atribut
+### 4.3. Koleksi Konfigurasi & Atribut
 
 **`categories`**: Kategori untuk produk.
-- `id`, `organization_id`, `name`
+- `organization_id`, `name`
 
-**`grades`**: Tingkatan kualitas parfum (misal: Standard, Premium).
-- `id`, `organization_id`, `name`, `price_multiplier` (misal: 1.5x), `extra_essence_price`
+**`grades`**: Tingkatan kualitas parfum.
+- `organization_id`, `name`, `price_multiplier`, `extra_essence_price`
 
 **`aromas`**: Daftar aroma bibit yang tersedia.
-- `id`, `organization_id`, `name`, `category`, `description`
+- `organization_id`, `name`, `category`, `description`
 
 **`bottle_sizes`**: Ukuran botol yang tersedia untuk refill.
-- `id`, `organization_id`, `size` (misal: 50), `unit` (misal: 'ml'), `price`
+- `organization_id`, `size` (number), `unit` ('ml'), `price`
 
 **`recipes`**: Resep standar untuk kombinasi aroma dan botol.
-- `id`, `organization_id`, `name`, `grade_id` (FK), `aroma_id` (FK), `bottle_size_id` (FK), `instructions`, `price`
+- `organization_id`, `name`, `grade_id`, `aroma_id`, `bottle_size_id`, `instructions`, `price`
 
 **`settings`**: Tabel serbaguna untuk menyimpan pengaturan lain.
-- `id`, `organization_id`, `key` (misal: 'loyalty_threshold'), `value`
+- `organization_id`, `key` (e.g., 'loyalty_threshold'), `value`
 
 ---
 
-## 5. Fungsi & Trigger Penting di Database
+## 5. Logika Backend (Firebase Cloud Functions)
 
--   **`function handle_new_user()` & Trigger `on_auth_user_created`**:
-    -   Secara otomatis membuat *record* di `public.profiles` setiap kali pengguna baru berhasil mendaftar di `auth.users`. Ini memastikan data pengguna dan profil selalu sinkron.
+-   **`createOwner`**:
+    -   **Pemicu**: Dipanggil oleh klien (HTTPS Callable).
+    -   **Tugas**: Menangani seluruh alur pendaftaran pemilik baru secara atomik: membuat pengguna di Auth, membuat dokumen `organizations`, dan membuat dokumen `profiles`. Melakukan rollback jika terjadi kegagalan.
 
--   **`function signup_owner(...)`**:
-    -   Fungsi RPC yang menangani seluruh alur pendaftaran pemilik baru secara atomik. Ini termasuk memeriksa duplikasi email/organisasi, membuat pengguna di `auth.users`, membuat record `organizations`, dan membuat record `profiles`.
+-   **`createUser`**:
+    -   **Pemicu**: Dipanggil oleh klien (HTTPS Callable).
+    -   **Tugas**: Memungkinkan `owner` atau `admin` untuk membuat pengguna baru (misal, kasir) di dalam organisasi mereka.
 
--   **`function process_checkout(...)`**:
-    -   Fungsi RPC untuk menangani checkout. Menerima detail pesanan (item, pelanggan, total) dan secara atomik membuat record di `transactions` & `transaction_items`, serta memperbarui stok produk di `products`.
+-   **`deleteUser`**:
+    -   **Pemicu**: Dipanggil oleh klien (HTTPS Callable).
+    -   **Tugas**: Memungkinkan `owner` atau `admin` untuk menghapus pengguna dari organisasi mereka, termasuk menghapus profil dan akun Auth.
+
+-   **`setupInitialData`**:
+    -   **Pemicu**: Dipanggil oleh klien (HTTPS Callable) dari halaman setup.
+    -   **Tugas**: Mengisi Firestore dengan data awal (kategori, grade) untuk organisasi yang baru dibuat.
+
+-   **`get_dashboard_analytics`**:
+    -   **Pemicu**: Dipanggil oleh klien (HTTPS Callable).
+    -   **Tugas**: Menghitung data analitik untuk dasbor, seperti pendapatan harian.
+
+-   **`process_checkout`**:
+    -   **Pemicu**: Dipanggil oleh klien (HTTPS Callable).
+    -   **Tugas**: Fungsi untuk menangani checkout. Menerima detail pesanan dan secara atomik membuat record di `transactions` & `transaction_items`, serta memperbarui stok. (Rencana implementasi).
