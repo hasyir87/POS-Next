@@ -10,7 +10,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
-    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts"
+    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
+    "setup-db": "psql $SUPABASE_DB_URL -f setup-database.sql"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.14.1",
