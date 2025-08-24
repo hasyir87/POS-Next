@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { getFunctions, httpsCallable } from "firebase/functions";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -16,7 +15,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MPerfumeAmalLogo } from "./m-perfume-amal-logo";
 import { AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { firebaseApp } from "@/lib/firebase/config";
 
 const formSchema = z.object({
   fullName: z.string().min(3, { message: "Nama lengkap minimal 3 karakter." }),
@@ -55,10 +53,9 @@ export default function SignupForm() {
     setLoading(true);
 
     try {
-      const functions = getFunctions(firebaseApp);
-      // We must call the onRequest function as a standard HTTPS endpoint
-      const region = "us-central1"; // Or your function's region
+      const region = "us-central1";
       const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+      // This MUST be the URL of the onRequest HTTP function
       const functionUrl = `https://${region}-${projectId}.cloudfunctions.net/createOwner`;
 
       const response = await fetch(functionUrl, {
@@ -77,7 +74,8 @@ export default function SignupForm() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error?.message || 'Pendaftaran gagal.');
+        // Use the error message from the backend if available
+        throw new Error(result.error?.message || 'Pendaftaran gagal. Server merespons dengan error.');
       }
       
       setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke halaman login.");
@@ -87,7 +85,8 @@ export default function SignupForm() {
 
     } catch (err: any) {
       console.error("Signup component error:", err);
-      const errorMessage = err.message || "Terjadi kesalahan yang tidak terduga.";
+      // Display the actual error message
+      const errorMessage = err.message || "Terjadi kesalahan yang tidak terduga. Periksa koneksi Anda.";
       setErrorState(errorMessage);
 
       if (errorMessage.toLowerCase().includes('email')) {
