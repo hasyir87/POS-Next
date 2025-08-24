@@ -1,9 +1,6 @@
 
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import * as cors from "cors";
-
-const corsHandler = cors({ origin: true });
 
 // Initialize the Admin SDK safely
 if (admin.apps.length === 0) {
@@ -12,24 +9,15 @@ if (admin.apps.length === 0) {
 const db = admin.firestore();
 
 // --- Cloud Function to create a new Owner and their Organization ---
-export const createOwner = functions.https.onRequest((req, res) => {
-  corsHandler(req, res, async () => {
-    if (req.method !== 'POST') {
-        res.status(405).send('Method Not Allowed');
-        return;
-    }
-
-    const { email, password, fullName, organizationName } = req.body.data;
+export const createOwner = functions.https.onCall(async (data, context) => {
+    const { email, password, fullName, organizationName } = data;
 
     // --- Validation ---
     if (!email || !password || !fullName || !organizationName) {
-      functions.logger.error("Validation failed: Missing data.", req.body.data);
-      res.status(400).send({ error: { message: "Data tidak lengkap. Pastikan semua field terisi." } });
-      return;
+      throw new functions.https.HttpsError("invalid-argument", "Data tidak lengkap. Pastikan semua field terisi.");
     }
     if (password.length < 8) {
-      res.status(400).send({ error: { message: "Password harus minimal 8 karakter." } });
-      return;
+      throw new functions.https.HttpsError("invalid-argument", "Password harus minimal 8 karakter.");
     }
 
     let newUserRecord: admin.auth.UserRecord | null = null;
@@ -39,8 +27,7 @@ export const createOwner = functions.https.onRequest((req, res) => {
       const orgQuery = orgsRef.where("name", "==", organizationName);
       const orgQuerySnapshot = await orgQuery.get();
       if (!orgQuerySnapshot.empty) {
-        res.status(409).send({ error: { message: "Nama organisasi sudah digunakan." } });
-        return;
+        throw new functions.https.HttpsError("already-exists", "Nama organisasi sudah digunakan.");
       }
 
       // Step 1: Create user in Firebase Auth
@@ -72,7 +59,7 @@ export const createOwner = functions.https.onRequest((req, res) => {
         updated_at: admin.firestore.FieldValue.serverTimestamp()
       });
       
-      res.status(200).send({ data: { status: "success", message: "Pemilik dan organisasi berhasil dibuat.", uid: newUserRecord.uid } });
+      return { status: "success", message: "Pemilik dan organisasi berhasil dibuat.", uid: newUserRecord.uid };
 
     } catch (error: any) {
       // --- Rollback logic ---
@@ -82,12 +69,11 @@ export const createOwner = functions.https.onRequest((req, res) => {
 
       functions.logger.error("ERROR IN createOwner:", error);
       if (error.code === 'auth/email-already-exists') {
-        res.status(409).send({ error: { message: "Email ini sudah terdaftar." }});
-        return;
+        throw new functions.https.HttpsError("already-exists", "Email ini sudah terdaftar.");
       }
-      res.status(500).send({ error: { message: `Gagal membuat pemilik baru: ${error.message}` }});
+      // Re-throw other errors to be caught by the client
+      throw new functions.https.HttpsError("internal", `Gagal membuat pemilik baru: ${error.message}`, error);
     }
-  });
 });
 
 
