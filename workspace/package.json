@@ -10,8 +10,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
-    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
-    "setup-db": "psql $SUPABASE_DB_URL -f setup-database.sql"
+    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.14.1",
@@ -44,6 +43,7 @@
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.6.0",
     "firebase": "^10.12.3",
+    "file-saver": "^2.0.5",
     "genkit": "^1.14.1",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
@@ -58,7 +58,6 @@
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "xlsx": "^0.18.5",
-    "file-saver": "^2.0.5",
     "zod": "^3.24.2"
   },
   "devDependencies": {
