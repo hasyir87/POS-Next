@@ -16,8 +16,8 @@ export const createOwner = functions.https.onCall(async (data, context) => {
     if (!email || !password || !fullName || !organizationName) {
       throw new functions.https.HttpsError("invalid-argument", "Data tidak lengkap. Pastikan semua field terisi.");
     }
-    if (password.length < 8) {
-      throw new functions.https.HttpsError("invalid-argument", "Password harus minimal 8 karakter.");
+    if (password.length < 6) { // Firebase min password is 6
+      throw new functions.https.HttpsError("invalid-argument", "Password harus minimal 6 karakter.");
     }
 
     let newUserRecord: admin.auth.UserRecord | null = null;
@@ -68,8 +68,11 @@ export const createOwner = functions.https.onCall(async (data, context) => {
       }
 
       functions.logger.error("ERROR IN createOwner:", error);
-      if (error.code === 'auth/email-already-exists') {
+      if (error.code === 'auth/email-already-exists' || (error.message && error.message.includes('EMAIL_EXISTS'))) {
         throw new functions.https.HttpsError("already-exists", "Email ini sudah terdaftar.");
+      }
+      if (error.code === 'already-exists') { // Re-throw our custom error
+          throw error;
       }
       // Re-throw other errors to be caught by the client
       throw new functions.https.HttpsError("internal", `Gagal membuat pemilik baru: ${error.message}`, error);

@@ -92,9 +92,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           if (userProfile.organizations && !userProfile.organizations.is_setup_complete && pathname !== '/dashboard/setup') {
             router.replace('/dashboard/setup');
+          } else if (userProfile.organizations && userProfile.organizations.is_setup_complete && pathname === '/dashboard/setup') {
+            router.replace('/dashboard');
           }
         } else {
-          await handleLogout({title: "Sesi Tidak Valid", description: "Data profil Anda tidak ditemukan. Sesi diakhiri."});
+          // This case can happen if a user is in Auth but their profile was deleted. Log them out.
+          await handleLogout({title: "Sesi Tidak Valid", description: "Data profil Anda tidak ditemukan. Silakan login kembali."});
         }
       } else {
         setUser(null);

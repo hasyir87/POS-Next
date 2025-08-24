@@ -23,7 +23,7 @@ const formSchema = z.object({
   fullName: z.string().min(3, { message: "Nama lengkap minimal 3 karakter." }),
   organizationName: z.string().min(3, { message: "Nama organisasi minimal 3 karakter." }),
   email: z.string().email({ message: "Harap masukkan email yang valid." }),
-  password: z.string().min(8, { message: "Password minimal 8 karakter." }),
+  password: z.string().min(6, { message: "Password minimal 6 karakter." }),
   confirmPassword: z.string(),
 }).refine(data => data.password === data.confirmPassword, {
   message: "Konfirmasi password tidak cocok.",
@@ -58,7 +58,6 @@ export default function SignupForm() {
 
     try {
       const functions = getFunctions(firebaseApp);
-      // NOTE: We are now calling an onRequest function, not an onCall function.
       const createOwnerFunction = httpsCallable(functions, 'createOwner');
       
       const result = await createOwnerFunction({
@@ -73,14 +72,14 @@ export default function SignupForm() {
           throw new Error(resultData.message || 'Pendaftaran gagal.');
       }
 
-      await login({ email: values.email, password: values.password });
+      setSuccess("Pendaftaran berhasil! Silakan login dengan akun baru Anda.");
+      setTimeout(() => {
+        router.push('/');
+      }, 2000);
 
-      setSuccess("Pendaftaran berhasil! Anda akan diarahkan...");
-      // Redirect is handled by the onAuthStateChanged listener in AuthContext
     } catch (err: any) {
       console.error("Signup component error:", err);
-      // The error from an onRequest function is often in err.response.data.error.message
-      const errorMessage = err.response?.data?.error?.message || err.message || "Terjadi kesalahan yang tidak terduga.";
+      const errorMessage = err.message || "Terjadi kesalahan yang tidak terduga.";
       setErrorState(errorMessage);
 
       if (errorMessage.toLowerCase().includes('email')) {
@@ -94,7 +93,7 @@ export default function SignupForm() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
             <MPerfumeAmalLogo className="w-12 h-12 mx-auto text-primary" />
