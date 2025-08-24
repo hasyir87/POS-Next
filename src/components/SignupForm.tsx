@@ -22,7 +22,7 @@ const formSchema = z.object({
   fullName: z.string().min(3, { message: "Nama lengkap minimal 3 karakter." }),
   organizationName: z.string().min(3, { message: "Nama organisasi minimal 3 karakter." }),
   email: z.string().email({ message: "Harap masukkan email yang valid." }),
-  password: z.string().min(8, { message: "Password minimal 8 karakter." }),
+  password: z.string().min(6, { message: "Password minimal 6 karakter." }),
   confirmPassword: z.string(),
 }).refine(data => data.password === data.confirmPassword, {
   message: "Konfirmasi password tidak cocok.",
@@ -56,14 +56,29 @@ export default function SignupForm() {
 
     try {
       const functions = getFunctions(firebaseApp);
-      const createOwner = httpsCallable(functions, 'createOwner');
-      
-      await createOwner({
-          email: values.email,
-          password: values.password,
-          fullName: values.fullName,
-          organizationName: values.organizationName
+      // We must call the onRequest function as a standard HTTPS endpoint
+      const region = "us-central1"; // Or your function's region
+      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+      const functionUrl = `https://${region}-${projectId}.cloudfunctions.net/createOwner`;
+
+      const response = await fetch(functionUrl, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ data: {
+                email: values.email,
+                password: values.password,
+                fullName: values.fullName,
+                organizationName: values.organizationName
+          }})
       });
+      
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'Pendaftaran gagal.');
+      }
       
       setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke halaman login.");
       setTimeout(() => {
@@ -72,7 +87,7 @@ export default function SignupForm() {
 
     } catch (err: any) {
       console.error("Signup component error:", err);
-      const errorMessage = err.details?.message || err.message || "Terjadi kesalahan yang tidak terduga.";
+      const errorMessage = err.message || "Terjadi kesalahan yang tidak terduga.";
       setErrorState(errorMessage);
 
       if (errorMessage.toLowerCase().includes('email')) {
