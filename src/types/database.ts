@@ -34,7 +34,7 @@ export interface UserProfile {
     role: UserRole;
     created_at: string;
     updated_at: string;
-    organizations?: Organization | null;
+    organization?: Organization | null;
 }
 
 export interface Category {

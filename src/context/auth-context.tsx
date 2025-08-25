@@ -71,7 +71,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const orgDocRef = doc(db, 'organizations', profileData.organization_id);
             const orgDocSnap = await getDoc(orgDocRef);
             if (orgDocSnap.exists()) {
-                profileData.organizations = { id: orgDocSnap.id, ...orgDocSnap.data() } as Organization;
+                profileData.organization = { id: orgDocSnap.id, ...orgDocSnap.data() } as Organization;
             }
         }
         return profileData;
@@ -102,9 +102,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             localStorage.setItem('selectedOrgId', userProfile.organization_id);
           }
 
-          if (userProfile.organizations && !userProfile.organizations.is_setup_complete && pathname !== '/dashboard/setup') {
+          if (userProfile.organization && !userProfile.organization.is_setup_complete && pathname !== '/dashboard/setup') {
             router.replace('/dashboard/setup');
-          } else if (userProfile.organizations && userProfile.organizations.is_setup_complete && pathname === '/dashboard/setup') {
+          } else if (userProfile.organization && userProfile.organization.is_setup_complete && pathname === '/dashboard/setup') {
             router.replace('/dashboard');
           }
         } else {
