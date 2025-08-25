@@ -6,10 +6,6 @@ import { addDays, format } from "date-fns"
 import { id } from "date-fns/locale"
 import { Calendar as CalendarIcon, FileDown } from "lucide-react"
 import { DateRange } from "react-day-picker"
-import jsPDF from "jspdf"
-import autoTable from 'jspdf-autotable'
-import * as XLSX from 'xlsx';
-
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -26,7 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { saveAs } from "file-saver"
 
 
 interface ReportControlsProps {
@@ -40,35 +35,13 @@ export function ReportControls({ data, className }: ReportControlsProps) {
     to: addDays(new Date(2024, 0, 1), 365),
   })
 
+  // Export functionality is temporarily disabled to resolve build issues.
   const handleDownloadExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan Laba Rugi");
-    // Auto-size columns
-    const max_width = data.reduce((w, r) => Math.max(w, r.Laporan.length), 10);
-    worksheet["!cols"] = [ { wch: max_width }, { wch: 20 } ];
-
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
-    saveAs(blob, "laporan_laba_rugi.xlsx");
+    alert("Fitur ekspor Excel sedang dalam perbaikan.");
   };
 
   const handleDownloadPdf = () => {
-    const doc = new jsPDF();
-    const period = date?.from && date?.to ? `${format(date.from, "d LLL y")} - ${format(date.to, "d LLL y")}` : "Semua Waktu";
-    
-    doc.setFontSize(16);
-    doc.text("Laporan Laba & Rugi", 14, 22);
-    doc.setFontSize(10);
-    doc.text(`Periode: ${period}`, 14, 28);
-    
-    autoTable(doc, {
-        head: [['Laporan', 'Jumlah']],
-        body: data.map(row => [row.Laporan, new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(row.Jumlah)]),
-        startY: 35,
-        theme: 'grid'
-    });
-    doc.save('laporan_laba_rugi.pdf');
+     alert("Fitur ekspor PDF sedang dalam perbaikan.");
   };
 
 
@@ -132,10 +105,10 @@ export function ReportControls({ data, className }: ReportControlsProps) {
             </div>
           </PopoverContent>
         </Popover>
-        <Button onClick={handleDownloadPdf} variant="outline">
+        <Button onClick={handleDownloadPdf} variant="outline" disabled>
             <FileDown className="mr-2 h-4 w-4" /> PDF
         </Button>
-        <Button onClick={handleDownloadExcel} variant="outline">
+        <Button onClick={handleDownloadExcel} variant="outline" disabled>
             <FileDown className="mr-2 h-4 w-4" /> Excel
         </Button>
     </div>
