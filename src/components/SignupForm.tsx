@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import { getFirestore, doc, setDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -15,6 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MPerfumeAmalLogo } from "./m-perfume-amal-logo";
 import { AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { firebaseApp } from "@/lib/firebase/config";
 
 const formSchema = z.object({
   fullName: z.string().min(3, { message: "Nama lengkap minimal 3 karakter." }),
@@ -26,7 +29,6 @@ const formSchema = z.object({
   message: "Konfirmasi password tidak cocok.",
   path: ["confirmPassword"],
 });
-
 
 export default function SignupForm() {
   const [error, setErrorState] = useState<string | null>(null);
@@ -52,56 +54,47 @@ export default function SignupForm() {
     setSuccess(null);
     setLoading(true);
 
+    const auth = getAuth(firebaseApp);
+    const db = getFirestore(firebaseApp);
+
     try {
-      // This MUST be the URL of the onRequest HTTP function
-      const region = "us-central1"; // Ganti jika region Anda berbeda
-      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+      // Step 1: Create the user in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const user = userCredential.user;
 
-      if (!projectId) {
-        throw new Error("ID Proyek Firebase tidak dikonfigurasi di variabel lingkungan.");
-      }
-      
-      const functionUrl = `https://${region}-${projectId}.cloudfunctions.net/createOwner`;
+      // Step 2: Create the organization document
+      const orgDocRef = await addDoc(collection(db, 'organizations'), {
+        name: values.organizationName,
+        owner_id: user.uid,
+        is_setup_complete: false,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
+      });
 
-      const response = await fetch(functionUrl, {
-          method: 'POST',
-          headers: {
-              'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ data: {
-                email: values.email,
-                password: values.password,
-                fullName: values.fullName,
-                organizationName: values.organizationName
-          }})
+      // Step 3: Create the user's profile document
+      await setDoc(doc(db, 'profiles', user.uid), {
+        id: user.uid,
+        email: values.email,
+        full_name: values.fullName,
+        organization_id: orgDocRef.id,
+        role: 'owner',
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
       });
       
-      const result = await response.json();
-
-      if (!response.ok) {
-        // Use the error message from the backend if available
-        throw new Error(result.error?.message || `Error ${response.status}: Pendaftaran gagal.`);
-      }
-      
-      setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke halaman login.");
+      setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke halaman login untuk masuk dengan akun baru Anda.");
       setTimeout(() => {
         router.push('/');
-      }, 2000);
+      }, 3000);
 
     } catch (err: any) {
-      console.error("Signup component error:", err);
-      // Display a more user-friendly message for generic fetch errors
-      const errorMessage = err.message.includes('Failed to fetch') 
-        ? "Gagal terhubung ke server. Periksa koneksi internet Anda atau hubungi dukungan jika masalah berlanjut."
-        : err.message || "Terjadi kesalahan yang tidak terduga.";
-        
-      setErrorState(errorMessage);
-
-      if (errorMessage.toLowerCase().includes('email')) {
-          setError('email', { type: 'manual', message: errorMessage });
-      } else if (errorMessage.toLowerCase().includes('organisasi')) {
-           setError('organizationName', { type: 'manual', message: errorMessage });
+      console.error("Client-side signup error:", err);
+      let errorMessage = "Terjadi kesalahan yang tidak terduga.";
+      if (err.code === 'auth/email-already-in-use') {
+        errorMessage = "Email ini sudah terdaftar. Silakan gunakan email lain.";
+        setError('email', { type: 'manual', message: errorMessage });
       }
+      setErrorState(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -138,7 +131,7 @@ export default function SignupForm() {
                   <FormItem>
                     <FormLabel>Nama Lengkap Anda</FormLabel>
                     <FormControl>
-                      <Input placeholder="Contoh: John Doe" {...field} />
+                      <Input placeholder="Contoh: John Doe" {...field} disabled={loading || !!success} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -151,7 +144,7 @@ export default function SignupForm() {
                   <FormItem>
                     <FormLabel>Nama Organisasi/Toko</FormLabel>
                     <FormControl>
-                      <Input placeholder="Contoh: ScentPRO" {...field} />
+                      <Input placeholder="Contoh: ScentPRO" {...field} disabled={loading || !!success} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -164,7 +157,7 @@ export default function SignupForm() {
                   <FormItem>
                     <FormLabel>Email Pemilik</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="nama@email.com" {...field} />
+                      <Input type="email" placeholder="nama@email.com" {...field} disabled={loading || !!success} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -177,7 +170,7 @@ export default function SignupForm() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="********" {...field} />
+                      <Input type="password" placeholder="********" {...field} disabled={loading || !!success}/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -190,7 +183,7 @@ export default function SignupForm() {
                   <FormItem>
                     <FormLabel>Konfirmasi Password</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="********" {...field} />
+                      <Input type="password" placeholder="********" {...field} disabled={loading || !!success}/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
