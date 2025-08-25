@@ -49,49 +49,48 @@ export default function DashboardLayout({
 
   const fetchOrganizations = useCallback(async () => {
     if (!profile || !profile.organization_id) return;
-    
+
     setIsLoadingOrgs(true);
     try {
-      // Find the parent organization ID. If the current organization has a parent_organization_id, use that.
-      // Otherwise, assume the current organization is the parent.
-      const mainOrgRef = doc(db, 'organizations', profile.organization_id);
-      const mainOrgSnap = await getDoc(mainOrgRef);
-      if (!mainOrgSnap.exists()) {
-        throw new Error("Organisasi utama tidak ditemukan.");
-      }
-      
-      const mainOrgData = { id: mainOrgSnap.id, ...mainOrgSnap.data() } as Organization;
-      const parentId = mainOrgData.parent_organization_id || mainOrgData.id;
+        const orgsRef = collection(db, 'organizations');
+        const mainOrgRef = doc(orgsRef, profile.organization_id);
+        const mainOrgSnap = await getDoc(mainOrgRef);
 
-      if (!parentId) {
-          setOrganizations([mainOrgData]); // Case where there is no parent and it's the only org
-          setIsLoadingOrgs(false);
-          return;
-      }
-      
-      // Query for all organizations that share the same parent (i.e., are outlets of the same main company)
-      const orgsRef = collection(db, 'organizations');
-      const q = query(orgsRef, where('parent_organization_id', '==', parentId));
-      const querySnapshot = await getDocs(q);
-      const outlets = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() } as Organization));
-      
-      // Combine the main/parent organization with its outlets
-      const parentOrgRef = doc(db, 'organizations', parentId);
-      const parentOrgSnap = await getDoc(parentOrgRef);
-      const parentOrgData = parentOrgSnap.exists() ? {id: parentOrgSnap.id, ...parentOrgSnap.data()} as Organization : null;
-      
-      const allOrgs = parentOrgData ? [parentOrgData, ...outlets] : outlets;
-      const uniqueOrgs = Array.from(new Map(allOrgs.map(item => [item.id, item])).values());
-      
-      setOrganizations(uniqueOrgs);
+        if (!mainOrgSnap.exists()) {
+            throw new Error("Organisasi utama tidak ditemukan.");
+        }
 
+        const mainOrgData = { id: mainOrgSnap.id, ...mainOrgSnap.data() } as Organization;
+        const parentId = mainOrgData.parent_organization_id || mainOrgData.id;
+
+        // Query for the parent organization and all its children in one go
+        const parentQuery = doc(orgsRef, parentId);
+        const childrenQuery = query(orgsRef, where('parent_organization_id', '==', parentId));
+
+        const [parentSnap, childrenSnap] = await Promise.all([
+            getDoc(parentQuery),
+            getDocs(childrenQuery)
+        ]);
+
+        let allOrgs: Organization[] = [];
+        if (parentSnap.exists()) {
+            allOrgs.push({ id: parentSnap.id, ...parentSnap.data() } as Organization);
+        }
+        childrenSnap.forEach(doc => {
+            allOrgs.push({ id: doc.id, ...doc.data() } as Organization);
+        });
+        
+        // Use a Map to get unique organizations based on ID
+        const uniqueOrgs = Array.from(new Map(allOrgs.map(item => [item.id, item])).values());
+        
+        setOrganizations(uniqueOrgs);
     } catch (error) {
-      console.error("Error fetching organizations:", error);
-      setOrganizations([]);
+        console.error("Error fetching organizations:", error);
+        setOrganizations([]);
     } finally {
-      setIsLoadingOrgs(false);
+        setIsLoadingOrgs(false);
     }
-  }, [profile, db]);
+}, [profile, db]);
 
 
   useEffect(() => {
@@ -100,8 +99,6 @@ export default function DashboardLayout({
     }
   }, [profile, loading, fetchOrganizations]);
 
-  // Main loading state for the entire auth process is handled by AuthProvider.
-  // This check is for when auth is done, but the user/profile is somehow still null (e.g., redirecting).
   if (loading || !user || !profile) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
