@@ -63,27 +63,28 @@ export default function DashboardLayout({
         const mainOrgData = { id: mainOrgSnap.id, ...mainOrgSnap.data() } as Organization;
         const parentId = mainOrgData.parent_organization_id || mainOrgData.id;
 
-        // Query for the parent organization and all its children in one go
         const parentQuery = doc(orgsRef, parentId);
         const childrenQuery = query(orgsRef, where('parent_organization_id', '==', parentId));
-
+        
         const [parentSnap, childrenSnap] = await Promise.all([
             getDoc(parentQuery),
             getDocs(childrenQuery)
         ]);
 
-        let allOrgs: Organization[] = [];
+        const orgMap = new Map<string, Organization>();
+
         if (parentSnap.exists()) {
-            allOrgs.push({ id: parentSnap.id, ...parentSnap.data() } as Organization);
+            orgMap.set(parentSnap.id, { id: parentSnap.id, ...parentSnap.data() } as Organization);
         }
         childrenSnap.forEach(doc => {
-            allOrgs.push({ id: doc.id, ...doc.data() } as Organization);
+            if (!orgMap.has(doc.id)) {
+                orgMap.set(doc.id, { id: doc.id, ...doc.data() } as Organization);
+            }
         });
         
-        // Use a Map to get unique organizations based on ID
-        const uniqueOrgs = Array.from(new Map(allOrgs.map(item => [item.id, item])).values());
-        
-        setOrganizations(uniqueOrgs);
+        const allOrgs = Array.from(orgMap.values());
+        setOrganizations(allOrgs);
+
     } catch (error) {
         console.error("Error fetching organizations:", error);
         setOrganizations([]);
@@ -99,6 +100,7 @@ export default function DashboardLayout({
     }
   }, [profile, loading, fetchOrganizations]);
 
+  // If auth is loading, or user/profile is not available, show a full-page loader.
   if (loading || !user || !profile) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
