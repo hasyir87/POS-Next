@@ -27,6 +27,9 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper function to add a delay
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
@@ -83,7 +86,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(true);
       if (firebaseUser) {
         setUser(firebaseUser);
-        const userProfile = await fetchUserProfile(firebaseUser);
+        
+        // --- START: Retry Logic ---
+        let userProfile = await fetchUserProfile(firebaseUser);
+
+        // If profile is not found, wait 2 seconds and try again.
+        // This handles the race condition after registration.
+        if (!userProfile) {
+          await delay(2000); 
+          userProfile = await fetchUserProfile(firebaseUser);
+        }
+        // --- END: Retry Logic ---
 
         if (userProfile) {
           setProfile(userProfile);
@@ -92,9 +105,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           if (userProfile.organizations && !userProfile.organizations.is_setup_complete && pathname !== '/dashboard/setup') {
             router.replace('/dashboard/setup');
+          } else if (userProfile.organizations && userProfile.organizations.is_setup_complete && pathname === '/dashboard/setup') {
+            router.replace('/dashboard');
           }
         } else {
-          await handleLogout({title: "Sesi Tidak Valid", description: "Data profil Anda tidak ditemukan. Sesi diakhiri."});
+          await handleLogout({title: "Sesi Tidak Valid", description: "Data profil Anda tidak ditemukan. Silakan login kembali."});
         }
       } else {
         setUser(null);
@@ -129,7 +144,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     refreshProfile,
   };
   
-  if (loading && ['/','/signup'].includes(pathname)) {
+  if (loading) {
      return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
