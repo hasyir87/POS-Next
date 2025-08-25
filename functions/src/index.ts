@@ -5,7 +5,6 @@ import cors from "cors";
 
 const corsHandler = cors({origin: true});
 
-// Initialize the Admin SDK safely
 try {
   if (admin.apps.length === 0) {
     admin.initializeApp();
@@ -16,10 +15,8 @@ try {
 
 const db = admin.firestore();
 
-// --- Cloud Function to create a new Owner and their Organization ---
 export const createOwner = functions.https.onRequest((req, res) => {
   corsHandler(req, res, async () => {
-    // Handle preflight OPTIONS request
     if (req.method === "OPTIONS") {
       res.status(204).send("");
       return;
@@ -103,8 +100,9 @@ export const createOwner = functions.https.onRequest((req, res) => {
             "Gagal rollback user auth:", err));
       }
       functions.logger.error("ERROR IN createOwner:", error);
-      
-      const errorMessage = (error instanceof Error) ? error.message : "An unknown error occurred.";
+
+      const errorMessage = (error instanceof Error) ?
+        error.message : "An unknown error occurred.";
 
       if (errorMessage.includes("auth/email-already-exists")) {
         res.status(409).json({error: {message: "Email ini sudah terdaftar."}});
