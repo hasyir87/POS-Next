@@ -15,18 +15,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import type { UserProfile, Organization } from '@/types/database';
 import { Badge } from '@/components/ui/badge';
-import { getFirestore, collection, query, where, getDocs, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { getAuth, createUserWithEmailAndPassword, deleteUser as deleteAuthUser } from 'firebase/auth';
+import { getFirestore, collection, query, where, getDocs, doc } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { firebaseApp } from '@/lib/firebase/config';
-
-// NOTE: Creating a separate auth instance for user management actions
-// to avoid conflicts with the main app's auth state.
-const secondaryAuth = getAuth(firebaseApp);
 
 export default function UsersPage() {
     const { toast } = useToast();
     const { profile: currentProfile, loading: authLoading, selectedOrganizationId } = useAuth();
     const db = getFirestore(firebaseApp);
+    const functions = getFunctions(firebaseApp);
 
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -80,46 +77,16 @@ export default function UsersPage() {
 
         setIsSubmitting(true);
         try {
-            if (editingUser.id) { // Update existing user
-                const userDocRef = doc(db, 'profiles', editingUser.id);
-                await updateDoc(userDocRef, {
-                    full_name: editingUser.full_name,
-                    role: editingUser.role,
-                });
-                toast({ title: 'Sukses', description: `Pengguna berhasil diperbarui.` });
-            } else { // Create new user client-side
-                let newUserCredential;
-                try {
-                    // We create the user with a secondary auth instance to not affect current user's session
-                    newUserCredential = await createUserWithEmailAndPassword(secondaryAuth, editingUser.email, editingUser.password!);
-                    const newUser = newUserCredential.user;
-
-                    // Now create the profile for the new user
-                    await setDoc(doc(db, "profiles", newUser.uid), {
-                        id: newUser.uid,
-                        email: editingUser.email,
-                        full_name: editingUser.full_name,
-                        role: editingUser.role,
-                        organization_id: selectedOrganizationId,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString(),
-                    });
-
-                    toast({ title: 'Sukses', description: 'Pengguna baru berhasil dibuat.'});
-                } catch (error: any) {
-                    // If user creation in auth fails, we show the error.
-                    // If it succeeds but firestore fails, we should ideally delete the auth user.
-                    if (newUserCredential) {
-                       // await deleteAuthUser(newUserCredential.user);
-                       // Deleting user can be complex due to re-authentication needs, so we log it for now.
-                       console.error("Auth user created but Firestore profile failed. Manual cleanup may be needed for UID:", newUserCredential.user.uid);
-                    }
-                    if (error.code === 'auth/email-already-in-use') {
-                        throw new Error('Email ini sudah digunakan oleh pengguna lain.');
-                    }
-                    throw error;
-                }
-            }
+            const callableFunction = editingUser.id ? httpsCallable(functions, 'updateUser') : httpsCallable(functions, 'createUser');
+            await callableFunction({
+                uid: editingUser.id,
+                email: editingUser.email,
+                password: editingUser.password,
+                fullName: editingUser.full_name,
+                role: editingUser.role,
+                organizationId: selectedOrganizationId
+            });
+            toast({ title: 'Sukses', description: `Pengguna berhasil ${editingUser.id ? 'diperbarui' : 'ditambahkan'}.` });
             setDialogOpen(false);
             fetchUsersAndOrgs();
         } catch (error: any) {
@@ -130,15 +97,13 @@ export default function UsersPage() {
     };
 
     const handleDeleteUser = async (userId: string) => {
-        if (!confirm('Apakah Anda yakin ingin menghapus pengguna ini? Tindakan ini tidak dapat diurungkan.')) return;
+        if (!confirm('Apakah Anda yakin ingin menghapus pengguna ini? Tindakan ini akan menghapus akun login dan profil mereka secara permanen.')) return;
         
         setIsSubmitting(true);
         try {
-            // Firestore security rules should be configured to allow an 'owner' or 'admin' to delete profiles.
-            // Deleting the auth user from the client is complex and requires re-authentication,
-            // so for now we will just delete the profile. A more robust solution might use an admin backend.
-            await deleteDoc(doc(db, 'profiles', userId));
-            toast({ title: 'Sukses', description: 'Profil pengguna berhasil dihapus. Akun login masih ada dan harus dihapus dari Firebase Console.' });
+            const deleteUserFunction = httpsCallable(functions, 'deleteUser');
+            await deleteUserFunction({ uid: userId });
+            toast({ title: 'Sukses', description: 'Pengguna berhasil dihapus.' });
             fetchUsersAndOrgs();
         } catch (error: any) {
              toast({ variant: 'destructive', title: 'Error', description: error.message });
