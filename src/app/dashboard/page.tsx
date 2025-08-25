@@ -8,10 +8,10 @@ import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from '@
 import { Trophy } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { useCallback, useEffect, useState } from 'react';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getFirestore, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
 
-const functions = getFunctions(firebaseApp);
+const db = getFirestore(firebaseApp);
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
@@ -33,6 +33,7 @@ export default function DashboardPage() {
   const fetchDashboardData = useCallback(async () => {
     if (!selectedOrganizationId) {
         setIsLoading(false);
+        setDashboardData(null);
         return;
     }
     
@@ -40,12 +41,48 @@ export default function DashboardPage() {
     setError(null);
 
     try {
-        const getDashboardAnalytics = httpsCallable(functions, 'getDashboardAnalytics');
-        const result = await getDashboardAnalytics({ organizationId: selectedOrganizationId });
-        const data = result.data as DashboardData;
-        setDashboardData(data);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const startOfToday = Timestamp.fromDate(today);
+
+        const transactionsQuery = query(
+            collection(db, "transactions"),
+            where("organization_id", "==", selectedOrganizationId),
+            where("created_at", ">=", startOfToday)
+        );
+        const customersQuery = query(
+            collection(db, "customers"),
+            where("organization_id", "==", selectedOrganizationId),
+            where("created_at", ">=", startOfToday)
+        );
+
+        const [transactionsSnapshot, newCustomersSnapshot] = await Promise.all([
+            getDocs(transactionsQuery),
+            getDocs(customersQuery)
+        ]);
+
+        let dailyRevenue = 0;
+        transactionsSnapshot.forEach((doc) => {
+            dailyRevenue += doc.data().total_amount || 0;
+        });
+        const dailySalesCount = transactionsSnapshot.size;
+        const newCustomersToday = newCustomersSnapshot.size;
+
+        // Note: Calculating top products on the client-side can be inefficient.
+        // This part is simplified and might be slow on large datasets.
+        // A proper implementation would use a server-side aggregation.
+        // For now, we'll keep it simple or show placeholder data.
+        const topProducts: DashboardData['topProducts'] = [];
+
+        setDashboardData({
+            dailyRevenue,
+            dailySalesCount,
+            newCustomersToday,
+            topProducts,
+        });
+
     } catch (err: any) {
-        console.error("Error fetching dashboard data:", err);
+        console.error("Error fetching dashboard data from client:", err);
         setError(err.message || "Gagal memuat data dasbor.");
     } finally {
         setIsLoading(false);
@@ -57,6 +94,7 @@ export default function DashboardPage() {
       fetchDashboardData();
     } else if (!authLoading && !selectedOrganizationId) {
       setIsLoading(false);
+      setDashboardData(null);
     }
   }, [authLoading, selectedOrganizationId, fetchDashboardData]);
   
@@ -172,3 +210,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
