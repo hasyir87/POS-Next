@@ -96,20 +96,22 @@ export const createOwner = functions.https.onRequest((req, res) => {
           uid: newUserRecord.uid,
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (newUserRecord) {
         await admin.auth().deleteUser(newUserRecord.uid)
-            .catch((err) => functions.logger.error(
-                "Gagal rollback user auth:", err));
+          .catch((err) => functions.logger.error(
+            "Gagal rollback user auth:", err));
       }
       functions.logger.error("ERROR IN createOwner:", error);
+      
+      const errorMessage = (error instanceof Error) ? error.message : "An unknown error occurred.";
 
-      if (error.code === "auth/email-already-exists") {
+      if (errorMessage.includes("auth/email-already-exists")) {
         res.status(409).json({error: {message: "Email ini sudah terdaftar."}});
       } else {
         res.status(500).json({
           error: {
-            message: `Gagal membuat pemilik baru: ${error.message}`,
+            message: `Gagal membuat pemilik baru: ${errorMessage}`,
           },
         });
       }
@@ -120,16 +122,15 @@ export const createOwner = functions.https.onRequest((req, res) => {
 export const createUser = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated",
-        "Anda harus login untuk melakukan aksi ini.");
+      "Anda harus login untuk melakukan aksi ini.");
   }
   const {email, password, fullName, role, organizationId} = data;
   const requestingUid = context.auth.uid;
 
   if (!email || !password || !fullName || !role || !organizationId) {
     throw new functions.https.HttpsError("invalid-argument",
-        "Data tidak lengkap untuk membuat pengguna baru.");
+      "Data tidak lengkap untuk membuat pengguna baru.");
   }
-
   // Logic for creating user by an admin/owner
   console.log(requestingUid);
 });
@@ -138,25 +139,24 @@ export const createUser = functions.https.onCall(async (data, context) => {
 export const deleteUser = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated",
-        "Anda harus login untuk melakukan aksi ini.");
+      "Anda harus login untuk melakukan aksi ini.");
   }
   const {uid: uidToDelete} = data;
   console.log(uidToDelete);
 });
 
 export const setupInitialData = functions.https.onCall(async (data,
-    context) => {
+  context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated",
-        "Anda harus login untuk melakukan setup.");
+      "Anda harus login untuk melakukan setup.");
   }
 });
 
 export const getDashboardAnalytics = functions.https.onCall(async (data,
-    context) => {
+  context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated",
-        "Anda harus login untuk melihat data ini.");
+      "Anda harus login untuk melihat data ini.");
   }
 });
-
