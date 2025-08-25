@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import { getFirestore, doc, setDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { getFirestore, doc, setDoc, addDoc, collection, serverTimestamp, getDocs, query, where } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -58,11 +58,20 @@ export default function SignupForm() {
     const db = getFirestore(firebaseApp);
 
     try {
-      // Step 1: Create the user in Firebase Authentication
+      // --- Step 1: Check for duplicate organization name before anything else ---
+      const orgsRef = collection(db, "organizations");
+      const q = query(orgsRef, where("name", "==", values.organizationName));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        throw new Error("Nama organisasi sudah digunakan. Silakan pilih nama lain.");
+      }
+
+      // Step 2: Create the user in Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
-      // Step 2: Create the organization document
+      // Step 3: Create the organization document
       const orgDocRef = await addDoc(collection(db, 'organizations'), {
         name: values.organizationName,
         owner_id: user.uid,
@@ -71,7 +80,7 @@ export default function SignupForm() {
         updated_at: serverTimestamp()
       });
 
-      // Step 3: Create the user's profile document
+      // Step 4: Create the user's profile document
       await setDoc(doc(db, 'profiles', user.uid), {
         id: user.uid,
         email: values.email,
@@ -89,11 +98,15 @@ export default function SignupForm() {
 
     } catch (err: any) {
       console.error("Client-side signup error:", err);
-      let errorMessage = "Terjadi kesalahan yang tidak terduga.";
+      let errorMessage = err.message || "Terjadi kesalahan yang tidak terduga.";
+      
       if (err.code === 'auth/email-already-in-use') {
         errorMessage = "Email ini sudah terdaftar. Silakan gunakan email lain.";
         setError('email', { type: 'manual', message: errorMessage });
+      } else if (errorMessage.includes("Nama organisasi sudah digunakan")) {
+        setError('organizationName', { type: 'manual', message: errorMessage });
       }
+
       setErrorState(errorMessage);
     } finally {
       setLoading(false);
