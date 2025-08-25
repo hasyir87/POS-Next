@@ -8,7 +8,6 @@ import { firebaseApp } from '@/lib/firebase/config';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import type { UserProfile, Organization } from '@/types/database';
-import { useToast } from '@/hooks/use-toast';
 
 // Initialize Firebase services
 const auth = getAuth(firebaseApp);
@@ -27,10 +26,11 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
-  const { toast } = useToast();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,28 +44,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     setSelectedOrganizationIdState(orgId);
   }, []);
-  
-  const handleLogout = useCallback(async (message?: {title: string, description: string}) => {
-    await signOut(auth);
-    setUser(null);
-    setProfile(null);
-    setSelectedOrganizationId(null);
-    if (message) {
-      toast({
-        variant: "destructive",
-        title: message.title,
-        description: message.description,
-      });
-    }
-    router.push('/');
-  }, [setSelectedOrganizationId, toast, router]);
 
   const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser): Promise<UserProfile | null> => {
-    const profileDocRef = doc(db, 'profiles', firebaseUser.uid);
-    const profileDocSnap = await getDoc(profileDocRef);
-    if (profileDocSnap.exists()) {
+    try {
+      const profileDocRef = doc(db, 'profiles', firebaseUser.uid);
+      const profileDocSnap = await getDoc(profileDocRef);
+
+      if (profileDocSnap.exists()) {
         const profileData = { id: profileDocSnap.id, ...profileDocSnap.data() } as UserProfile;
         
+        // Also fetch the organization data and attach it to the profile
         if (profileData.organization_id) {
             const orgDocRef = doc(db, 'organizations', profileData.organization_id);
             const orgDocSnap = await getDoc(orgDocRef);
@@ -74,46 +62,68 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         }
         return profileData;
+      } else {
+         // This case might happen if there's a delay in Firestore document creation after signup.
+         // We will retry once after a short delay.
+        await delay(2000);
+        const secondAttemptSnap = await getDoc(profileDocRef);
+        if (secondAttemptSnap.exists()) {
+           return { id: secondAttemptSnap.id, ...secondAttemptSnap.data() } as UserProfile;
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
     }
     return null;
   }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setLoading(true);
       if (firebaseUser) {
-        setUser(firebaseUser);
         const userProfile = await fetchUserProfile(firebaseUser);
-
         if (userProfile) {
+          setUser(firebaseUser);
           setProfile(userProfile);
+          
           const storedOrgId = localStorage.getItem('selectedOrgId');
+          // Ensure the storedOrgId is actually one of the user's valid orgs, otherwise default.
+          // For now, we default to the user's primary org ID.
           setSelectedOrganizationIdState(storedOrgId || userProfile.organization_id);
 
-          if (userProfile.organizations && !userProfile.organizations.is_setup_complete && pathname !== '/dashboard/setup') {
-            router.replace('/dashboard/setup');
-          } else if (userProfile.organizations && userProfile.organizations.is_setup_complete && pathname === '/dashboard/setup') {
-            router.replace('/dashboard');
+          const isSetupComplete = userProfile.organizations?.is_setup_complete ?? false;
+          if (!isSetupComplete && pathname !== '/dashboard/setup') {
+              router.replace('/dashboard/setup');
+          } else if (isSetupComplete && (pathname === '/dashboard/setup' || pathname === '/')) {
+              router.replace('/dashboard');
           }
+
         } else {
-          // This case can happen if a user is in Auth but their profile was deleted. Log them out.
-          await handleLogout({title: "Sesi Tidak Valid", description: "Data profil Anda tidak ditemukan. Silakan login kembali."});
+          // If profile doesn't exist even after retry, log the user out.
+          await signOut(auth);
         }
       } else {
         setUser(null);
         setProfile(null);
         setSelectedOrganizationId(null);
+        // If not on a public page, redirect to login
+        if (pathname !== '/' && pathname !== '/signup') {
+            router.replace('/');
+        }
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [fetchUserProfile, handleLogout, router, pathname, setSelectedOrganizationId]);
+  }, [fetchUserProfile, pathname, router]);
 
   const login = async ({ email, password }: { email: string, password: string }) => {
     await signInWithEmailAndPassword(auth, email, password);
   };
   
+  const logout = async () => {
+      await signOut(auth);
+  };
+
   const refreshProfile = useCallback(async () => {
     if (user) {
         const refreshedProfile = await fetchUserProfile(user);
@@ -128,7 +138,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     selectedOrganizationId,
     setSelectedOrganizationId,
     login,
-    logout: () => handleLogout(),
+    logout,
     refreshProfile,
   };
   
