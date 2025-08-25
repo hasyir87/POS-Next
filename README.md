@@ -7,7 +7,7 @@ Selamat datang di ScentPOS, sebuah Point of Sale (POS) modern yang dirancang khu
 ScentPOS dikembangkan untuk mengatasi tantangan unik dalam bisnis parfum dengan melayani dua model bisnis utama:
 
 1.  **Toko Parfum Isi Ulang (Refill)**: Dengan fitur unggulan seperti formulir isi ulang dinamis, ScentPOS memudahkan pembuatan parfum kustom dengan memilih grade, aroma, ukuran botol, dan menyesuaikan jumlah bibit. Harga dihitung secara otomatis, dan sistem ini mengelola inventaris bahan baku yang kompleks.
-2.  **Toko Parfum Jadi**: ScentPOS membantu mengelola produk siap jual dengan informasi detail seperti nama, gambar, stok, Harga Pokok Penjualan (HPP), dan harga jual, memungkinkan pelacakan profitabilitas yang akurat.
+2.  **Toko Parfum Jadi**: ScentPOS membantu mengelola produk siap jual dengan informasi detail seperti nama, gambar, stok, dan harga jual.
 
 Tujuannya adalah untuk menjadi sistem "all-in-one" yang mengelola penjualan, inventaris, pelanggan, dan keuangan dalam satu platform yang intuitif, baik untuk toko yang fokus pada salah satu model maupun yang menjalankan keduanya secara bersamaan.
 
@@ -18,67 +18,55 @@ ScentPOS dirancang dengan arsitektur modern yang memisahkan frontend dan backend
 ### 2.1. Tumpukan Teknologi (Tech Stack)
 -   **Framework Frontend**: Next.js (dengan App Router)
 -   **Bahasa**: TypeScript
--   **Backend as a Service (BaaS)**: **Supabase**
+-   **Backend as a Service (BaaS)**: **Firebase**
 -   **Styling**: Tailwind CSS
 -   **Komponen UI**: ShadCN UI (dibangun di atas Radix UI)
 -   **Manajemen State**: React Context API & `useState`
 -   **Formulir**: React Hook Form dengan Zod untuk validasi skema
 -   **Fitur AI**: Google Genkit
--   **Grafik & Laporan**: Recharts, jspdf, xlsx
 
-### 2.2. Integrasi Supabase (Backend)
+### 2.2. Integrasi Firebase (Backend)
 
-Saat ini, aplikasi menggunakan state lokal untuk simulasi. Namun, arsitektur yang dituju adalah migrasi penuh ke **Supabase** sebagai backend.
+Aplikasi ini terintegrasi penuh dengan **Firebase** sebagai backend.
 
--   **Database (PostgreSQL)**: Semua data, termasuk pengguna, produk, inventaris, dan transaksi, akan disimpan di database PostgreSQL Supabase. Keamanan akan dijamin dengan **Row Level Security (RLS)** untuk memastikan setiap pengguna hanya bisa mengakses data sesuai haknya.
--   **Authentication (Supabase Auth)**: Mengelola otentikasi (login, daftar, sesi) dan terintegrasi langsung dengan kebijakan RLS di database.
--   **Storage**: Menyimpan file seperti gambar produk dengan aman.
--   **Edge Functions**: Digunakan untuk logika backend kustom yang mungkin diperlukan di masa depan.
+-   **Database (Firestore)**: Semua data, termasuk profil pengguna, organisasi, produk, inventaris, dan transaksi, disimpan di database NoSQL Firestore.
+-   **Authentication (Firebase Auth)**: Mengelola otentikasi (login, daftar, sesi) dan terintegrasi dengan data profil di Firestore.
+-   **Storage**: Digunakan untuk menyimpan file seperti gambar produk dengan aman.
+-   **Cloud Functions**: Digunakan untuk logika backend yang aman seperti pembuatan pengguna, penghapusan, dan kalkulasi analitik dasbor.
 
-### 2.3. Struktur Database yang Dituju di Supabase
+### 2.3. Struktur Database di Firestore (Koleksi)
 
--   **Produk Jadi (`products`)**: `{ id, name, cogs, price, stock, image_url, organization_id, tokopedia_product_id, shopee_product_id }`
--   **Bahan Baku (`materials`)**: `{ id, name, brand, quantity, unit, category, purchase_price, organization_id }`
--   **Anggota (`members`)**: `{ id, name, email, phone, transaction_count, organization_id }`
--   **Transaksi (`transactions`)**: `{ id, created_at, total_amount, member_id, user_id, marketplace_order_id, marketplace_name }`
--   **Item Transaksi (`transaction_items`)**: `{ id, transaction_id, product_id, material_id, quantity, price }`
--   **Beban (`expenses`)**: `{ id, date, category, description, amount, organization_id }`
--   **Pengguna & Peran (`users`)**: `{ id, email, role, organization_id }`
--   **Organisasi (`organizations`)**: `{ id, name, owner_id }`
+-   **`organizations`**: Menyimpan data toko/organisasi. `{ name, owner_id, is_setup_complete }`
+-   **`profiles`**: Menyimpan data pengguna yang terikat pada ID Firebase Auth. `{ email, full_name, role, organization_id }`
+-   **`products`**: Menyimpan produk jadi. `{ organization_id, name, price, stock, image_url }`
+-   **`raw_materials`**: Menyimpan bahan baku untuk refill. `{ organization_id, name, brand, quantity, unit, category, purchase_price }`
+-   **`customers`**: Menyimpan data pelanggan/anggota. `{ organization_id, name, email, phone, transaction_count }`
+-   **`transactions`**: Menyimpan riwayat transaksi. `{ organization_id, cashier_id, customer_id, total_amount, payment_method }`
+-   **`grades`**: Menyimpan grade parfum untuk refill. `{ organization_id, name, price_multiplier, extra_essence_price }`
 
 ## 3. Fitur Utama
 
-Berikut adalah rincian fungsionalitas utama yang akan didukung oleh arsitektur Supabase:
-
-- **Dasbor Analitik**: Menampilkan KPI, grafik penjualan, dan notifikasi stok menipis dari data real-time.
-- **Point of Sale (POS)**: Antarmuka terpadu untuk penjualan produk jadi dan isi ulang yang langsung mencatat transaksi ke database.
-- **Manajemen Produk & Inventaris**: CRUD untuk produk jadi dan bahan baku yang terhubung ke tabel `products` dan `materials`.
-- **Keuangan**: Manajemen beban dan laporan laba rugi yang dihasilkan dari data transaksi.
-- **Manajemen Operasional**: Pengelolaan shift, anggota, dan peran pengguna dengan hak akses yang diatur oleh RLS.
+- **Dasbor Analitik**: Menampilkan KPI, grafik penjualan, dan notifikasi stok menipis dari data real-time yang diproses oleh Cloud Functions.
+- **Point of Sale (POS)**: Antarmuka terpadu untuk penjualan produk jadi dan isi ulang yang langsung mencatat transaksi ke Firestore.
+- **Manajemen Data**: Fungsionalitas CRUD untuk Produk, Inventaris, Anggota, dan Pengguna yang terhubung ke Firestore.
+- **Manajemen Multi-Outlet**: Kemampuan untuk beralih antar outlet (organisasi) yang berbeda.
 
 ## 4. Panduan Menjalankan Proyek
 
-1.  **Instal dependensi**:
+1.  **Konfigurasi Environment**: Salin `.env.local.example` ke `.env.local` dan isi dengan kredensial proyek Firebase Anda.
+2.  **Instal dependensi**:
     ```bash
     npm install
     ```
-2.  **Jalankan server pengembangan**:
+3.  **Jalankan server pengembangan**:
     ```bash
     npm run dev
     ```
-3.  **Akses Aplikasi**: Buka `http://localhost:9002`.
+4.  **Akses Aplikasi**: Buka `http://localhost:9002`.
 
-## 5. Perencanaan Masa Depan
+## 5. Visi Jangka Panjang
 
-### Prioritas Berikutnya: Integrasi E-commerce
-- **Tujuan**: Mengubah ScentPOS menjadi pusat komando untuk penjualan omnichannel.
-- **Fitur yang Akan Ditambahkan**:
-    - **Sinkronisasi Stok Otomatis**: Stok akan tersinkronisasi secara real-time antara ScentPOS, Tokopedia, dan Shopee.
-    - **Manajemen Produk Terpusat**: Buat atau perbarui produk di ScentPOS, dan perubahan tersebut akan diterapkan ke semua marketplace yang terhubung.
-    - **Laporan Penjualan Terkonsolidasi**: Dasbor akan menampilkan data penjualan gabungan dari semua kanal.
-
-### Visi Jangka Panjang:
-- **Peningkatan AI**: Inventaris prediktif dan rekomendasi personal.
+- **Peningkatan AI**: Manajemen inventaris prediktif dan rekomendasi wewangian.
 - **Fitur Lanjutan**: Program loyalitas berjenjang.
-- **Integrasi Pembayaran**: Menambah gateway pembayaran dan opsi nirsentuh.
+- **Integrasi Pembayaran**: Menambah gateway pembayaran digital.
 - **Peningkatan UX**: Dasbor yang dapat disesuaikan dan mode offline.
