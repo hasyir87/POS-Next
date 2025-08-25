@@ -45,6 +45,31 @@ type RecipeData = {
     [key: string]: { [key: number]: { essence: number; solvent: number; price: number } }
 };
 
+// --- DATA STATIS SEMENTARA ---
+const staticProducts: Product[] = [
+    { id: 'PROD001', name: 'Ocean Breeze', price: 79990, stock: 50, organization_id: '1', created_at: '', updated_at: '' },
+    { id: 'PROD002', name: 'Mystic Woods', price: 85000, stock: 30, organization_id: '1', created_at: '', updated_at: '' },
+    { id: 'PROD003', name: 'Citrus Grove', price: 75000, stock: 60, organization_id: '1', created_at: '', updated_at: '' },
+    { id: 'PROD004', name: 'Floral Fantasy', price: 92000, stock: 45, organization_id: '1', created_at: '', updated_at: '' },
+    { id: 'PROD005', name: 'Parfum Mini', price: 25000, stock: 100, organization_id: '1', created_at: '', updated_at: '' },
+];
+const staticGrades: Partial<Grade>[] = [
+    { id: 'GRADE01', name: 'Standard', price_multiplier: 1, extra_essence_price: 1000 },
+    { id: 'GRADE02', name: 'Premium', price_multiplier: 1.5, extra_essence_price: 1500 },
+];
+const staticAromas: Partial<Aroma>[] = [
+    { id: 'AROMA01', name: 'YSL Black Opium' }, { id: 'AROMA02', name: 'Sandalwood Supreme' }, { id: 'AROMA03', name: 'Vanilla Sky' }
+];
+const staticBottleSizes: Partial<BottleSize>[] = [
+    { id: 'BOTTLE01', size: 30, unit: 'ml' }, { id: 'BOTTLE02', size: 50, unit: 'ml' }, { id: 'BOTTLE03', size: 100, unit: 'ml' }
+];
+const staticRecipes: RecipeData = {
+    'AROMA01': { 30: { essence: 8, solvent: 22, price: 45000 }, 50: { essence: 15, solvent: 35, price: 90000 } },
+    'AROMA02': { 30: { essence: 10, solvent: 20, price: 50000 }, 50: { essence: 18, solvent: 32, price: 95000 } },
+    'AROMA03': { 30: { essence: 7, solvent: 23, price: 40000 }, 50: { essence: 12, solvent: 38, price: 80000 } }
+};
+
+
 const RefillForm = ({ onAddToCart, grades, aromas, bottleSizes, recipes }: { onAddToCart: (item: CartItem) => void, grades: Partial<Grade>[], aromas: Partial<Aroma>[], bottleSizes: Partial<BottleSize>[], recipes: RecipeData }) => {
     const { toast } = useToast();
     const [selectedGradeId, setSelectedGradeId] = useState('');
@@ -181,17 +206,18 @@ const RefillForm = ({ onAddToCart, grades, aromas, bottleSizes, recipes }: { onA
 
 export default function PosPage() {
     const { toast } = useToast();
-    const { profile, selectedOrganizationId, loading: authLoading, supabase } = useAuth();
+    const { profile, selectedOrganizationId, loading: authLoading } = useAuth();
     
-    const [productCatalog, setProductCatalog] = useState<Product[]>([]);
+    // Menggunakan data statis untuk sementara
+    const [productCatalog, setProductCatalog] = useState<Product[]>(staticProducts);
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [promotions, setPromotions] = useState<Promotion[]>([]);
-    const [grades, setGrades] = useState<Partial<Grade>[]>([]);
-    const [aromas, setAromas] = useState<Partial<Aroma>[]>([]);
-    const [bottleSizes, setBottleSizes] = useState<Partial<BottleSize>[]>([]);
-    const [recipes, setRecipes] = useState<RecipeData>({});
+    const [grades, setGrades] = useState<Partial<Grade>[]>(staticGrades);
+    const [aromas, setAromas] = useState<Partial<Aroma>[]>(staticAromas);
+    const [bottleSizes, setBottleSizes] = useState<Partial<BottleSize>[]>(staticBottleSizes);
+    const [recipes, setRecipes] = useState<RecipeData>(staticRecipes);
 
-    const [isLoadingData, setIsLoadingData] = useState(true);
+    const [isLoadingData, setIsLoadingData] = useState(false); // Diubah ke false karena tidak ada data yang diambil
     const [isCheckingOut, setIsCheckingOut] = useState(false);
     
     const [cart, setCart] = useState<CartItem[]>([]);
@@ -199,63 +225,6 @@ export default function PosPage() {
     const [appliedPromo, setAppliedPromo] = useState<Promotion | null>(null);
     const [showLoyaltyReward, setShowLoyaltyReward] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState('cash');
-
-    const fetchPosData = useCallback(async () => {
-        if (!selectedOrganizationId || !supabase) {
-            setProductCatalog([]); setCustomers([]); setPromotions([]); setGrades([]); setAromas([]); setBottleSizes([]); setRecipes({});
-            setIsLoadingData(false);
-            return;
-        }
-        setIsLoadingData(true);
-        const [productsRes, customersRes, promotionsRes, gradesRes, aromasRes, bottleSizesRes, recipesRes] = await Promise.all([
-            supabase.from('products').select('*').eq('organization_id', selectedOrganizationId),
-            supabase.from('customers').select('*').eq('organization_id', selectedOrganizationId),
-            supabase.from('promotions').select('*').eq('organization_id', selectedOrganizationId).eq('is_active', true),
-            supabase.from('grades').select('*').eq('organization_id', selectedOrganizationId),
-            supabase.from('aromas').select('*').eq('organization_id', selectedOrganizationId),
-            supabase.from('bottle_sizes').select('*').eq('organization_id', selectedOrganizationId),
-            supabase.from('recipes').select('*').eq('organization_id', selectedOrganizationId)
-        ]);
-
-        const errors = [productsRes.error, customersRes.error, promotionsRes.error, gradesRes.error, aromasRes.error, bottleSizesRes.error, recipesRes.error].filter(Boolean);
-        if(errors.length > 0) {
-            toast({ variant: "destructive", title: "Error Memuat Data", description: `Gagal memuat beberapa data. ${errors.map(e => e?.message).join(', ')}` });
-        }
-
-        setProductCatalog(productsRes.data || []);
-        setCustomers(customersRes.data || []);
-        setPromotions(promotionsRes.data || []);
-        setGrades(gradesRes.data || []);
-        setAromas(aromasRes.data || []);
-        setBottleSizes(bottleSizesRes.data || []);
-        
-        if (recipesRes.data) {
-            const recipesObj: RecipeData = {};
-            const bottleSizeMap = new Map(bottleSizesRes.data?.map(bs => [bs.id, bs.size]));
-
-            for (const r of recipesRes.data) {
-                if(r.aroma_id && r.bottle_size_id && r.price) {
-                    const bottleSize = bottleSizeMap.get(r.bottle_size_id);
-                    if(bottleSize) {
-                        if (!recipesObj[r.aroma_id]) recipesObj[r.aroma_id] = {};
-                        // TODO: The essence/solvent values are placeholders and need to be added to the recipes table.
-                        recipesObj[r.aroma_id][bottleSize] = { essence: 10, solvent: 20, price: r.price }; 
-                    }
-                }
-            }
-            setRecipes(recipesObj);
-        }
-
-        setIsLoadingData(false);
-    }, [selectedOrganizationId, supabase, toast]);
-
-    useEffect(() => {
-      if(!authLoading && selectedOrganizationId){
-        fetchPosData();
-      } else if (!selectedOrganizationId && !authLoading) {
-        setIsLoadingData(false);
-      }
-    }, [authLoading, selectedOrganizationId, fetchPosData]);
 
     const addProductToCart = (product: Product) => {
         setCart(prevCart => {
@@ -292,35 +261,29 @@ export default function PosPage() {
     };
 
     const handleCheckout = async () => {
-        if (cart.length === 0 || !profile || !selectedOrganizationId || !supabase) {
+        if (cart.length === 0 || !profile || !selectedOrganizationId) {
             toast({ variant: "destructive", title: "Keranjang Kosong", description: "Tidak bisa checkout dengan keranjang kosong." });
             return;
         }
         setIsCheckingOut(true);
-
-        const { data, error } = await supabase.rpc('process_checkout', {
+        toast({ title: "Fitur dalam Pengembangan", description: "Fungsi checkout belum terhubung ke backend." });
+        // Logika checkout akan diimplementasikan dengan Firebase Functions
+        console.log({
             p_organization_id: selectedOrganizationId,
             p_cashier_id: profile.id,
             p_customer_id: activeCustomer?.id,
             p_total_amount: total,
             p_payment_method: paymentMethod,
-            p_items: cart.filter(item => !item.isPromo && item.type === 'product').map(item => ({ product_id: item.id, quantity: item.quantity, price: item.price }))
+            p_items: cart.filter(item => !item.isPromo).map(item => ({ product_id: item.id, quantity: item.quantity, price: item.price, type: item.type }))
         });
 
-        if (error) {
-            toast({ variant: "destructive", title: "Checkout Gagal", description: error.message });
-        } else {
-            toast({ title: "Transaksi Berhasil!", description: "Pesanan telah berhasil diproses." });
-            handleClearOrder();
-        }
-        setIsCheckingOut(false);
+        setTimeout(() => {
+             setIsCheckingOut(false);
+             handleClearOrder();
+        }, 1500)
     };
 
     const memberOptions = useMemo(() => customers.map(m => ({ value: m.id, label: m.name })), [customers]);
-
-    useEffect(() => {
-        // BOGO logic
-    }, [appliedPromo, cart, productCatalog]);
 
     const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
     const discount = useMemo(() => {
