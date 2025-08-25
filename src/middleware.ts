@@ -9,19 +9,17 @@ export async function middleware(request: NextRequest) {
   // For now, we check for the presence of the cookie as a hint of being logged in.
   const hasSession = request.cookies.getAll().some(c => c.name.includes('firebase'));
 
-  const isPublicRoute = ['/', '/signup', '/unauthorized'].includes(pathname);
   const isDashboardRoute = pathname.startsWith('/dashboard');
-
-  // If user seems to be logged in and tries to access a public route, redirect to dashboard
-  if (hasSession && isPublicRoute) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
-  }
 
   // If user seems to be logged out and tries to access a protected dashboard route, redirect to login
   if (!hasSession && isDashboardRoute) {
     return NextResponse.redirect(new URL('/', request.url));
   }
   
+  // The logic to redirect a logged-in user from a public page to the dashboard
+  // has been removed from here. It is now handled by the client-side AuthProvider
+  // to prevent a race condition where the middleware redirects before the user profile is loaded.
+
   return NextResponse.next();
 }
 
