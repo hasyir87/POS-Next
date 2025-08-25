@@ -1,137 +1,220 @@
 
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import { getFirestore, doc, setDoc, addDoc, collection, serverTimestamp, getDocs, query, where } from "firebase/firestore";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { MPerfumeAmalLogo } from "./m-perfume-amal-logo";
+import { AlertCircle, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { firebaseApp } from "@/lib/firebase/config";
+
+const formSchema = z.object({
+  fullName: z.string().min(3, { message: "Nama lengkap minimal 3 karakter." }),
+  organizationName: z.string().min(3, { message: "Nama organisasi minimal 3 karakter." }),
+  email: z.string().email({ message: "Harap masukkan email yang valid." }),
+  password: z.string().min(6, { message: "Password minimal 6 karakter." }),
+  confirmPassword: z.string(),
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Konfirmasi password tidak cocok.",
+  path: ["confirmPassword"],
+});
 
 export default function SignupForm() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [organizationName, setOrganizationName] = useState('');
+  const [error, setErrorState] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
 
-  const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError(null);
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      fullName: "",
+      organizationName: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
+  const { setError } = form;
+
+  const handleSignup = async (values: z.infer<typeof formSchema>) => {
+    setErrorState(null);
     setSuccess(null);
-
-    // --- Validasi Verifikasi Password ---
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-
     setLoading(true);
 
+    const auth = getAuth(firebaseApp);
+    const db = getFirestore(firebaseApp);
+
     try {
-      const response = await fetch('/api/auth/signup-owner', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password, organization_name: organizationName }),
+      // --- Step 1: Check for duplicate organization name before anything else ---
+      const orgsRef = collection(db, "organizations");
+      const q = query(orgsRef, where("name", "==", values.organizationName));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        throw new Error("Nama organisasi sudah digunakan. Silakan pilih nama lain.");
+      }
+
+      // Step 2: Create the user in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const user = userCredential.user;
+
+      // Step 3: Create the organization document
+      const orgDocRef = await addDoc(collection(db, 'organizations'), {
+        name: values.organizationName,
+        owner_id: user.uid,
+        is_setup_complete: false,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'An unexpected error occurred.');
-      }
+      // Step 4: Create the user's profile document
+      await setDoc(doc(db, 'profiles', user.uid), {
+        id: user.uid,
+        email: values.email,
+        full_name: values.fullName,
+        organization_id: orgDocRef.id,
+        role: 'owner',
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
+      });
       
-      setSuccess(data.message || 'Signup successful! You can now log in.');
-      setEmail('');
-      setPassword('');
-      setConfirmPassword('');
-      setOrganizationName('');
-      // Arahkan pengguna ke halaman login setelah 2 detik
+      setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke halaman login untuk masuk dengan akun baru Anda.");
       setTimeout(() => {
-        router.push('/'); // Asumsikan halaman login ada di root
-      }, 2000);
+        router.push('/');
+      }, 3000);
 
     } catch (err: any) {
-      setError(err.message || 'An error occurred during signup.');
-      console.error('Signup fetch error:', err);
+      console.error("Client-side signup error:", err);
+      let errorMessage = err.message || "Terjadi kesalahan yang tidak terduga.";
+      
+      if (err.code === 'auth/email-already-in-use') {
+        errorMessage = "Email ini sudah terdaftar. Silakan gunakan email lain.";
+        setError('email', { type: 'manual', message: errorMessage });
+      } else if (errorMessage.includes("Nama organisasi sudah digunakan")) {
+        setError('organizationName', { type: 'manual', message: errorMessage });
+      }
+
+      setErrorState(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      <div className="p-8 bg-white rounded shadow-md w-96">
-        <h2 className="text-2xl font-bold text-center mb-6">Owner Signup</h2>
-        <form onSubmit={handleSignup}>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="organizationName">
-              Organization Name
-            </label>
-            <input
-              type="text"
-              id="organizationName"
-              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-              value={organizationName}
-              onChange={(e) => setOrganizationName(e.target.value)}
-              required
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">
-              Email
-            </label>
-            <input
-              type="email"
-              id="email"
-              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
-              Password
-            </label>
-            <input
-              type="password"
-              id="password"
-              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-           <div className="mb-6">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="confirmPassword">
-              Confirm Password
-            </label>
-            <input
-              type="password"
-              id="confirmPassword"
-              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
-          </div>
-          
-          {error && <p className="text-red-500 text-xs italic mb-4">{error}</p>}
-          {success && <p className="text-green-500 text-xs italic mb-4">{success}</p>}
-          
-          <div className="flex items-center justify-center">
-            <button
-              type="submit"
-              className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-              disabled={loading}
-            >
-              {loading ? 'Registering...' : 'Sign Up as Owner'}
-            </button>
-          </div>
-        </form>
-      </div>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+            <MPerfumeAmalLogo className="w-12 h-12 mx-auto text-primary" />
+            <CardTitle className="font-headline text-2xl mt-2">Buat Akun Pemilik</CardTitle>
+            <CardDescription>Daftarkan organisasi Anda untuk memulai.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSignup)} className="space-y-4">
+               {error && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Error Pendaftaran</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                {success && (
+                  <Alert>
+                    <AlertTitle>Sukses!</AlertTitle>
+                    <AlertDescription>{success}</AlertDescription>
+                  </Alert>
+                )}
+              <FormField
+                control={form.control}
+                name="fullName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nama Lengkap Anda</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Contoh: John Doe" {...field} disabled={loading || !!success} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="organizationName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nama Organisasi/Toko</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Contoh: ScentPRO" {...field} disabled={loading || !!success} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Pemilik</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="nama@email.com" {...field} disabled={loading || !!success} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="********" {...field} disabled={loading || !!success}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Konfirmasi Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="********" {...field} disabled={loading || !!success}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full" disabled={loading || !!success}>
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Daftar sebagai Pemilik"}
+              </Button>
+            </form>
+          </Form>
+           <div className="mt-4 text-center text-sm">
+                Sudah punya akun?{" "}
+                <Link href="/" className="underline">
+                    Masuk di sini
+                </Link>
+            </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

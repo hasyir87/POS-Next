@@ -1,31 +1,23 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/auth-context";
-import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, MoreHorizontal, SprayCan } from "lucide-react";
+import { PlusCircle, MoreHorizontal, SprayCan, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
+import type { Database } from "@/types/database";
+import { getFirestore, collection, query, where, getDocs, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { firebaseApp } from '@/lib/firebase/config';
 
-// This type now reflects the 'products' table in Supabase
-type Product = {
-    id: string;
-    name: string;
-    cogs: number; // Cost of Goods Sold
-    price: number;
-    stock: number;
-    image_url: string;
-    organization_id: string;
-    created_at: string;
-};
+type Product = Database['public']['Tables']['products']['Row'];
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
@@ -34,37 +26,45 @@ const formatCurrency = (amount: number) => {
 export default function ProductsPage() {
     const { toast } = useToast();
     const { selectedOrganizationId, loading: authLoading } = useAuth();
+    const db = getFirestore(firebaseApp);
     
     const [products, setProducts] = useState<Product[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isDialogOpen, setDialogOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
 
-    const emptyProduct: Partial<Product> = { name: "", price: 0, cogs: 0, stock: 0, image_url: "https://placehold.co/150x150.png" };
+    const emptyProduct: Partial<Product> = { name: "", price: 0, stock: 0, image_url: "https://placehold.co/150x150.png" };
     
-    const fetchProducts = async () => {
-        if (!selectedOrganizationId) return;
+    const fetchProducts = useCallback(async () => {
+        if (!selectedOrganizationId) {
+            setProducts([]);
+            setIsLoading(false);
+            return;
+        }
 
         setIsLoading(true);
-        const { data, error } = await supabase
-            .from('products')
-            .select('*')
-            .eq('organization_id', selectedOrganizationId)
-            .order('created_at', { ascending: false });
-
-        if (error) {
+        try {
+            const q = query(collection(db, "products"), where("organization_id", "==", selectedOrganizationId));
+            const querySnapshot = await getDocs(q);
+            const productsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+            setProducts(productsData);
+        } catch (error) {
             console.error("Error fetching products:", error);
             toast({ variant: "destructive", title: "Error", description: "Gagal mengambil data produk." });
             setProducts([]);
-        } else {
-            setProducts(data as Product[]);
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
-    };
+    }, [selectedOrganizationId, db, toast]);
 
     useEffect(() => {
-        fetchProducts();
-    }, [selectedOrganizationId]);
+        if (!authLoading && selectedOrganizationId) {
+            fetchProducts();
+        } else if (!selectedOrganizationId && !authLoading) {
+            setIsLoading(false);
+            setProducts([]);
+        }
+    }, [selectedOrganizationId, authLoading, fetchProducts]);
 
     const handleOpenDialog = (product: Partial<Product> | null = null) => {
         setEditingProduct(product ? { ...product } : emptyProduct);
@@ -83,55 +83,42 @@ export default function ProductsPage() {
 
         const productData = {
             name: editingProduct.name,
-            cogs: editingProduct.cogs || 0,
             price: editingProduct.price,
             stock: editingProduct.stock || 0,
             image_url: editingProduct.image_url,
             organization_id: selectedOrganizationId,
+            description: editingProduct.description
         };
 
-        let error;
-
-        if (editingProduct.id) {
-            // Update existing product
-            ({ error } = await supabase
-                .from('products')
-                .update(productData)
-                .eq('id', editingProduct.id));
-        } else {
-            // Create new product
-            ({ error } = await supabase
-                .from('products')
-                .insert([productData]));
-        }
-
-        if (error) {
-            toast({ variant: "destructive", title: "Error", description: `Gagal menyimpan produk: ${error.message}` });
-        } else {
-            toast({ title: "Sukses", description: `Produk berhasil ${editingProduct.id ? 'diperbarui' : 'ditambahkan'}.` });
+        try {
+            if (editingProduct.id) {
+                const productRef = doc(db, 'products', editingProduct.id);
+                await updateDoc(productRef, productData);
+            } else {
+                await addDoc(collection(db, 'products'), productData);
+            }
+             toast({ title: "Sukses", description: `Produk berhasil disimpan.` });
+        } catch (error: any) {
+             toast({ variant: "destructive", title: "Error", description: `Gagal menyimpan produk: ${error.message}` });
         }
         
         setDialogOpen(false);
         setEditingProduct(null);
-        fetchProducts(); // Refetch data
+        await fetchProducts();
     };
     
     const handleDeleteProduct = async (id: string) => {
-        const { error } = await supabase
-            .from('products')
-            .delete()
-            .eq('id', id);
-
-        if (error) {
-            toast({ variant: "destructive", title: "Error", description: `Gagal menghapus produk: ${error.message}` });
-        } else {
+        try {
+            await deleteDoc(doc(db, 'products', id));
             toast({ title: "Sukses", description: "Produk berhasil dihapus." });
-            fetchProducts(); // Refetch data
+            await fetchProducts();
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Error", description: `Gagal menghapus produk: ${error.message}` });
         }
     };
 
-    if (authLoading || isLoading) {
-        return <div className="p-6">Loading products...</div>
+    if (authLoading) {
+        return <div className="p-6 flex justify-center items-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
     }
 
     return (
@@ -140,7 +127,7 @@ export default function ProductsPage() {
                 <h1 className="font-headline text-3xl font-bold flex items-center gap-2"><SprayCan className="h-8 w-8" /> Manajemen Produk Jadi</h1>
                 <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button onClick={() => handleOpenDialog()}>
+                        <Button onClick={() => handleOpenDialog()} disabled={!selectedOrganizationId}>
                             <PlusCircle className="mr-2 h-4 w-4" /> Tambah Produk Baru
                         </Button>
                     </DialogTrigger>
@@ -152,10 +139,6 @@ export default function ProductsPage() {
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="name" className="text-right">Nama</Label>
                                 <Input id="name" placeholder="Nama produk" className="col-span-3" value={editingProduct?.name || ''} onChange={(e) => setEditingProduct(prev => prev ? {...prev, name: e.target.value} : null)} />
-                            </div>
-                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="cogs" className="text-right">HPP</Label>
-                                <Input id="cogs" type="number" placeholder="Rp 0" className="col-span-3" value={editingProduct?.cogs || ''} onChange={(e) => setEditingProduct(prev => prev ? {...prev, cogs: parseFloat(e.target.value) || 0} : null)} />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="price" className="text-right">Harga Jual</Label>
@@ -185,42 +168,50 @@ export default function ProductsPage() {
                                 <TableHead className="w-[80px]">Gambar</TableHead>
                                 <TableHead>Nama Produk</TableHead>
                                 <TableHead>Stok</TableHead>
-                                <TableHead className="text-right">HPP</TableHead>
                                 <TableHead className="text-right">Harga Jual</TableHead>
                                 <TableHead className="w-[50px]"></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {products.length > 0 ? products.map((product) => (
-                                <TableRow key={product.id}>
-                                    <TableCell>
-                                        <Image src={product.image_url || "https://placehold.co/50x50.png"} alt={product.name} width={50} height={50} className="rounded-md aspect-square object-cover" />
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="font-medium">{product.name}</div>
-                                        <div className="text-sm text-muted-foreground">{product.id}</div>
-                                    </TableCell>
-                                    <TableCell>{product.stock} pcs</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(product.cogs)}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(product.price)}</TableCell>
-                                    <TableCell>
-                                       <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                                    <span className="sr-only">Buka menu</span>
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => handleOpenDialog(product)}>Ubah</DropdownMenuItem>
-                                                <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteProduct(product.id)}>Hapus</DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </TableCell>
-                                </TableRow>
-                            )) : (
+                            {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center">Tidak ada produk untuk outlet ini.</TableCell>
+                                    <TableCell colSpan={5} className="text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell>
+                                </TableRow>
+                            ) : !selectedOrganizationId ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center">Pilih outlet untuk melihat data produk.</TableCell>
+                                </TableRow>
+                            ) : products.length > 0 ? (
+                                products.map((product) => (
+                                    <TableRow key={product.id}>
+                                        <TableCell>
+                                            <Image src={product.image_url || "https://placehold.co/50x50.png"} alt={product.name} width={50} height={50} className="rounded-md aspect-square object-cover" data-ai-hint="perfume bottle" />
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="font-medium">{product.name}</div>
+                                            <div className="text-sm text-muted-foreground">{product.id}</div>
+                                        </TableCell>
+                                        <TableCell>{product.stock} pcs</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(product.price)}</TableCell>
+                                        <TableCell>
+                                           <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0">
+                                                        <span className="sr-only">Buka menu</span>
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => handleOpenDialog(product)}>Ubah</DropdownMenuItem>
+                                                    <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteProduct(product.id)}>Hapus</DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center">Tidak ada produk untuk outlet ini.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
