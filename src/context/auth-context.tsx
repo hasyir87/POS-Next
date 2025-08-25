@@ -7,8 +7,29 @@ import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import type { UserProfile, Organization } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
+
+// Define types locally to match Firestore structure, removing dependency on the old database.ts
+export type UserRole = 'owner' | 'cashier' | 'admin' | 'superadmin';
+
+export interface Organization {
+  id: string;
+  name: string;
+  is_setup_complete: boolean;
+  owner_id: string;
+  parent_organization_id?: string;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  organization_id: string;
+  role: UserRole;
+  avatar_url?: string;
+  organization?: Organization;
+}
+
 
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
@@ -64,6 +85,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser): Promise<UserProfile | null> => {
     const profileDocRef = doc(db, 'profiles', firebaseUser.uid);
     const profileDocSnap = await getDoc(profileDocRef);
+
     if (profileDocSnap.exists()) {
         const profileData = { id: profileDocSnap.id, ...profileDocSnap.data() } as UserProfile;
         
@@ -87,7 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         let userProfile = await fetchUserProfile(firebaseUser);
         if (!userProfile) {
-          await delay(2000); 
+          await delay(1500); 
           userProfile = await fetchUserProfile(firebaseUser);
         }
 
@@ -98,8 +120,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if(storedOrgId) {
             setSelectedOrganizationIdState(storedOrgId);
           } else if(userProfile.organization_id) {
-            setSelectedOrganizationIdState(userProfile.organization_id);
-            localStorage.setItem('selectedOrgId', userProfile.organization_id);
+            const orgId = userProfile.organization_id;
+            setSelectedOrganizationIdState(orgId);
+            localStorage.setItem('selectedOrgId', orgId);
           }
 
           if (userProfile.organization && !userProfile.organization.is_setup_complete && pathname !== '/dashboard/setup') {

@@ -5,7 +5,6 @@ import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Combobox } from "@/components/ui/combobox";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -18,7 +17,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, MinusCircle, PlusCircle, Search, Star, User, UserPlus, X, XCircle, Droplets, SprayCan } from "lucide-react";
 import Image from "next/image";
-import type { Product, Customer, Promotion, Grade, Aroma, BottleSize, Recipe } from "@/types/database";
+
+// Local Types
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  organization_id: string;
+  image_url?: string | null;
+}
+interface Customer { id: string; name: string; }
+interface Promotion { id: string; name: string; type: 'Persentase' | 'Nominal' | 'BOGO'; value: number; }
+interface Grade { id: string; name: string; price_multiplier: number; extra_essence_price: number; }
+interface Aroma { id: string; name: string; }
+interface BottleSize { id: string; size: number; unit: string; }
+
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
@@ -47,11 +61,11 @@ type RecipeData = {
 
 // --- DATA STATIS SEMENTARA ---
 const staticProducts: Product[] = [
-    { id: 'PROD001', name: 'Ocean Breeze', price: 79990, stock: 50, organization_id: '1', created_at: '', updated_at: '' },
-    { id: 'PROD002', name: 'Mystic Woods', price: 85000, stock: 30, organization_id: '1', created_at: '', updated_at: '' },
-    { id: 'PROD003', name: 'Citrus Grove', price: 75000, stock: 60, organization_id: '1', created_at: '', updated_at: '' },
-    { id: 'PROD004', name: 'Floral Fantasy', price: 92000, stock: 45, organization_id: '1', created_at: '', updated_at: '' },
-    { id: 'PROD005', name: 'Parfum Mini', price: 25000, stock: 100, organization_id: '1', created_at: '', updated_at: '' },
+    { id: 'PROD001', name: 'Ocean Breeze', price: 79990, stock: 50, organization_id: '1', image_url: "https://placehold.co/100x100.png" },
+    { id: 'PROD002', name: 'Mystic Woods', price: 85000, stock: 30, organization_id: '1', image_url: "https://placehold.co/100x100.png" },
+    { id: 'PROD003', name: 'Citrus Grove', price: 75000, stock: 60, organization_id: '1', image_url: "https://placehold.co/100x100.png" },
+    { id: 'PROD004', name: 'Floral Fantasy', price: 92000, stock: 45, organization_id: '1', image_url: "https://placehold.co/100x100.png" },
+    { id: 'PROD005', name: 'Parfum Mini', price: 25000, stock: 100, organization_id: '1', image_url: "https://placehold.co/100x100.png" },
 ];
 const staticGrades: Partial<Grade>[] = [
     { id: 'GRADE01', name: 'Standard', price_multiplier: 1, extra_essence_price: 1000 },
@@ -168,7 +182,7 @@ const RefillForm = ({ onAddToCart, grades, aromas, bottleSizes, recipes }: { onA
                     <Label>3. Pilih Ukuran Botol</Label>
                     <Select value={selectedBottleSize > 0 ? selectedBottleSize.toString() : ""} onValueChange={(v) => setSelectedBottleSize(Number(v) || 0)} disabled={bottleSizes.length === 0}>
                         <SelectTrigger><SelectValue placeholder="Pilih ukuran botol..." /></SelectTrigger>
-                        <SelectContent>{bottleSizes.map(b => (<SelectItem key={b.id} value={b.size?.toString() ?? ''}>{b.size} {b.unit}</SelectItem>))}</SelectContent>
+                        <SelectContent>{bottleSizes.map(b => (<SelectItem key={b.id} value={String(b.size ?? '')}>{b.size} {b.unit}</SelectItem>))}</SelectContent>
                     </Select>
                 </div>)}
                 {selectedBottleSize > 0 && basePrice > 0 && grade && (
@@ -208,7 +222,6 @@ export default function PosPage() {
     const { toast } = useToast();
     const { profile, selectedOrganizationId, loading: authLoading } = useAuth();
     
-    // Menggunakan data statis untuk sementara
     const [productCatalog, setProductCatalog] = useState<Product[]>(staticProducts);
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [promotions, setPromotions] = useState<Promotion[]>([]);
@@ -217,7 +230,7 @@ export default function PosPage() {
     const [bottleSizes, setBottleSizes] = useState<Partial<BottleSize>[]>(staticBottleSizes);
     const [recipes, setRecipes] = useState<RecipeData>(staticRecipes);
 
-    const [isLoadingData, setIsLoadingData] = useState(false); // Diubah ke false karena tidak ada data yang diambil
+    const [isLoadingData, setIsLoadingData] = useState(false);
     const [isCheckingOut, setIsCheckingOut] = useState(false);
     
     const [cart, setCart] = useState<CartItem[]>([]);
@@ -267,7 +280,6 @@ export default function PosPage() {
         }
         setIsCheckingOut(true);
         toast({ title: "Fitur dalam Pengembangan", description: "Fungsi checkout belum terhubung ke backend." });
-        // Logika checkout akan diimplementasikan dengan Firebase Functions
         console.log({
             p_organization_id: selectedOrganizationId,
             p_cashier_id: profile.id,

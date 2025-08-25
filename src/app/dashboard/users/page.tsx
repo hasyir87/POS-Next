@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/context/auth-context';
+import { useAuth, type UserProfile, type Organization } from '@/context/auth-context';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,9 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PlusCircle, MoreHorizontal, Users, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import type { UserProfile, Organization } from '@/types/database';
 import { Badge } from '@/components/ui/badge';
-import { getFirestore, collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { firebaseApp } from '@/lib/firebase/config';
 
@@ -47,8 +46,6 @@ export default function UsersPage() {
             const usersData = usersSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile));
             setUsers(usersData);
 
-            // In a multi-tenant app with many orgs, this would be a more complex query or a separate "organizations" page
-            // For now, let's just fetch the current user's organization.
             if(selectedOrganizationId) {
               const orgDoc = await getDoc(doc(db, 'organizations', selectedOrganizationId));
               if(orgDoc.exists()){

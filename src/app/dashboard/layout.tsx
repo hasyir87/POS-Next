@@ -6,13 +6,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { BarChartBig, Clock, Home, LogOut, Menu, Settings, DollarSign, BookUser, Store, ChevronsUpDown, Users, PackageSearch, SprayCan, Loader2 } from "lucide-react";
+import { BarChartBig, Home, LogOut, Menu, Settings, Store, ChevronsUpDown, Users, PackageSearch, SprayCan, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from 'next/navigation';
-import { MPerfumeAmalLogo } from "@/components/m-perfume-amal-logo"; // Perbaikan di sini
-import { useAuth } from '@/context/auth-context';
-import { useRouter } from 'next/navigation';
-import type { Organization, UserProfile } from '@/types/database';
+import { MPerfumeAmalLogo } from "@/components/m-perfume-amal-logo";
+import { useAuth, type UserProfile, type Organization } from '@/context/auth-context';
 import { getFirestore, collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
 
@@ -39,8 +37,6 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  console.log("DashboardLayout: Component is rendering."); 
-  const router = useRouter();
   const pathname = usePathname();
   const { user, profile, loading, logout, selectedOrganizationId, setSelectedOrganizationId } = useAuth();
   
@@ -63,12 +59,12 @@ export default function DashboardLayout({
 
         const mainOrgData = { id: mainOrgSnap.id, ...mainOrgSnap.data() } as Organization;
         const parentId = mainOrgData.parent_organization_id || mainOrgData.id;
-
-        const parentQuery = doc(orgsRef, parentId);
+        
+        const parentDoc = await getDoc(doc(orgsRef, parentId));
         const childrenQuery = query(orgsRef, where('parent_organization_id', '==', parentId));
         
         const [parentSnap, childrenSnap] = await Promise.all([
-            getDoc(parentQuery),
+            parentDoc,
             getDocs(childrenQuery)
         ]);
 
@@ -77,11 +73,17 @@ export default function DashboardLayout({
         if (parentSnap.exists()) {
             orgMap.set(parentSnap.id, { id: parentSnap.id, ...parentSnap.data() } as Organization);
         }
+        
         childrenSnap.forEach(doc => {
             if (!orgMap.has(doc.id)) {
                 orgMap.set(doc.id, { id: doc.id, ...doc.data() } as Organization);
             }
         });
+
+        // Ensure the user's direct organization is in the list, in case it's the parent itself
+        if (!orgMap.has(mainOrgData.id)) {
+             orgMap.set(mainOrgData.id, mainOrgData);
+        }
         
         const allOrgs = Array.from(orgMap.values());
         setOrganizations(allOrgs);

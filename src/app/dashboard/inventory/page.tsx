@@ -16,11 +16,21 @@ import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import type { Database } from '@/types/database';
 import { getFirestore, collection, query, where, getDocs, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
 
-type RawMaterial = Database['public']['Tables']['raw_materials']['Row'];
+// Local type definition
+export interface RawMaterial {
+  id: string;
+  organization_id: string;
+  name: string;
+  brand: string | null;
+  quantity: number;
+  unit: string;
+  category: string | null;
+  purchase_price: number;
+}
+
 
 const initialCategories = [
     { value: "Bibit Parfum", label: "Bibit Parfum" },

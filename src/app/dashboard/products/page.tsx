@@ -13,11 +13,21 @@ import { PlusCircle, MoreHorizontal, SprayCan, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
-import type { Database } from "@/types/database";
 import { getFirestore, collection, query, where, getDocs, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
 
-type Product = Database['public']['Tables']['products']['Row'];
+// Local type definition
+export interface Product {
+  id: string
+  organization_id: string
+  name: string
+  description?: string | null
+  price: number
+  stock: number
+  category_id?: string | null
+  image_url?: string | null
+}
+
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);

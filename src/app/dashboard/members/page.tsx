@@ -13,9 +13,20 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/auth-context";
-import type { Customer } from "@/types/database";
 import { getFirestore, collection, query, where, getDocs, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
+
+// Local type definition
+export interface Customer {
+  id: string
+  organization_id: string
+  name: string
+  email: string | null
+  phone: string | null
+  loyalty_points: number
+  transaction_count: number
+}
+
 
 const getLoyaltyLevel = (transactionCount: number): "Bronze" | "Silver" | "Gold" => {
     if (transactionCount >= 20) return "Gold";

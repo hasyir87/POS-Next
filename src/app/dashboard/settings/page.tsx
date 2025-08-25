@@ -16,8 +16,17 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/auth-context";
-import type { Grade } from '@/types/database';
+import { getFirestore, doc, updateDoc, addDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { firebaseApp } from '@/lib/firebase/config';
 
+// Local types
+interface Grade {
+  id: string;
+  organization_id: string;
+  name: string;
+  price_multiplier: number;
+  extra_essence_price: number;
+}
 
 // SIMULASI DATA - Di aplikasi nyata, ini akan berasal dari database
 const productCatalogForSettings = [
@@ -74,7 +83,8 @@ const initialBrands: Attribute[] = [
 
 export default function SettingsPage() {
     const { toast } = useToast();
-    const { selectedOrganizationId, supabase, loading: authLoading } = useAuth();
+    const { selectedOrganizationId, loading: authLoading } = useAuth();
+    const db = getFirestore(firebaseApp);
 
     const [apiKeys, setApiKeys] = useState<ApiKey[]>(initialApiKeys);
     const [outlets, setOutlets] = useState<Outlet[]>(initialOutlets);
@@ -108,25 +118,20 @@ export default function SettingsPage() {
     const [loyaltyFreeProductId, setLoyaltyFreeProductId] = useState('PROD005');
 
     const fetchGrades = useCallback(async () => {
-        if (!selectedOrganizationId || !supabase) {
+        if (!selectedOrganizationId) {
             setGrades([]);
             setIsGradeLoading(false);
             return;
         }
         setIsGradeLoading(true);
-        const { data, error } = await supabase
-            .from('grades')
-            .select('*')
-            .eq('organization_id', selectedOrganizationId);
+        const gradesRef = collection(db, 'grades');
+        const q = query(gradesRef, where('organization_id', '==', selectedOrganizationId));
+        const querySnapshot = await getDocs(q);
         
-        if (error) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Gagal memuat data grade.' });
-            setGrades([]);
-        } else {
-            setGrades(data);
-        }
+        const gradesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grade));
+        setGrades(gradesData);
         setIsGradeLoading(false);
-    }, [selectedOrganizationId, supabase, toast]);
+    }, [selectedOrganizationId, db]);
 
     useEffect(() => {
         if (!authLoading && selectedOrganizationId) {
@@ -255,7 +260,7 @@ export default function SettingsPage() {
     };
 
     const handleSaveGrade = async () => {
-        if (!editingGrade || !editingGrade.name || !supabase || !selectedOrganizationId) {
+        if (!editingGrade || !editingGrade.name || !selectedOrganizationId) {
             toast({ variant: "destructive", title: "Error", description: "Nama grade harus diisi." });
             return;
         }
@@ -267,28 +272,29 @@ export default function SettingsPage() {
             organization_id: selectedOrganizationId,
         };
 
-        const { error } = editingGrade.id
-            ? await supabase.from('grades').update(gradeData).eq('id', editingGrade.id)
-            : await supabase.from('grades').insert([gradeData]);
-
-        if (error) {
-            toast({ variant: "destructive", title: "Error", description: `Gagal menyimpan grade: ${error.message}` });
-        } else {
-            toast({ title: "Sukses", description: "Grade berhasil disimpan." });
-            setGradeDialogOpen(false);
-            fetchGrades();
+        try {
+            if (editingGrade.id) {
+                await updateDoc(doc(db, 'grades', editingGrade.id), gradeData);
+            } else {
+                await addDoc(collection(db, 'grades'), gradeData);
+            }
+             toast({ title: "Sukses", description: "Grade berhasil disimpan." });
+        } catch (error: any) {
+             toast({ variant: "destructive", title: "Error", description: `Gagal menyimpan grade: ${error.message}` });
         }
+
+        setGradeDialogOpen(false);
+        fetchGrades();
     };
 
     const handleDeleteGrade = async (id: string) => {
-        if (!supabase) return;
-        const { error } = await supabase.from('grades').delete().eq('id', id);
-        if (error) {
-            toast({ variant: "destructive", title: "Error", description: `Gagal menghapus grade: ${error.message}` });
-        } else {
+        try {
+            await deleteDoc(doc(db, 'grades', id));
             toast({ title: "Sukses", description: "Grade berhasil dihapus." });
-            fetchGrades();
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Error", description: `Gagal menghapus grade: ${error.message}` });
         }
+        fetchGrades();
     };
 
 
