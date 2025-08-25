@@ -40,7 +40,7 @@ export default function DashboardPage() {
     setError(null);
 
     try {
-        const getDashboardAnalytics = httpsCallable(functions, 'get_dashboard_analytics');
+        const getDashboardAnalytics = httpsCallable(functions, 'getDashboardAnalytics');
         const result = await getDashboardAnalytics({ organizationId: selectedOrganizationId });
         const data = result.data as DashboardData;
         setDashboardData(data);
