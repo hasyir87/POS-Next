@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { BarChart3, Clock, Home, LogOut, Menu, Settings, DollarSign, BookUser, Store, ChevronsUpDown, Users, PackageSearch, SprayCan, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from 'next/navigation';
-import { MPerfumeAmalLogo } from "@/components/m-perfume-amal-logo";
+import { MPerfumeAmalLogo } from "@/components/m-perfume-amal-logo"; // Perbaikan di sini
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 import type { Organization, UserProfile } from '@/types/database';
@@ -39,6 +39,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  console.log("DashboardLayout: Component is rendering."); 
   const router = useRouter();
   const pathname = usePathname();
   const { user, profile, loading, logout, selectedOrganizationId, setSelectedOrganizationId } = useAuth();
