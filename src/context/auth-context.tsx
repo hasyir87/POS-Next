@@ -45,7 +45,36 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+async function fetchUserProfile(firebaseUser: FirebaseUser): Promise<UserProfile | null> {
+    if (!firebaseUser) return null;
+  
+    const profileDocRef = doc(db, 'profiles', firebaseUser.uid);
+    const profileDocSnap = await getDoc(profileDocRef);
+  
+    if (!profileDocSnap.exists()) {
+      console.error("User profile does not exist in Firestore for UID:", firebaseUser.uid);
+      return null;
+    }
+  
+    const profileData = { id: profileDocSnap.id, ...profileDocSnap.data() } as UserProfile;
+  
+    if (profileData.organization_id) {
+        const orgDocRef = doc(db, 'organizations', profileData.organization_id);
+        const orgDocSnap = await getDoc(orgDocRef);
+    
+        if (orgDocSnap.exists()) {
+            profileData.organization = { id: orgDocSnap.id, ...orgDocSnap.data() } as Organization;
+        } else {
+             profileData.organization = { id: profileData.organization_id, name: 'Organization Not Found', is_setup_complete: false, owner_id: '' };
+        }
+    } else {
+        // Handle cases where organization_id might be missing
+        profileData.organization = { id: '', name: 'No Organization', is_setup_complete: false, owner_id: '' };
+    }
+    
+    return profileData;
+}
+
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
@@ -84,90 +113,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     router.push('/');
   }, [setSelectedOrganizationId, toast, router]);
 
-  const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser): Promise<UserProfile | null> => {
-    if (!firebaseUser) return null;
-    const profileDocRef = doc(db, 'profiles', firebaseUser.uid);
-    const profileDocSnap = await getDoc(profileDocRef);
-
-    if (profileDocSnap.exists()) {
-        const profileData = { id: profileDocSnap.id, ...profileDocSnap.data() } as UserProfile;
-        
-        if (profileData.organization_id) {
-            const orgDocRef = doc(db, 'organizations', profileData.organization_id);
-            const orgDocSnap = await getDoc(orgDocRef);
-            if (orgDocSnap.exists()) {
-                profileData.organization = { id: orgDocSnap.id, ...orgDocSnap.data() } as Organization;
-            } else {
-                // Ensure organization object exists to prevent crashes, even if data is missing.
-                profileData.organization = { id: profileData.organization_id, name: 'Organization Not Found', is_setup_complete: false, owner_id: '' };
-            }
-        } else {
-             profileData.organization = { id: '', name: 'No Organization Assigned', is_setup_complete: false, owner_id: '' };
-        }
-        return profileData;
-    }
-    return null;
-  }, []);
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setLoading(true);
       if (firebaseUser) {
-        let userProfile = await fetchUserProfile(firebaseUser);
-        
-        if (!userProfile) {
-          await delay(1500); 
-          userProfile = await fetchUserProfile(firebaseUser);
-        }
+        try {
+            const userProfile = await fetchUserProfile(firebaseUser);
+            
+            if (!userProfile) {
+                await handleLogout({title: "Sesi Tidak Valid", description: "Profil pengguna tidak ditemukan. Sesi diakhiri."});
+                return;
+            }
 
-        if (userProfile) {
-          setUser(firebaseUser);
-          setProfile(userProfile);
-          
-          try {
+            setUser(firebaseUser);
+            setProfile(userProfile);
+            
             const storedOrgId = localStorage.getItem('selectedOrgId');
-            if(storedOrgId) {
-              setSelectedOrganizationIdState(storedOrgId);
-            } else if(userProfile.organization_id) {
-              const orgId = userProfile.organization_id;
-              setSelectedOrganizationIdState(orgId);
-              localStorage.setItem('selectedOrgId', orgId);
+            if (storedOrgId) {
+                setSelectedOrganizationIdState(storedOrgId);
+            } else if (userProfile.organization_id) {
+                setSelectedOrganizationIdState(userProfile.organization_id);
+                localStorage.setItem('selectedOrgId', userProfile.organization_id);
             }
-          } catch (error) {
-            console.error("Could not access localStorage.");
-          }
 
-          // This is the critical section that was causing the crash.
-          // Add extra checks to ensure userProfile and userProfile.organization are not null/undefined.
-          if (userProfile && userProfile.organization) {
-            const org = userProfile.organization;
-            if (!org.is_setup_complete && pathname !== '/dashboard/setup') {
-              router.replace('/dashboard/setup');
-            } else if (org.is_setup_complete && (pathname === '/dashboard/setup' || pathname === '/')) {
-              router.replace('/dashboard');
+            if (userProfile.organization && !userProfile.organization.is_setup_complete) {
+                if (pathname !== '/dashboard/setup') {
+                    router.replace('/dashboard/setup');
+                }
+            } else if (pathname === '/dashboard/setup' || pathname === '/') {
+                 router.replace('/dashboard');
             }
-          } else if (userProfile && !userProfile.organization) {
-             // If profile exists but organization doesn't, it's a critical data error.
-             // Log them out to prevent being stuck.
-             await handleLogout({title: "Data Error", description: "Data organisasi tidak ditemukan. Sesi diakhiri."});
-          }
-
-        } else {
-          await handleLogout({title: "Sesi Tidak Valid", description: "Data profil Anda tidak ditemukan. Sesi diakhiri."});
+        } catch (error: any) {
+            console.error("Auth state change error:", error.message);
+            await handleLogout({title: "Sesi Tidak Valid", description: "Gagal memuat data profil. Sesi diakhiri."});
         }
       } else {
         setUser(null);
         setProfile(null);
         setSelectedOrganizationId(null);
-        if (pathname.startsWith('/dashboard')) {
-          router.replace('/');
-        }
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [fetchUserProfile, handleLogout, router, pathname, setSelectedOrganizationId]);
+  }, [handleLogout, router, pathname]);
 
   const login = async ({ email, password }: { email: string, password: string }) => {
     await signInWithEmailAndPassword(auth, email, password);
@@ -175,10 +163,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const refreshProfile = useCallback(async () => {
     if (user) {
-        const refreshedProfile = await fetchUserProfile(user);
-        setProfile(refreshedProfile);
+        try {
+            const refreshedProfile = await fetchUserProfile(user);
+            setProfile(refreshedProfile);
+        } catch (error) {
+            console.error("Failed to refresh profile:", error);
+            await handleLogout({title: "Gagal Memuat Ulang", description: "Tidak dapat memuat ulang data profil. Sesi diakhiri."});
+        }
     }
-  }, [user, fetchUserProfile]);
+  }, [user, handleLogout]);
 
   const value: AuthContextType = {
     user,
