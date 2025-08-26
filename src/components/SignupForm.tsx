@@ -58,9 +58,10 @@ export default function SignupForm() {
     const db = getFirestore(firebaseApp);
 
     try {
-      // --- Step 1: Check for duplicate organization name before anything else ---
+      // --- Step 1: Check for duplicate organization name (case-insensitive) ---
       const orgsRef = collection(db, "organizations");
-      const q = query(orgsRef, where("name", "==", values.organizationName));
+      const organizationNameLower = values.organizationName.toLowerCase();
+      const q = query(orgsRef, where("name_lowercase", "==", organizationNameLower));
       const querySnapshot = await getDocs(q);
 
       if (!querySnapshot.empty) {
@@ -74,6 +75,7 @@ export default function SignupForm() {
       // Step 3: Create the organization document
       const orgDocRef = await addDoc(collection(db, 'organizations'), {
         name: values.organizationName,
+        name_lowercase: organizationNameLower, // Add lowercase name for validation
         owner_id: user.uid,
         is_setup_complete: false,
         created_at: serverTimestamp(),
