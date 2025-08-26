@@ -50,7 +50,7 @@ export default function SetupPage() {
   };
 
   return (
-    <div className="flex min-h-full items-center justify-center p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-lg">
         <CardHeader className="text-center">
           <Rocket className="mx-auto h-12 w-12 text-primary" />

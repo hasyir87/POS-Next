@@ -65,11 +65,10 @@ async function fetchUserProfile(firebaseUser: FirebaseUser): Promise<UserProfile
         if (orgDocSnap.exists()) {
             profileData.organization = { id: orgDocSnap.id, ...orgDocSnap.data() } as Organization;
         } else {
-             profileData.organization = { id: profileData.organization_id, name: 'Organization Not Found', is_setup_complete: false, owner_id: '' };
+             profileData.organization = { id: profileData.organization_id, name: 'Organization Not Found', is_setup_complete: false, owner_id: profileData.id };
         }
     } else {
-        // Handle cases where organization_id might be missing
-        profileData.organization = { id: '', name: 'No Organization', is_setup_complete: false, owner_id: '' };
+        profileData.organization = { id: '', name: 'No Organization', is_setup_complete: false, owner_id: profileData.id };
     }
     
     return profileData;
@@ -115,12 +114,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setLoading(true);
       if (firebaseUser) {
         try {
             const userProfile = await fetchUserProfile(firebaseUser);
             
             if (!userProfile) {
                 await handleLogout({title: "Sesi Tidak Valid", description: "Profil pengguna tidak ditemukan. Sesi diakhiri."});
+                setLoading(false);
                 return;
             }
 
@@ -134,14 +135,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setSelectedOrganizationIdState(userProfile.organization_id);
                 localStorage.setItem('selectedOrgId', userProfile.organization_id);
             }
-
-            if (userProfile.organization && !userProfile.organization.is_setup_complete) {
-                if (pathname !== '/dashboard/setup') {
-                    router.replace('/dashboard/setup');
+            
+            if (userProfile && userProfile.organization) {
+                if (!userProfile.organization.is_setup_complete && pathname !== '/setup') {
+                    router.replace('/setup');
+                } else if (userProfile.organization.is_setup_complete && (pathname === '/setup' || pathname === '/')) {
+                     router.replace('/dashboard');
                 }
-            } else if (pathname === '/dashboard/setup' || pathname === '/') {
-                 router.replace('/dashboard');
+            } else {
+                await handleLogout({title: "Data Tidak Lengkap", description: "Data profil atau organisasi tidak lengkap. Sesi diakhiri."});
             }
+
         } catch (error: any) {
             console.error("Auth state change error:", error.message);
             await handleLogout({title: "Sesi Tidak Valid", description: "Gagal memuat data profil. Sesi diakhiri."});
@@ -150,6 +154,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setProfile(null);
         setSelectedOrganizationId(null);
+        if (pathname.startsWith('/dashboard') || pathname.startsWith('/setup')) {
+            router.replace('/');
+        }
       }
       setLoading(false);
     });
