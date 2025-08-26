@@ -13,7 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/auth-context";
-import { getFirestore, collection, query, where, getDocs, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, doc, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
 
 // Local type definition
@@ -25,6 +25,8 @@ export interface Customer {
   phone: string | null
   loyalty_points: number
   transaction_count: number
+  created_at?: any;
+  updated_at?: any;
 }
 
 
@@ -93,6 +95,7 @@ export default function MembersPage() {
             transaction_count: editingMember.transaction_count || 0,
             loyalty_points: editingMember.loyalty_points || 0,
             organization_id: selectedOrganizationId,
+            updated_at: serverTimestamp(),
         };
 
         try {
@@ -100,7 +103,10 @@ export default function MembersPage() {
                 const memberRef = doc(db, 'customers', editingMember.id);
                 await updateDoc(memberRef, memberData);
             } else {
-                await addDoc(collection(db, 'customers'), memberData);
+                await addDoc(collection(db, 'customers'), {
+                    ...memberData,
+                    created_at: serverTimestamp()
+                });
             }
             toast({ title: "Sukses", description: "Data anggota berhasil disimpan." });
             setDialogOpen(false);

@@ -45,17 +45,20 @@ export default function DashboardPage() {
         today.setHours(0, 0, 0, 0);
         const startOfToday = Timestamp.fromDate(today);
 
-        // Kueri diperbarui dengan orderBy untuk memastikan penggunaan indeks yang benar
+        // Kueri untuk transaksi, sudah benar dengan orderBy
         const transactionsQuery = query(
             collection(db, "transactions"),
             where("organization_id", "==", selectedOrganizationId),
             where("created_at", ">=", startOfToday),
-            orderBy("created_at") // Menambahkan orderBy pada field rentang
+            orderBy("created_at")
         );
+        
+        // MEMPERBAIKI Kueri untuk pelanggan dengan menambahkan orderBy
         const customersQuery = query(
             collection(db, "customers"),
             where("organization_id", "==", selectedOrganizationId),
-            where("created_at", ">=", startOfToday)
+            where("created_at", ">=", startOfToday),
+            orderBy("created_at") // Penambahan ini memperbaiki error
         );
 
         const [transactionsSnapshot, newCustomersSnapshot] = await Promise.all([
