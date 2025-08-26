@@ -9,7 +9,6 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-// Define types locally to match Firestore structure, removing dependency on the old database.ts
 export type UserRole = 'owner' | 'cashier' | 'admin' | 'superadmin';
 
 export interface Organization {
@@ -29,7 +28,6 @@ export interface UserProfile {
   avatar_url?: string;
   organization?: Organization;
 }
-
 
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
@@ -59,12 +57,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [selectedOrganizationId, setSelectedOrganizationIdState] = useState<string | null>(null);
 
   const setSelectedOrganizationId = useCallback((orgId: string | null) => {
-    if (orgId) {
-      localStorage.setItem('selectedOrgId', orgId);
-    } else {
-      localStorage.removeItem('selectedOrgId');
+    try {
+      if (orgId) {
+        localStorage.setItem('selectedOrgId', orgId);
+      } else {
+        localStorage.removeItem('selectedOrgId');
+      }
+      setSelectedOrganizationIdState(orgId);
+    } catch (error) {
+      console.error("Could not access localStorage. Running in a non-browser environment?");
     }
-    setSelectedOrganizationIdState(orgId);
   }, []);
   
   const handleLogout = useCallback(async (message?: {title: string, description: string}) => {
@@ -83,6 +85,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [setSelectedOrganizationId, toast, router]);
 
   const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser): Promise<UserProfile | null> => {
+    if (!firebaseUser) return null;
     const profileDocRef = doc(db, 'profiles', firebaseUser.uid);
     const profileDocSnap = await getDoc(profileDocRef);
 
@@ -105,31 +108,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
       if (firebaseUser) {
-        setUser(firebaseUser);
-        
         let userProfile = await fetchUserProfile(firebaseUser);
+        
+        // Retry logic in case Firestore data isn't immediately available after creation
         if (!userProfile) {
           await delay(1500); 
           userProfile = await fetchUserProfile(firebaseUser);
         }
 
         if (userProfile) {
+          setUser(firebaseUser);
           setProfile(userProfile);
-          const storedOrgId = localStorage.getItem('selectedOrgId');
           
-          if(storedOrgId) {
-            setSelectedOrganizationIdState(storedOrgId);
-          } else if(userProfile.organization_id) {
-            const orgId = userProfile.organization_id;
-            setSelectedOrganizationIdState(orgId);
-            localStorage.setItem('selectedOrgId', orgId);
+          try {
+            const storedOrgId = localStorage.getItem('selectedOrgId');
+            if(storedOrgId) {
+              setSelectedOrganizationIdState(storedOrgId);
+            } else if(userProfile.organization_id) {
+              const orgId = userProfile.organization_id;
+              setSelectedOrganizationIdState(orgId);
+              localStorage.setItem('selectedOrgId', orgId);
+            }
+          } catch (error) {
+            console.error("Could not access localStorage.");
           }
 
-          if (userProfile.organization && !userProfile.organization.is_setup_complete && pathname !== '/dashboard/setup') {
+          const org = userProfile.organization;
+          if (org && !org.is_setup_complete && pathname !== '/dashboard/setup') {
             router.replace('/dashboard/setup');
-          } else if (userProfile.organization && userProfile.organization.is_setup_complete && pathname === '/dashboard/setup') {
+          } else if (org && org.is_setup_complete && (pathname === '/dashboard/setup' || pathname === '/')) {
             router.replace('/dashboard');
           }
+
         } else {
           await handleLogout({title: "Sesi Tidak Valid", description: "Data profil Anda tidak ditemukan. Sesi diakhiri."});
         }
@@ -137,6 +147,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setProfile(null);
         setSelectedOrganizationId(null);
+        if (pathname.startsWith('/dashboard')) {
+          router.replace('/');
+        }
       }
       setLoading(false);
     });
@@ -166,7 +179,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     refreshProfile,
   };
   
-  if (loading && !profile) {
+  if (loading) {
      return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

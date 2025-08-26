@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Fragment } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { BarChartBig, Home, LogOut, Menu, Settings, Store, ChevronsUpDown, Users, PackageSearch, SprayCan, Loader2 } from "lucide-react";
+import { BarChartBig, Home, LogOut, Menu, Settings, Store, ChevronsUpDown, Users, PackageSearch, SprayCan, Loader2, FileClock, Briefcase, HandCoins, Building2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from 'next/navigation';
 import { MPerfumeAmalLogo } from "@/components/m-perfume-amal-logo";
@@ -27,7 +27,10 @@ const allNavItems: NavItem[] = [
   { href: "/dashboard/products", label: "Produk", icon: SprayCan, requiredRoles: ["owner", "admin", "superadmin"] },
   { href: "/dashboard/inventory", label: "Inventaris", icon: PackageSearch, requiredRoles: ["owner", "admin", "superadmin"] },
   { href: "/dashboard/members", label: "Anggota", icon: Users, requiredRoles: ["owner", "admin", "cashier", "superadmin"] },
-  { href: "/dashboard/users", label: "Pengguna", icon: Users, requiredRoles: ["owner", "admin", "superadmin"] },
+  { href: "/dashboard/expenses", label: "Beban", icon: HandCoins, requiredRoles: ["owner", "admin", "superadmin"] },
+  { href: "/dashboard/accounts", label: "Akun", icon: Building2, requiredRoles: ["owner", "admin", "superadmin"] },
+  { href: "/dashboard/shifts", label: "Shift", icon: FileClock, requiredRoles: ["owner", "admin", "cashier", "superadmin"] },
+  { href: "/dashboard/users", label: "Staf", icon: Briefcase, requiredRoles: ["owner", "admin", "superadmin"] },
   { href: "/dashboard/reports", label: "Laporan", icon: BarChartBig, requiredRoles: ["owner", "admin", "superadmin"] },
   { href: "/dashboard/settings", label: "Pengaturan", icon: Settings, requiredRoles: ["owner", "superadmin"] },
 ];
@@ -80,7 +83,6 @@ export default function DashboardLayout({
             }
         });
 
-        // Ensure the user's direct organization is in the list, in case it's the parent itself
         if (!orgMap.has(mainOrgData.id)) {
              orgMap.set(mainOrgData.id, mainOrgData);
         }
@@ -103,7 +105,6 @@ export default function DashboardLayout({
     }
   }, [profile, loading, fetchOrganizations]);
 
-  // If auth is loading, or user/profile is not available, show a full-page loader.
   if (loading || !user || !profile) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
@@ -210,7 +211,7 @@ export default function DashboardLayout({
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">
                 <Avatar>
-                  <AvatarImage src={profile?.avatar_url || "https://placehold.co/40x40"} alt={profile?.full_name || 'Avatar'} data-ai-hint="avatar" />
+                  <AvatarImage src={profile?.avatar_url || "https://placehold.co/40x40"} alt={profile?.full_name || 'Avatar'} data-ai-hint="avatar"/>
                   <AvatarFallback>{profile?.full_name?.substring(0, 2).toUpperCase() || user?.email?.substring(0,2).toUpperCase() || 'U'}</AvatarFallback>
                 </Avatar>
                 <span className="sr-only">Buka menu pengguna</span>
