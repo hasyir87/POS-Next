@@ -17,13 +17,6 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         router.replace('/');
         return;
       }
-
-      // Jika ada user tapi profil belum termuat atau setup belum selesai
-      if (user && profile) {
-        if (!profile.organization?.is_setup_complete) {
-          router.replace('/setup');
-        }
-      }
     }
   }, [user, profile, loading, router]);
 
@@ -36,8 +29,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
   
-  // Jika profil sudah ada dan setup sudah lengkap, tampilkan konten dasbor
-  if (profile && profile.organization?.is_setup_complete) {
+  // Jika profil sudah ada, tampilkan konten dasbor
+  if (profile) {
     return <>{children}</>;
   }
 

@@ -65,12 +65,10 @@ async function fetchUserProfile(firebaseUser: FirebaseUser): Promise<UserProfile
             profileData.organization = { id: orgDocSnap.id, ...orgDocSnap.data() } as Organization;
         } else {
              console.error(`Organization with ID ${profileData.organization_id} not found.`);
-             // Return a default/fallback organization object to prevent crashes
              profileData.organization = { id: profileData.organization_id, name: 'Organisasi Tidak Ditemukan', is_setup_complete: false, owner_id: profileData.id };
         }
     } else {
         console.error(`User ${profileData.id} has no organization_id.`);
-        // Return a default/fallback organization object
         profileData.organization = { id: '', name: 'Tidak Ada Organisasi', is_setup_complete: false, owner_id: profileData.id };
     }
     

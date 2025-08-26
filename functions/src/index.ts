@@ -1,3 +1,4 @@
+
 /**
  * Import function triggers from their respective submodules:
  *
@@ -14,8 +15,113 @@ import * as admin from "firebase-admin";
 admin.initializeApp();
 const db = admin.firestore();
 
-// Define reusable batch writer
-const createBatch = () => db.batch();
+/**
+ * Creates a new owner user, an organization, and initial data in a single transaction.
+ * This function is callable without authentication.
+ */
+export const createOwner = onCall({ enforceAppCheck: false }, async (request) => {
+  const { email, password, fullName, organizationName } = request.data;
+
+  // Validate required fields
+  if (!email || !password || !fullName || !organizationName) {
+    throw new onCall.HttpsError("invalid-argument", "Missing required fields.");
+  }
+  if (password.length < 6) {
+    throw new onCall.HttpsError("invalid-argument", "Password must be at least 6 characters long.");
+  }
+
+  const orgsRef = db.collection("organizations");
+  const usersRef = db.collection("profiles");
+  const organizationNameLower = organizationName.toLowerCase();
+
+  let newUserRecord;
+  try {
+    // Check for duplicate organization name (case-insensitive)
+    const orgQuery = orgsRef.where("name_lowercase", "==", organizationNameLower);
+    const orgSnapshot = await orgQuery.get();
+    if (!orgSnapshot.empty) {
+      throw new onCall.HttpsError("already-exists", "Organization name is already in use.", { field: 'organization' });
+    }
+
+    // Check for duplicate email
+    try {
+      await admin.auth().getUserByEmail(email);
+      // If the above line doesn't throw, the user exists.
+      throw new onCall.HttpsError("already-exists", "Email is already in use.", { field: 'email' });
+    } catch (error: any) {
+      // "user-not-found" is the expected error if the email is available.
+      if (error.code !== 'auth/user-not-found') {
+        throw error; // Re-throw other auth errors
+      }
+    }
+
+    // Create user in Firebase Auth
+    newUserRecord = await admin.auth().createUser({
+      email: email,
+      password: password,
+      displayName: fullName,
+    });
+
+    const batch = db.batch();
+
+    // Create organization document
+    const orgDocRef = orgsRef.doc();
+    batch.set(orgDocRef, {
+      name: organizationName,
+      name_lowercase: organizationNameLower,
+      owner_id: newUserRecord.uid,
+      is_setup_complete: true, // No setup step anymore
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+      updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Create user profile document
+    const profileDocRef = usersRef.doc(newUserRecord.uid);
+    batch.set(profileDocRef, {
+      id: newUserRecord.uid,
+      email: email,
+      full_name: fullName,
+      organization_id: orgDocRef.id,
+      role: 'owner',
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+      updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Create initial grades
+    const initialGrades = [
+      { name: "Standard", price_multiplier: 1.0, extra_essence_price: 1000 },
+      { name: "Premium", price_multiplier: 1.5, extra_essence_price: 1500 },
+    ];
+    
+    initialGrades.forEach(grade => {
+      const gradeRef = db.collection("grades").doc();
+      batch.set(gradeRef, { ...grade, organization_id: orgDocRef.id });
+    });
+
+    await batch.commit();
+
+    return {
+      status: "success",
+      message: `Owner ${fullName} and organization ${organizationName} created successfully.`,
+      uid: newUserRecord.uid,
+      organizationId: orgDocRef.id,
+    };
+
+  } catch (error: any) {
+    logger.error("Error creating owner:", error);
+    // Clean up failed user creation in Auth if it exists
+    if (newUserRecord?.uid) {
+      await admin.auth().deleteUser(newUserRecord.uid).catch(e => logger.error("Cleanup failed for UID:", newUserRecord!.uid, e));
+    }
+    // Re-throw HttpsError to be caught by the client
+    if (error instanceof onCall.HttpsError) {
+      throw error;
+    }
+    // Throw a generic internal error for other cases
+    throw new onCall.HttpsError("internal", error.message || "An unknown error occurred.");
+  }
+});
+
 
 /**
  * Creates a new user in Firebase Auth and a corresponding profile
@@ -154,67 +260,6 @@ export const deleteUser = onCall(
     } catch (error: any) {
       logger.error("Error deleting user:", error);
       throw new onCall.HttpsError("internal", error.message || "An unknown error occurred while deleting the user.");
-    }
-  }
-);
-
-/**
- * Sets up initial data (grades, etc.) for a new organization.
- * This is a callable function that expects the user to be authenticated.
- */
-export const setupInitialData = onCall(
-  { enforceAppCheck: false },
-  async (request) => {
-    // 1. Authentication Check (Handled automatically by onCall)
-    const uid = request.auth?.uid;
-    if (!uid) {
-      throw new onCall.HttpsError(
-        "unauthenticated",
-        "The function must be called while authenticated."
-      );
-    }
-
-    try {
-      // 2. Get User Profile & Organization
-      const profileDoc = await db.collection("profiles").doc(uid).get();
-      if (!profileDoc.exists) {
-        throw new onCall.HttpsError("not-found", "Profile not found.");
-      }
-      const profileData = profileDoc.data();
-      const organizationId = profileData?.organization_id;
-      if (!organizationId) {
-        throw new onCall.HttpsError("failed-precondition", "Organization ID not found for user.");
-      }
-
-      const orgDocRef = db.collection("organizations").doc(organizationId);
-
-      // 3. Define initial data
-      const initialGrades = [
-        { name: "Standard", price_multiplier: 1.0, extra_essence_price: 1000 },
-        { name: "Premium", price_multiplier: 1.5, extra_essence_price: 1500 },
-      ];
-
-      const batch = createBatch();
-
-      // Add grades
-      initialGrades.forEach(grade => {
-        const gradeRef = db.collection("grades").doc();
-        batch.set(gradeRef, { ...grade, organization_id: organizationId });
-      });
-
-      // 4. Mark organization setup as complete
-      batch.update(orgDocRef, { is_setup_complete: true, updated_at: admin.firestore.FieldValue.serverTimestamp() });
-
-      await batch.commit();
-      logger.info(`Initial data setup complete for organization ${organizationId}`);
-      return { status: "success", message: "Initial data setup was successful." };
-
-    } catch (error: any) {
-        logger.error("Error during initial data setup:", error);
-        if (error instanceof onCall.HttpsError) {
-          throw error;
-        }
-        throw new onCall.HttpsError("internal", "An internal error occurred during setup.");
     }
   }
 );

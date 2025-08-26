@@ -6,8 +6,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import { getFirestore, doc, setDoc, addDoc, collection, serverTimestamp, getDocs, query, where } from "firebase/firestore";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -54,44 +53,16 @@ export default function SignupForm() {
     setSuccess(null);
     setLoading(true);
 
-    const auth = getAuth(firebaseApp);
-    const db = getFirestore(firebaseApp);
-
     try {
-      // --- Step 1: Check for duplicate organization name (case-insensitive) ---
-      const orgsRef = collection(db, "organizations");
-      const organizationNameLower = values.organizationName.toLowerCase();
-      const q = query(orgsRef, where("name_lowercase", "==", organizationNameLower));
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        throw new Error("Nama organisasi sudah digunakan. Silakan pilih nama lain.");
-      }
-
-      // Step 2: Create the user in Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-      const user = userCredential.user;
-
-      // Step 3: Create the organization document
-      const orgDocRef = await addDoc(collection(db, 'organizations'), {
-        name: values.organizationName,
-        name_lowercase: organizationNameLower, // Add lowercase name for validation
-        owner_id: user.uid,
-        is_setup_complete: false,
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp()
-      });
-
-      // Step 4: Create the user's profile document
-      await setDoc(doc(db, 'profiles', user.uid), {
-        id: user.uid,
-        email: values.email,
-        full_name: values.fullName,
-        organization_id: orgDocRef.id,
-        role: 'owner',
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp()
-      });
+        const functions = getFunctions(firebaseApp);
+        const createOwner = httpsCallable(functions, 'createOwner');
+        
+        await createOwner({
+            email: values.email,
+            password: values.password,
+            fullName: values.fullName,
+            organizationName: values.organizationName,
+        });
       
       setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke halaman login untuk masuk dengan akun baru Anda.");
       setTimeout(() => {
@@ -102,11 +73,14 @@ export default function SignupForm() {
       console.error("Client-side signup error:", err);
       let errorMessage = err.message || "Terjadi kesalahan yang tidak terduga.";
       
-      if (err.code === 'auth/email-already-in-use') {
-        errorMessage = "Email ini sudah terdaftar. Silakan gunakan email lain.";
-        setError('email', { type: 'manual', message: errorMessage });
-      } else if (errorMessage.includes("Nama organisasi sudah digunakan")) {
-        setError('organizationName', { type: 'manual', message: errorMessage });
+      if (err.code === 'functions/already-exists') {
+         if(err.details && err.details.field === 'email'){
+            errorMessage = "Email ini sudah terdaftar. Silakan gunakan email lain.";
+            setError('email', { type: 'manual', message: errorMessage });
+         } else if(err.details && err.details.field === 'organization') {
+            errorMessage = "Nama organisasi sudah digunakan. Silakan pilih nama lain.";
+            setError('organizationName', { type: 'manual', message: errorMessage });
+         }
       }
 
       setErrorState(errorMessage);
