@@ -25,6 +25,7 @@ export default function SetupPage() {
 
     try {
       const functions = getFunctions(firebaseApp);
+      // Menggunakan httpsCallable untuk fungsi onCall
       const setupInitialData = httpsCallable(functions, 'setupInitialData');
       
       const result = await setupInitialData();
@@ -65,7 +66,6 @@ export default function SetupPage() {
               Dengan mengklik tombol di bawah, kami akan secara otomatis mengisi toko Anda dengan:
             </p>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-              <li>Kategori produk standar (Bibit Parfum, Kemasan, dll.)</li>
               <li>Grade parfum awal (Standard, Premium)</li>
             </ul>
             <p className="text-sm text-muted-foreground">

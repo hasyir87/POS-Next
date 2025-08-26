@@ -7,12 +7,9 @@
  * See a full list of supported triggers at https://firebase.google.com/docs/functions
  */
 
-import { onCall, onRequest } from "firebase-functions/v2/https";
+import { onCall } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
-import * as cors from "cors";
-
-const corsHandler = cors({ origin: true });
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -161,39 +158,32 @@ export const deleteUser = onCall(
   }
 );
 
+/**
+ * Sets up initial data (grades, etc.) for a new organization.
+ * This is a callable function that expects the user to be authenticated.
+ */
+export const setupInitialData = onCall(
+  { enforceAppCheck: false },
+  async (request) => {
+    // 1. Authentication Check (Handled automatically by onCall)
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new onCall.HttpsError(
+        "unauthenticated",
+        "The function must be called while authenticated."
+      );
+    }
 
-export const setupInitialData = onRequest(
-  { enforceAppCheck: false, cors: true },
-  async (req, res) => {
-    corsHandler(req, res, async () => {
-      // 1. Authentication Check
-      const authorization = req.headers.authorization;
-      if (!authorization || !authorization.startsWith("Bearer ")) {
-        res.status(403).send("Unauthorized");
-        return;
-      }
-      const idToken = authorization.split("Bearer ")[1];
-      let decodedIdToken;
-      try {
-        decodedIdToken = await admin.auth().verifyIdToken(idToken);
-      } catch (error) {
-        logger.error("Error verifying ID token:", error);
-        res.status(403).send("Unauthorized");
-        return;
-      }
-      const uid = decodedIdToken.uid;
-
+    try {
       // 2. Get User Profile & Organization
       const profileDoc = await db.collection("profiles").doc(uid).get();
       if (!profileDoc.exists) {
-        res.status(404).send({ status: "error", message: "Profile not found." });
-        return;
+        throw new onCall.HttpsError("not-found", "Profile not found.");
       }
       const profileData = profileDoc.data();
       const organizationId = profileData?.organization_id;
       if (!organizationId) {
-        res.status(400).send({ status: "error", message: "Organization ID not found for user." });
-        return;
+        throw new onCall.HttpsError("failed-precondition", "Organization ID not found for user.");
       }
 
       const orgDocRef = db.collection("organizations").doc(organizationId);
@@ -204,10 +194,6 @@ export const setupInitialData = onRequest(
         { name: "Premium", price_multiplier: 1.5, extra_essence_price: 1500 },
       ];
 
-      const initialCategories = [
-        "Bibit Parfum", "Pelarut", "Bahan Sintetis", "Kemasan",
-      ];
-      
       const batch = createBatch();
 
       // Add grades
@@ -216,21 +202,19 @@ export const setupInitialData = onRequest(
         batch.set(gradeRef, { ...grade, organization_id: organizationId });
       });
 
-      // We are not adding categories to a separate collection in this version,
-      // as they are managed on the client-side.
-      // This function's main purpose now is to add grades and mark setup as complete.
-
       // 4. Mark organization setup as complete
       batch.update(orgDocRef, { is_setup_complete: true, updated_at: admin.firestore.FieldValue.serverTimestamp() });
 
-      try {
-        await batch.commit();
-        logger.info(`Initial data setup complete for organization ${organizationId}`);
-        res.status(200).send({ status: "success", message: "Initial data setup was successful." });
-      } catch (error) {
-        logger.error("Error during initial data setup batch commit:", error);
-        res.status(500).send({ status: "error", message: "Failed to commit initial data." });
-      }
-    });
+      await batch.commit();
+      logger.info(`Initial data setup complete for organization ${organizationId}`);
+      return { status: "success", message: "Initial data setup was successful." };
+
+    } catch (error: any) {
+        logger.error("Error during initial data setup:", error);
+        if (error instanceof onCall.HttpsError) {
+          throw error;
+        }
+        throw new onCall.HttpsError("internal", "An internal error occurred during setup.");
+    }
   }
 );
