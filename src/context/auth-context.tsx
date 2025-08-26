@@ -97,7 +97,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const orgDocSnap = await getDoc(orgDocRef);
             if (orgDocSnap.exists()) {
                 profileData.organization = { id: orgDocSnap.id, ...orgDocSnap.data() } as Organization;
+            } else {
+                // Ensure organization object exists to prevent crashes, even if data is missing.
+                profileData.organization = { id: profileData.organization_id, name: 'Organization Not Found', is_setup_complete: false, owner_id: '' };
             }
+        } else {
+             profileData.organization = { id: '', name: 'No Organization Assigned', is_setup_complete: false, owner_id: '' };
         }
         return profileData;
     }
@@ -132,11 +137,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             console.error("Could not access localStorage.");
           }
 
-          const org = userProfile.organization;
-          if (org && !org.is_setup_complete && pathname !== '/dashboard/setup') {
-            router.replace('/dashboard/setup');
-          } else if (org && org.is_setup_complete && (pathname === '/dashboard/setup' || pathname === '/')) {
-            router.replace('/dashboard');
+          // This is the critical section that was causing the crash.
+          // Add extra checks to ensure userProfile and userProfile.organization are not null/undefined.
+          if (userProfile && userProfile.organization) {
+            const org = userProfile.organization;
+            if (!org.is_setup_complete && pathname !== '/dashboard/setup') {
+              router.replace('/dashboard/setup');
+            } else if (org.is_setup_complete && (pathname === '/dashboard/setup' || pathname === '/')) {
+              router.replace('/dashboard');
+            }
+          } else if (userProfile && !userProfile.organization) {
+             // If profile exists but organization doesn't, it's a critical data error.
+             // Log them out to prevent being stuck.
+             await handleLogout({title: "Data Error", description: "Data organisasi tidak ditemukan. Sesi diakhiri."});
           }
 
         } else {
