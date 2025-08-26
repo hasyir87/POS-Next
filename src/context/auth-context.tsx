@@ -5,8 +5,7 @@ import React, { createContext, useState, useEffect, ReactNode, useContext, useCa
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
-import { useRouter, usePathname } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 
 export type UserRole = 'owner' | 'cashier' | 'admin' | 'superadmin';
@@ -65,10 +64,14 @@ async function fetchUserProfile(firebaseUser: FirebaseUser): Promise<UserProfile
         if (orgDocSnap.exists()) {
             profileData.organization = { id: orgDocSnap.id, ...orgDocSnap.data() } as Organization;
         } else {
-             profileData.organization = { id: profileData.organization_id, name: 'Organization Not Found', is_setup_complete: false, owner_id: profileData.id };
+             console.error(`Organization with ID ${profileData.organization_id} not found.`);
+             // Return a default/fallback organization object to prevent crashes
+             profileData.organization = { id: profileData.organization_id, name: 'Organisasi Tidak Ditemukan', is_setup_complete: false, owner_id: profileData.id };
         }
     } else {
-        profileData.organization = { id: '', name: 'No Organization', is_setup_complete: false, owner_id: profileData.id };
+        console.error(`User ${profileData.id} has no organization_id.`);
+        // Return a default/fallback organization object
+        profileData.organization = { id: '', name: 'Tidak Ada Organisasi', is_setup_complete: false, owner_id: profileData.id };
     }
     
     return profileData;
@@ -77,7 +80,6 @@ async function fetchUserProfile(firebaseUser: FirebaseUser): Promise<UserProfile
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
-  const pathname = usePathname();
   const { toast } = useToast();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -135,16 +137,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setSelectedOrganizationIdState(userProfile.organization_id);
                 localStorage.setItem('selectedOrgId', userProfile.organization_id);
             }
-            
-            if (userProfile && userProfile.organization) {
-                if (!userProfile.organization.is_setup_complete && pathname !== '/setup') {
-                    router.replace('/setup');
-                } else if (userProfile.organization.is_setup_complete && (pathname === '/setup' || pathname === '/')) {
-                     router.replace('/dashboard');
-                }
-            } else {
-                await handleLogout({title: "Data Tidak Lengkap", description: "Data profil atau organisasi tidak lengkap. Sesi diakhiri."});
-            }
 
         } catch (error: any) {
             console.error("Auth state change error:", error.message);
@@ -154,15 +146,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setProfile(null);
         setSelectedOrganizationId(null);
-        if (pathname.startsWith('/dashboard') || pathname.startsWith('/setup')) {
-            router.replace('/');
-        }
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [handleLogout, router, pathname]);
+  }, [handleLogout, router]);
 
   const login = async ({ email, password }: { email: string, password: string }) => {
     await signInWithEmailAndPassword(auth, email, password);
@@ -191,14 +180,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     refreshProfile,
   };
   
-  if (loading) {
-     return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
