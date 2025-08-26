@@ -1,27 +1,71 @@
-
-import type { NextConfig } from 'next';
-
-const nextConfig: NextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
+{
+  "name": "nextn",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
+    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts"
   },
-  eslint: {
-    ignoreDuringBuilds: true,
+  "dependencies": {
+    "@genkit-ai/googleai": "^1.17.1",
+    "@genkit-ai/next": "^1.17.1",
+    "@hookform/resolvers": "^3.9.0",
+    "@radix-ui/react-accordion": "^1.2.0",
+    "@radix-ui/react-alert-dialog": "^1.1.1",
+    "@radix-ui/react-avatar": "^1.1.0",
+    "@radix-ui/react-checkbox": "^1.1.1",
+    "@radix-ui/react-collapsible": "^1.1.0",
+    "@radix-ui/react-dialog": "^1.1.1",
+    "@radix-ui/react-dropdown-menu": "^2.1.1",
+    "@radix-ui/react-label": "^2.1.0",
+    "@radix-ui/react-menubar": "^1.1.1",
+    "@radix-ui/react-popover": "^1.1.1",
+    "@radix-ui/react-progress": "^1.1.0",
+    "@radix-ui/react-radio-group": "^1.2.0",
+    "cmdk": "^1.0.0",
+    "@radix-ui/react-scroll-area": "^1.1.0",
+    "@radix-ui/react-select": "^2.1.1",
+    "@radix-ui/react-separator": "^1.1.0",
+    "@radix-ui/react-slider": "^1.2.0",
+    "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-switch": "^1.1.0",
+    "@radix-ui/react-tabs": "^1.1.0",
+    "@radix-ui/react-toast": "^1.2.1",
+    "@radix-ui/react-tooltip": "^1.1.2",
+    "@tanstack/react-query": "^5.51.1",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.6.0",
+    "dotenv": "^16.4.5",
+    "firebase": "^10.12.3",
+    "genkit": "^1.17.1",
+    "input-otp": "^1.2.4",
+    "lucide-react": "^0.408.0",
+    "next": "15.3.3",
+    "next-themes": "0.4.0",
+    "react": "^19.0.0-rc-1b076e01-20240722",
+    "react-day-picker": "9.0.0-beta.1",
+    "react-dom": "^19.0.0-rc-1b076e01-20240722",
+    "react-hook-form": "^7.52.1",
+    "recharts": "^2.12.7",
+    "tailwind-merge": "^2.4.0",
+    "tailwindcss-animate": "^1.0.7",
+    "tsx": "^4.16.2",
+    "zod": "^3.23.8"
   },
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'placehold.co',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.googleusercontent.com',
-      },
-    ],
-  },
-};
-
-export default nextConfig;
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "15.3.3",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.5.3"
+  }
+}
