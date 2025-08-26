@@ -110,7 +110,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (firebaseUser) {
         let userProfile = await fetchUserProfile(firebaseUser);
         
-        // Retry logic in case Firestore data isn't immediately available after creation
         if (!userProfile) {
           await delay(1500); 
           userProfile = await fetchUserProfile(firebaseUser);
