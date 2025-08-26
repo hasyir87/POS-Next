@@ -70,7 +70,6 @@ export const createOwner = onCall({ enforceAppCheck: false }, async (request) =>
       name: organizationName,
       name_lowercase: organizationNameLower,
       owner_id: newUserRecord.uid,
-      is_setup_complete: true, // No setup step anymore
       created_at: admin.firestore.FieldValue.serverTimestamp(),
       updated_at: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -263,3 +262,74 @@ export const deleteUser = onCall(
     }
   }
 );
+
+
+export const createOutlet = onCall({ enforceAppCheck: false }, async (request) => {
+    const { outletName, parentOrganizationId } = request.data;
+    const callingUid = request.auth?.uid;
+
+    if (!callingUid) {
+      throw new onCall.HttpsError("unauthenticated", "The function must be called while authenticated.");
+    }
+    if (!outletName || !parentOrganizationId) {
+        throw new onCall.HttpsError("invalid-argument", "Outlet name and parent organization ID are required.");
+    }
+    
+    // Check permission of calling user
+    const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
+    const callingUserData = callingUserDoc.data();
+    if (!callingUserData || callingUserData.role !== "owner") {
+        throw new onCall.HttpsError("permission-denied", "You do not have permission to create outlets.");
+    }
+
+    const orgsRef = db.collection("organizations");
+    const orgDocRef = orgsRef.doc();
+    
+    await orgDocRef.set({
+        name: outletName,
+        name_lowercase: outletName.toLowerCase(),
+        owner_id: callingUid,
+        parent_organization_id: parentOrganizationId,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { status: "success", message: "Outlet created successfully.", id: orgDocRef.id };
+});
+
+export const deleteOutlet = onCall({ enforceAppCheck: false }, async (request) => {
+    const { outletId } = request.data;
+    const callingUid = request.auth?.uid;
+
+    if (!callingUid) {
+      throw new onCall.HttpsError("unauthenticated", "The function must be called while authenticated.");
+    }
+    if (!outletId) {
+        throw new onCall.HttpsError("invalid-argument", "Outlet ID is required.");
+    }
+    
+    const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
+    const callingUserData = callingUserDoc.data();
+    if (!callingUserData || callingUserData.role !== "owner") {
+        throw new onCall.HttpsError("permission-denied", "You do not have permission to delete outlets.");
+    }
+
+    const outletRef = db.doc(`organizations/${outletId}`);
+    const outletDoc = await outletRef.get();
+    if (!outletDoc.exists) {
+        throw new onCall.HttpsError("not-found", "Outlet not found.");
+    }
+
+    // Prevent deleting parent organization from here
+    if (!outletDoc.data()?.parent_organization_id) {
+        throw new onCall.HttpsError("permission-denied", "Cannot delete the main organization.");
+    }
+
+    // TODO: Add logic to handle users within the deleted outlet
+    
+    await outletRef.delete();
+
+    return { status: "success", message: "Outlet deleted successfully." };
+});
+
+    
