@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from '@
 import { Trophy } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { useCallback, useEffect, useState } from 'react';
-import { getFirestore, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
 
 const db = getFirestore(firebaseApp);
@@ -45,10 +45,12 @@ export default function DashboardPage() {
         today.setHours(0, 0, 0, 0);
         const startOfToday = Timestamp.fromDate(today);
 
+        // Kueri diperbarui dengan orderBy untuk memastikan penggunaan indeks yang benar
         const transactionsQuery = query(
             collection(db, "transactions"),
             where("organization_id", "==", selectedOrganizationId),
-            where("created_at", ">=", startOfToday)
+            where("created_at", ">=", startOfToday),
+            orderBy("created_at") // Menambahkan orderBy pada field rentang
         );
         const customersQuery = query(
             collection(db, "customers"),
@@ -210,5 +212,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
