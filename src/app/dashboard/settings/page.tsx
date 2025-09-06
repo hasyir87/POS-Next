@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth, type Organization } from "@/context/auth-context";
 import { getFirestore, doc, updateDoc, addDoc, deleteDoc, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getFunctions, httpsCallable, type HttpsCallableResult } from 'firebase/functions';
 import { firebaseApp } from '@/lib/firebase/config';
 
 // Local types
@@ -151,7 +151,9 @@ export default function SettingsPage() {
             setEditingOutlet(null);
             fetchOutlets();
         } catch (error: any) {
-            toast({ variant: "destructive", title: "Gagal Menyimpan", description: error.message });
+            console.error("Error saving outlet:", error);
+            const errorMessage = error.details?.message || error.message || "Terjadi kesalahan yang tidak diketahui.";
+            toast({ variant: "destructive", title: "Gagal Menyimpan", description: errorMessage });
         }
     };
     
@@ -163,7 +165,8 @@ export default function SettingsPage() {
             toast({ title: "Sukses", description: "Outlet berhasil dihapus." });
             fetchOutlets();
         } catch (error: any) {
-            toast({ variant: "destructive", title: "Gagal Menghapus", description: error.message });
+             const errorMessage = error.details?.message || error.message || "Terjadi kesalahan yang tidak diketahui.";
+            toast({ variant: "destructive", title: "Gagal Menghapus", description: errorMessage });
         }
     };
 
@@ -369,7 +372,7 @@ export default function SettingsPage() {
                                          <TableCell className="text-right">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" className="h-8 w-8 p-0" disabled={!selectedOrganizationId || outlet.id === profile?.organization?.parent_organization_id || outlet.id === profile?.organization_id && !profile?.organization?.parent_organization_id}>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0" disabled={!selectedOrganizationId || outlet.id === profile?.organization?.parent_organization_id || (outlet.id === profile?.organization_id && !profile?.organization?.parent_organization_id)}>
                                                       <span className="sr-only">Buka menu</span><MoreHorizontal className="h-4 w-4" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
@@ -402,5 +405,3 @@ export default function SettingsPage() {
         </div>
     )
 }
-
-    

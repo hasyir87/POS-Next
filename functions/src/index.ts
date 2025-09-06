@@ -278,7 +278,7 @@ export const createOutlet = onCall({ enforceAppCheck: false }, async (request) =
     // Check permission of calling user
     const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
     const callingUserData = callingUserDoc.data();
-    if (!callingUserData || callingUserData.role !== "owner") {
+    if (!callingUserData || (callingUserData.role !== "owner" && callingUserData.role !== "superadmin")) {
         throw new onCall.HttpsError("permission-denied", "You do not have permission to create outlets.");
     }
 
@@ -310,7 +310,7 @@ export const deleteOutlet = onCall({ enforceAppCheck: false }, async (request) =
     
     const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
     const callingUserData = callingUserDoc.data();
-    if (!callingUserData || callingUserData.role !== "owner") {
+    if (!callingUserData || (callingUserData.role !== "owner" && callingUserData.role !== "superadmin")) {
         throw new onCall.HttpsError("permission-denied", "You do not have permission to delete outlets.");
     }
 
@@ -331,5 +331,3 @@ export const deleteOutlet = onCall({ enforceAppCheck: false }, async (request) =
 
     return { status: "success", message: "Outlet deleted successfully." };
 });
-
-    
