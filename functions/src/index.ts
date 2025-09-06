@@ -275,10 +275,9 @@ export const createOutlet = onCall({ enforceAppCheck: false }, async (request) =
         throw new onCall.HttpsError("invalid-argument", "Outlet name and parent organization ID are required.");
     }
     
-    // Check permission of calling user
     const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
     const callingUserData = callingUserDoc.data();
-    if (!callingUserData || (callingUserData.role !== "owner" && callingUserData.role !== "superadmin")) {
+    if (!callingUserData || (callingUserData.role !== "owner" && callingUserData.role !== "superadmin" && callingUserData.role !== "admin")) {
         throw new onCall.HttpsError("permission-denied", "You do not have permission to create outlets.");
     }
 
@@ -288,7 +287,7 @@ export const createOutlet = onCall({ enforceAppCheck: false }, async (request) =
     await orgDocRef.set({
         name: outletName,
         name_lowercase: outletName.toLowerCase(),
-        owner_id: callingUid,
+        owner_id: callingUid, // Should this be the parent org owner? For now, creator.
         parent_organization_id: parentOrganizationId,
         created_at: admin.firestore.FieldValue.serverTimestamp(),
         updated_at: admin.firestore.FieldValue.serverTimestamp(),
@@ -310,7 +309,7 @@ export const deleteOutlet = onCall({ enforceAppCheck: false }, async (request) =
     
     const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
     const callingUserData = callingUserDoc.data();
-    if (!callingUserData || (callingUserData.role !== "owner" && callingUserData.role !== "superadmin")) {
+     if (!callingUserData || (callingUserData.role !== "owner" && callingUserData.role !== "superadmin" && callingUserData.role !== "admin")) {
         throw new onCall.HttpsError("permission-denied", "You do not have permission to delete outlets.");
     }
 
@@ -322,14 +321,13 @@ export const deleteOutlet = onCall({ enforceAppCheck: false }, async (request) =
 
     // Prevent deleting parent organization from here
     if (!outletDoc.data()?.parent_organization_id) {
-        throw new onCall.HttpsError("permission-denied", "Cannot delete the main organization.");
+        throw new onCall.HttpsError("permission-denied", "Cannot delete the main organization from this interface.");
     }
-
-    // TODO: Add logic to handle users within the deleted outlet
     
     await outletRef.delete();
 
     return { status: "success", message: "Outlet deleted successfully." };
 });
+    
 
     
