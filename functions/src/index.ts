@@ -331,3 +331,5 @@ export const deleteOutlet = onCall({ enforceAppCheck: false }, async (request) =
 
     return { status: "success", message: "Outlet deleted successfully." };
 });
+
+    

@@ -128,22 +128,23 @@ export default function SettingsPage() {
     };
 
     const handleSaveOutlet = async () => {
-        if (!editingOutlet || !editingOutlet.name || !profile?.organization_id) {
-            toast({ variant: "destructive", title: "Error", description: "Nama outlet harus diisi." });
+        if (!editingOutlet || !editingOutlet.name || !profile?.organization) {
+            toast({ variant: "destructive", title: "Error", description: "Nama outlet atau organisasi induk tidak valid." });
             return;
         }
-
+    
         try {
             if (editingOutlet.id) {
                 // Update existing outlet
                 const outletRef = doc(db, 'organizations', editingOutlet.id);
                 await updateDoc(outletRef, { name: editingOutlet.name });
             } else {
-                // Create new outlet
+                // Create new outlet using httpsCallable
                 const createOutlet = httpsCallable(functions, 'createOutlet');
                 await createOutlet({
                     outletName: editingOutlet.name,
-                    parentOrganizationId: profile.organization?.parent_organization_id || profile.organization_id
+                    // Determine the parent organization ID correctly
+                    parentOrganizationId: profile.organization.parent_organization_id || profile.organization_id
                 });
             }
             toast({ title: "Sukses", description: "Outlet berhasil disimpan." });
@@ -405,3 +406,5 @@ export default function SettingsPage() {
         </div>
     )
 }
+
+    
