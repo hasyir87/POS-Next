@@ -22,6 +22,8 @@ type NavItem = {
   requiredRoles: Array<UserProfile['role']>;
 };
 
+export const dynamic = 'force-dynamic';
+
 const allNavItems: NavItem[] = [
   { href: "/dashboard", label: "Dasbor", icon: Home, requiredRoles: ["owner", "admin", "superadmin"] },
   { href: "/dashboard/pos", label: "Point of Sale", icon: Store, requiredRoles: ["owner", "admin", "cashier", "superadmin"] },
