@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from '@
 import { Trophy } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { useCallback, useEffect, useState } from 'react';
-import { getFirestore, collection, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, Timestamp, orderBy, limit } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
 
 const db = getFirestore(firebaseApp);
@@ -21,7 +21,7 @@ interface DashboardData {
     dailyRevenue: number;
     dailySalesCount: number;
     newCustomersToday: number;
-    topProducts: Array<{ name: string | null, sales: number | null }>;
+    topProducts: Array<{ name: string; sales: number }>;
 }
 
 export default function DashboardPage() {
@@ -45,39 +45,61 @@ export default function DashboardPage() {
         today.setHours(0, 0, 0, 0);
         const startOfToday = Timestamp.fromDate(today);
 
-        // Kueri untuk transaksi, sudah benar dengan orderBy
         const transactionsQuery = query(
             collection(db, "transactions"),
             where("organization_id", "==", selectedOrganizationId),
-            where("created_at", ">=", startOfToday),
-            orderBy("created_at")
+            where("created_at", ">=", startOfToday)
         );
         
-        // MEMPERBAIKI Kueri untuk pelanggan dengan menambahkan orderBy
         const customersQuery = query(
             collection(db, "customers"),
             where("organization_id", "==", selectedOrganizationId),
-            where("created_at", ">=", startOfToday),
-            orderBy("created_at") // Penambahan ini memperbaiki error
+            where("created_at", ">=", startOfToday)
+        );
+        
+        // Query for all transactions to calculate top products.
+        // This is inefficient but will work for small datasets.
+        const allTransactionsQuery = query(
+            collection(db, "transactions"),
+            where("organization_id", "==", selectedOrganizationId),
+            orderBy("created_at", "desc"),
+            limit(500) // Limit to last 500 transactions for performance
         );
 
-        const [transactionsSnapshot, newCustomersSnapshot] = await Promise.all([
+        const [
+            transactionsSnapshot, 
+            newCustomersSnapshot, 
+            allTransactionsSnapshot
+        ] = await Promise.all([
             getDocs(transactionsQuery),
-            getDocs(customersQuery)
+            getDocs(customersQuery),
+            getDocs(allTransactionsSnapshot)
         ]);
 
         let dailyRevenue = 0;
         transactionsSnapshot.forEach((doc) => {
             dailyRevenue += doc.data().total_amount || 0;
         });
+
         const dailySalesCount = transactionsSnapshot.size;
         const newCustomersToday = newCustomersSnapshot.size;
 
-        // Note: Calculating top products on the client-side can be inefficient.
-        // This part is simplified and might be slow on large datasets.
-        // A proper implementation would use a server-side aggregation.
-        // For now, we'll keep it simple or show placeholder data.
-        const topProducts: DashboardData['topProducts'] = [];
+        const productSales: { [key: string]: number } = {};
+        allTransactionsSnapshot.forEach(doc => {
+            const items = doc.data().items as Array<{ product_id: string, name: string, quantity: number }>;
+            if (items) {
+                items.forEach(item => {
+                    if (item.name) {
+                        productSales[item.name] = (productSales[item.name] || 0) + item.quantity;
+                    }
+                });
+            }
+        });
+        
+        const topProducts = Object.entries(productSales)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 5)
+            .map(([name, sales]) => ({ name, sales }));
 
         setDashboardData({
             dailyRevenue,
@@ -88,7 +110,9 @@ export default function DashboardPage() {
 
     } catch (err: any) {
         console.error("Error fetching dashboard data from client:", err);
-        setError(err.message || "Gagal memuat data dasbor.");
+        // Firebase permission errors often don't have a clean `message`.
+        const defaultError = "Gagal memuat data dasbor. Periksa izin Firestore Anda.";
+        setError(err.message || defaultError);
     } finally {
         setIsLoading(false);
     }

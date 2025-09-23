@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { getFunctions, httpsCallable } from "firebase/functions";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -16,7 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SniposLogo } from "./snipos-logo";
 import { AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { firebaseApp } from "@/lib/firebase/config";
+import { fetchWithAuth } from "@/lib/utils";
 
 const formSchema = z.object({
   fullName: z.string().min(3, { message: "Nama lengkap minimal 3 karakter." }),
@@ -54,15 +53,12 @@ export default function SignupForm() {
     setLoading(true);
 
     try {
-        const functions = getFunctions(firebaseApp);
-        const createOwner = httpsCallable(functions, 'createOwner');
-        
-        await createOwner({
-            email: values.email,
-            password: values.password,
-            fullName: values.fullName,
-            organizationName: values.organizationName,
-        });
+      await fetchWithAuth('createOwner', {
+        email: values.email,
+        password: values.password,
+        fullName: values.fullName,
+        organizationName: values.organizationName,
+      }, false); // `false` karena ini adalah panggilan tanpa otentikasi
       
       setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke halaman login untuk masuk dengan akun baru Anda.");
       setTimeout(() => {
@@ -73,11 +69,12 @@ export default function SignupForm() {
       console.error("Client-side signup error:", err);
       let errorMessage = err.message || "Terjadi kesalahan yang tidak terduga.";
       
-      if (err.code === 'functions/already-exists') {
-         if(err.details && err.details.field === 'email'){
+      // Menangani error spesifik dari backend
+      if (err.field) {
+         if(err.field === 'email'){
             errorMessage = "Email ini sudah terdaftar. Silakan gunakan email lain.";
             setError('email', { type: 'manual', message: errorMessage });
-         } else if(err.details && err.details.field === 'organization') {
+         } else if(err.field === 'organization') {
             errorMessage = "Nama organisasi sudah digunakan. Silakan pilih nama lain.";
             setError('organizationName', { type: 'manual', message: errorMessage });
          }

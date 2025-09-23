@@ -15,29 +15,26 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from '@/components/ui/badge';
 import { getFirestore, collection, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { firebaseApp } from '@/lib/firebase/config';
+import { fetchWithAuth } from '@/lib/utils';
 
 
 export default function UsersPage() {
     const { toast } = useToast();
     const { profile: currentProfile, loading: authLoading, selectedOrganizationId } = useAuth();
     const db = getFirestore(firebaseApp);
-    const functions = getFunctions(firebaseApp);
 
     const [users, setUsers] = useState<UserProfile[]>([]);
-    const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     
     const [isDialogOpen, setDialogOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingUser, setEditingUser] = useState<Partial<UserProfile & {password?: string}>>({});
 
-    const fetchUsersAndOrgs = useCallback(async () => {
+    const fetchUsers = useCallback(async () => {
         if (!selectedOrganizationId) return;
         setIsLoading(true);
         try {
-            // Fetch users for the selected organization
             const usersRef = collection(db, 'profiles');
             const usersQuery = query(usersRef, where('organization_id', '==', selectedOrganizationId));
             const usersSnapshot = await getDocs(usersQuery);
@@ -53,12 +50,12 @@ export default function UsersPage() {
 
     useEffect(() => {
         if (!authLoading && selectedOrganizationId) {
-            fetchUsersAndOrgs();
+            fetchUsers();
         } else if (!authLoading && !selectedOrganizationId) {
             setIsLoading(false);
             setUsers([]);
         }
-    }, [authLoading, selectedOrganizationId, fetchUsersAndOrgs]);
+    }, [authLoading, selectedOrganizationId, fetchUsers]);
 
     const handleOpenDialog = (user: Partial<UserProfile> | null = null) => {
         const emptyUser: Partial<UserProfile & {password?: string}> = { 
@@ -99,8 +96,7 @@ export default function UsersPage() {
                 toast({ title: 'Sukses', description: `Pengguna berhasil diperbarui.` });
 
             } else { // Create new user
-                const createUser = httpsCallable(functions, 'createUser');
-                await createUser({
+                await fetchWithAuth('createUser', {
                     email: editingUser.email,
                     password: editingUser.password,
                     fullName: editingUser.full_name,
@@ -110,9 +106,9 @@ export default function UsersPage() {
                  toast({ title: 'Sukses', description: `Pengguna baru telah ditambahkan.` });
             }
             setDialogOpen(false);
-            fetchUsersAndOrgs();
+            fetchUsers();
         } catch (error: any) {
-            const errorMessage = error.details?.message || error.message || "Terjadi kesalahan internal.";
+            const errorMessage = error.message || "Terjadi kesalahan internal.";
             toast({ variant: 'destructive', title: 'Error', description: errorMessage });
         } finally {
             setIsSubmitting(false);
@@ -124,12 +120,11 @@ export default function UsersPage() {
         
         setIsSubmitting(true);
         try {
-            const deleteUser = httpsCallable(functions, 'deleteUser');
-            await deleteUser({ uid: userId });
+            await fetchWithAuth('deleteUser', { uid: userId });
             toast({ title: 'Sukses', description: 'Pengguna berhasil dihapus.' });
-            fetchUsersAndOrgs();
+            fetchUsers();
         } catch (error: any) {
-             const errorMessage = error.details?.message || error.message || "Terjadi kesalahan internal.";
+             const errorMessage = error.message || "Terjadi kesalahan internal.";
              toast({ variant: 'destructive', title: 'Error', description: errorMessage });
         } finally {
             setIsSubmitting(false);
@@ -247,5 +242,3 @@ export default function UsersPage() {
         </div>
     );
 }
-
-    

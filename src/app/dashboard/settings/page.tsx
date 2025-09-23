@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tag, User, Languages, Key, Store, MoreHorizontal, PlusCircle, Package, Bell, Star, Loader2, Save } from "lucide-react";
 import Link from "next/link";
@@ -16,8 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, type Organization } from "@/context/auth-context";
 import { getFirestore, doc, updateDoc, addDoc, deleteDoc, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { firebaseApp } from '@/lib/firebase/config';
+import { fetchWithAuth } from "@/lib/utils";
 
 // Local types
 interface Grade {
@@ -28,16 +27,10 @@ interface Grade {
   extra_essence_price: number;
 }
 
-type ApiKey = { id: string; label: string; key: string; created: string };
-type Promotion = { id: string; name: string; type: string; value: string; };
-type Attribute = { id: string; name: string };
-
-
 export default function SettingsPage() {
     const { toast } = useToast();
     const { profile, selectedOrganizationId, loading: authLoading, refreshProfile } = useAuth();
     const db = getFirestore(firebaseApp);
-    const functions = getFunctions(firebaseApp);
 
     const [outlets, setOutlets] = useState<Organization[]>([]);
     const [isLoadingOutlets, setIsLoadingOutlets] = useState(true);
@@ -166,12 +159,11 @@ export default function SettingsPage() {
                 await updateDoc(outletRef, { name: editingOutlet.name });
                 toast({ title: "Sukses", description: "Nama outlet berhasil diperbarui." });
             } else {
-                // CREATE logic: uses httpsCallable
-                const createOutlet = httpsCallable(functions, 'createOutlet');
+                // CREATE logic
                 const mainOrganization = await getDoc(doc(db, 'organizations', profile.organization_id));
                 const parentId = mainOrganization.data()?.parent_organization_id || profile.organization_id;
                 
-                await createOutlet({
+                await fetchWithAuth('createOutlet', {
                     outletName: editingOutlet.name,
                     parentOrganizationId: parentId,
                 });
@@ -183,7 +175,7 @@ export default function SettingsPage() {
             await refreshProfile();
         } catch (error: any) {
             console.error("Error saving outlet:", error);
-            const errorMessage = error.details?.message || error.message || "Terjadi kesalahan yang tidak diketahui.";
+            const errorMessage = error.message || "Terjadi kesalahan yang tidak diketahui.";
             toast({ variant: "destructive", title: "Gagal Menyimpan", description: errorMessage });
         } finally {
             setIsSubmitting(false);
@@ -195,14 +187,13 @@ export default function SettingsPage() {
         
         setIsSubmitting(true);
         try {
-            const deleteOutlet = httpsCallable(functions, 'deleteOutlet');
-            await deleteOutlet({ outletId: outletId });
+            await fetchWithAuth('deleteOutlet', { outletId });
             toast({ title: "Sukses", description: "Outlet berhasil dihapus." });
             await fetchOutlets();
             await refreshProfile();
         } catch (error: any) {
              console.error("Error deleting outlet:", error);
-             const errorMessage = error.details?.message || error.message || "Terjadi kesalahan yang tidak diketahui.";
+             const errorMessage = error.message || "Terjadi kesalahan yang tidak diketahui.";
             toast({ variant: "destructive", title: "Gagal Menghapus", description: errorMessage });
         } finally {
             setIsSubmitting(false);
@@ -481,5 +472,3 @@ export default function SettingsPage() {
         </div>
     )
 }
-
-    
