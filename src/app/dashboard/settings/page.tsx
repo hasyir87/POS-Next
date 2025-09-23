@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth, type Organization } from "@/context/auth-context";
 import { getFirestore, doc, updateDoc, addDoc, deleteDoc, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
-import { getFunctions, httpsCallable, type HttpsCallableResult } from 'firebase/functions';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { firebaseApp } from '@/lib/firebase/config';
 
 // Local types
@@ -171,7 +171,7 @@ export default function SettingsPage() {
             refreshProfile(); // Refresh context data
         } catch (error: any) {
             console.error("Error saving outlet:", error);
-            const errorMessage = error.details?.message || error.message || "Terjadi kesalahan yang tidak diketahui.";
+            const errorMessage = (error as any).details?.message || error.message || "Terjadi kesalahan yang tidak diketahui.";
             toast({ variant: "destructive", title: "Gagal Menyimpan", description: errorMessage });
         }
     };
@@ -185,7 +185,7 @@ export default function SettingsPage() {
             fetchOutlets();
             refreshProfile();
         } catch (error: any) {
-             const errorMessage = error.details?.message || error.message || "Terjadi kesalahan yang tidak diketahui.";
+             const errorMessage = (error as any).details?.message || error.message || "Terjadi kesalahan yang tidak diketahui.";
             toast({ variant: "destructive", title: "Gagal Menghapus", description: errorMessage });
         }
     };
@@ -451,7 +451,3 @@ export default function SettingsPage() {
         </div>
     )
 }
-
-    
-
-    
