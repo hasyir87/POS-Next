@@ -31,8 +31,13 @@ export async function fetchWithAuth(functionName: string, body: object, requireA
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // Correct URL format for Firebase App Hosting with Next.js
-  const url = `/api/${functionName}`;
+  // Construct the full Cloud Function URL
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const region = 'us-central1'; // Or your specific region
+  if (!projectId) {
+    throw new Error("Firebase Project ID is not configured in environment variables.");
+  }
+  const url = `https://${region}-${projectId}.cloudfunctions.net/${functionName}`;
 
   try {
     const response = await fetch(url, {
@@ -43,14 +48,13 @@ export async function fetchWithAuth(functionName: string, body: object, requireA
 
     // Check if the response is successful, but also if it has content
     if (!response.ok) {
-        let errorMessage = `HTTP error! status: ${response.status}`;
+        let errorData: { message?: string } = {};
         try {
-            const errorData = await response.json();
-            errorMessage = errorData.message || errorMessage;
+            errorData = await response.json();
         } catch (e) {
-            // If response is not JSON, use the status text
-            errorMessage = response.statusText;
+            // Response is not JSON or is empty
         }
+        const errorMessage = errorData.message || response.statusText || `Request failed with status ${response.status}`;
         throw new Error(errorMessage);
     }
     
@@ -62,7 +66,7 @@ export async function fetchWithAuth(functionName: string, body: object, requireA
     
     return JSON.parse(responseText);
 
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Fetch error for ${functionName}:`, error);
     // Re-throw the error to be caught by the calling function
     throw error;
