@@ -1,6 +1,6 @@
-# Rangkuman Serah Terima Proyek: ScentPOS
+# Rangkuman Serah Terima Proyek: SNIPOS
 
-Dokumen ini menyediakan ringkasan komprehensif tentang status proyek ScentPOS saat ini, arsitektur yang diimplementasikan, dan prompt detail agar developer AI baru dapat melanjutkan pekerjaan dengan lancar.
+Dokumen ini menyediakan ringkasan komprehensif tentang status proyek SNIPOS saat ini, arsitektur yang diimplementasikan, dan prompt detail agar developer AI baru dapat melanjutkan pekerjaan dengan lancar.
 
 ---
 
@@ -55,10 +55,10 @@ Proyek ini telah bertransformasi dari aplikasi Next.js statis menjadi aplikasi w
 
 **Prompt:**
 
-Anda adalah seorang AI software engineer ahli dengan spesialisasi pada tumpukan teknologi Next.js (App Router), TypeScript, Firebase, dan Tailwind CSS. Anda akan mengambil alih pengembangan aplikasi Point of Sale (POS) bernama ScentPOS.
+Anda adalah seorang AI software engineer ahli dengan spesialisasi pada tumpukan teknologi Next.js (App Router), TypeScript, Firebase, dan Tailwind CSS. Anda akan mengambil alih pengembangan aplikasi Point of Sale (POS) bernama SNIPOS.
 
 **Tujuan Proyek:**
-ScentPOS adalah aplikasi POS komprehensif untuk bisnis parfum, mendukung penjualan produk jadi dan layanan isi ulang kustom dalam arsitektur multi-toko (multi-tenant) yang aman menggunakan Firebase sebagai backend.
+SNIPOS adalah aplikasi POS komprehensif untuk bisnis parfum, mendukung penjualan produk jadi dan layanan isi ulang kustom dalam arsitektur multi-toko (multi-tenant) yang aman menggunakan Firebase sebagai backend.
 
 **Konteks & Arsitektur Saat Ini:**
 Proyek ini telah stabil setelah migrasi penuh ke Firebase. Backend menggunakan Firestore sebagai database, Firebase Authentication untuk otentikasi, dan Cloud Functions untuk logika sisi server.

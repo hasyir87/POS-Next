@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { MPerfumeAmalLogo } from "./m-perfume-amal-logo";
+import { SniposLogo } from "./snipos-logo";
 import { AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { firebaseApp } from "@/lib/firebase/config";
@@ -93,7 +93,7 @@ export default function SignupForm() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-            <MPerfumeAmalLogo className="w-12 h-12 mx-auto text-primary" />
+            <SniposLogo className="w-12 h-12 mx-auto text-primary" />
             <CardTitle className="font-headline text-2xl mt-2">Buat Akun Pemilik</CardTitle>
             <CardDescription>Daftarkan organisasi Anda untuk memulai.</CardDescription>
         </CardHeader>
@@ -133,7 +133,7 @@ export default function SignupForm() {
                   <FormItem>
                     <FormLabel>Nama Organisasi/Toko</FormLabel>
                     <FormControl>
-                      <Input placeholder="Contoh: ScentPRO" {...field} disabled={loading || !!success} />
+                      <Input placeholder="Contoh: SNIPOS Store" {...field} disabled={loading || !!success} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

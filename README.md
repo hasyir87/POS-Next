@@ -1,19 +1,19 @@
-# ScentPOS - Blueprint & Dokumentasi Aplikasi
+# SNIPOS - Blueprint & Dokumentasi Aplikasi
 
-Selamat datang di ScentPOS, sebuah Point of Sale (POS) modern yang dirancang khusus untuk bisnis parfum. Aplikasi ini dibangun dengan tumpukan teknologi modern untuk memberikan kinerja tinggi, antarmuka yang elegan, dan fitur-fitur cerdas untuk menyederhanakan operasi bisnis sehari-hari.
+Selamat datang di SNIPOS, sebuah Point of Sale (POS) modern yang dirancang khusus untuk bisnis parfum. Aplikasi ini dibangun dengan tumpukan teknologi modern untuk memberikan kinerja tinggi, antarmuka yang elegan, dan fitur-fitur cerdas untuk menyederhanakan operasi bisnis sehari-hari.
 
 ## 1. Filosofi & Tujuan Aplikasi
 
-ScentPOS dikembangkan untuk mengatasi tantangan unik dalam bisnis parfum dengan melayani dua model bisnis utama:
+SNIPOS dikembangkan untuk mengatasi tantangan unik dalam bisnis parfum dengan melayani dua model bisnis utama:
 
-1.  **Toko Parfum Isi Ulang (Refill)**: Dengan fitur unggulan seperti formulir isi ulang dinamis, ScentPOS memudahkan pembuatan parfum kustom dengan memilih grade, aroma, ukuran botol, dan menyesuaikan jumlah bibit. Harga dihitung secara otomatis, dan sistem ini mengelola inventaris bahan baku yang kompleks.
-2.  **Toko Parfum Jadi**: ScentPOS membantu mengelola produk siap jual dengan informasi detail seperti nama, gambar, stok, dan harga jual.
+1.  **Toko Parfum Isi Ulang (Refill)**: Dengan fitur unggulan seperti formulir isi ulang dinamis, SNIPOS memudahkan pembuatan parfum kustom dengan memilih grade, aroma, ukuran botol, dan menyesuaikan jumlah bibit. Harga dihitung secara otomatis, dan sistem ini mengelola inventaris bahan baku yang kompleks.
+2.  **Toko Parfum Jadi**: SNIPOS membantu mengelola produk siap jual dengan informasi detail seperti nama, gambar, stok, dan harga jual.
 
 Tujuannya adalah untuk menjadi sistem "all-in-one" yang mengelola penjualan, inventaris, pelanggan, dan keuangan dalam satu platform yang intuitif, baik untuk toko yang fokus pada salah satu model maupun yang menjalankan keduanya secara bersamaan.
 
 ## 2. Arsitektur & Tumpukan Teknologi
 
-ScentPOS dirancang dengan arsitektur modern yang memisahkan frontend dan backend, memastikannya skalabel, aman, dan mudah dikelola.
+SNIPOS dirancang dengan arsitektur modern yang memisahkan frontend dan backend, memastikannya skalabel, aman, dan mudah dikelola.
 
 ### 2.1. Tumpukan Teknologi (Tech Stack)
 -   **Framework Frontend**: Next.js (dengan App Router)

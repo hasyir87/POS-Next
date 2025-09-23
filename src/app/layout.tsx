@@ -14,7 +14,7 @@ export default function RootLayout({
   return (
     <html lang="id" suppressHydrationWarning>
       <head>
-        <title>ScentPOS</title>
+        <title>SNIPOS</title>
         <meta name="description" content="Point of Sale untuk bisnis parfum." />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

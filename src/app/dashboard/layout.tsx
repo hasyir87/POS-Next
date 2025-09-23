@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { BarChartBig, Home, LogOut, Menu, Settings, Store, ChevronsUpDown, Users, PackageSearch, SprayCan, Loader2, FileClock, Briefcase, HandCoins, Building2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from 'next/navigation';
-import { MPerfumeAmalLogo } from "@/components/m-perfume-amal-logo";
+import { SniposLogo } from "@/components/snipos-logo";
 import { useAuth, type UserProfile, type Organization } from '@/context/auth-context';
 import { getFirestore, collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
@@ -127,8 +127,8 @@ export default function DashboardLayout({
           <div className="flex h-full max-h-screen flex-col gap-2">
             <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
               <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-                <MPerfumeAmalLogo className="h-6 w-6 text-primary" />
-                <span className="font-headline text-xl">ScentPOS</span>
+                <SniposLogo className="h-6 w-6 text-primary" />
+                <span className="font-headline text-xl">SNIPOS</span>
               </Link>
             </div>
             <div className="flex-1">
@@ -159,8 +159,8 @@ export default function DashboardLayout({
               <SheetContent side="left" className="flex flex-col">
                 <SheetHeader>
                     <SheetTitle className="font-headline text-xl flex items-center gap-2">
-                      <MPerfumeAmalLogo className="h-6 w-6 text-primary" />
-                      ScentPOS
+                      <SniposLogo className="h-6 w-6 text-primary" />
+                      SNIPOS
                     </SheetTitle>
                 </SheetHeader>
                 <nav className="grid gap-2 text-lg font-medium mt-4">
