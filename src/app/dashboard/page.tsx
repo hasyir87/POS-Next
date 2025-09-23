@@ -56,24 +56,13 @@ export default function DashboardPage() {
             where("organization_id", "==", selectedOrganizationId),
             where("created_at", ">=", startOfToday)
         );
-        
-        // Query for all transactions to calculate top products.
-        // This is inefficient but will work for small datasets.
-        const allTransactionsQuery = query(
-            collection(db, "transactions"),
-            where("organization_id", "==", selectedOrganizationId),
-            orderBy("created_at", "desc"),
-            limit(500) // Limit to last 500 transactions for performance
-        );
 
         const [
             transactionsSnapshot, 
             newCustomersSnapshot, 
-            allTransactionsSnapshot
         ] = await Promise.all([
             getDocs(transactionsQuery),
             getDocs(customersQuery),
-            getDocs(allTransactionsQuery)
         ]);
 
         let dailyRevenue = 0;
@@ -85,7 +74,7 @@ export default function DashboardPage() {
         const newCustomersToday = newCustomersSnapshot.size;
 
         const productSales: { [key: string]: number } = {};
-        allTransactionsSnapshot.forEach(doc => {
+        transactionsSnapshot.forEach(doc => {
             const items = doc.data().items as Array<{ product_id: string, name: string, quantity: number }>;
             if (items) {
                 items.forEach(item => {
@@ -110,9 +99,11 @@ export default function DashboardPage() {
 
     } catch (err: any) {
         console.error("Error fetching dashboard data from client:", err);
-        // Firebase permission errors often don't have a clean `message`.
-        const defaultError = "Gagal memuat data dasbor. Periksa izin Firestore Anda.";
-        setError(err.message || defaultError);
+        let errorMessage = "Gagal memuat data dasbor. Periksa izin Firestore Anda.";
+        if (err.message.includes("requires an index")) {
+            errorMessage = "Database memerlukan konfigurasi indeks. Silakan hubungi developer.";
+        }
+        setError(errorMessage);
     } finally {
         setIsLoading(false);
     }
@@ -220,7 +211,7 @@ export default function DashboardPage() {
             <Card className="lg:col-span-3">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Trophy className="text-yellow-500" /> Produk Terlaris</CardTitle>
-                 <CardDescription>Produk dengan penjualan unit terbanyak.</CardDescription>
+                 <CardDescription>Produk dengan penjualan unit terbanyak hari ini.</CardDescription>
               </CardHeader>
               <CardContent>
                     <Table>
@@ -229,7 +220,7 @@ export default function DashboardPage() {
                             {dashboardData?.topProducts && dashboardData.topProducts.length > 0 ? (
                                 dashboardData.topProducts.map((p, index) => <TableRow key={index}><TableCell>{index + 1}</TableCell><TableCell>{p.name}</TableCell><TableCell className="text-right">{p.sales} unit</TableCell></TableRow>)
                             ) : (
-                                <TableRow><TableCell colSpan={3} className="text-center">Belum ada data penjualan.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={3} className="text-center">Belum ada data penjualan hari ini.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>
