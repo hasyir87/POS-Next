@@ -109,7 +109,7 @@ export default function UsersPage() {
             setDialogOpen(false);
             fetchUsersAndOrgs();
         } catch (error: any) {
-            const errorMessage = (error as any).details?.message || (error as Error).message;
+            const errorMessage = (error as any).details?.message || (error as Error).message || "Terjadi kesalahan internal.";
             toast({ variant: 'destructive', title: 'Error', description: errorMessage });
         } finally {
             setIsSubmitting(false);
@@ -126,7 +126,7 @@ export default function UsersPage() {
             toast({ title: 'Sukses', description: 'Pengguna berhasil dihapus.' });
             fetchUsersAndOrgs();
         } catch (error: any) {
-             const errorMessage = (error as any).details?.message || (error as Error).message;
+             const errorMessage = (error as any).details?.message || (error as Error).message || "Terjadi kesalahan internal.";
              toast({ variant: 'destructive', title: 'Error', description: errorMessage });
         } finally {
             setIsSubmitting(false);
