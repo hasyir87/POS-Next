@@ -73,7 +73,7 @@ export default function DashboardPage() {
         ] = await Promise.all([
             getDocs(transactionsQuery),
             getDocs(customersQuery),
-            getDocs(allTransactionsSnapshot)
+            getDocs(allTransactionsQuery)
         ]);
 
         let dailyRevenue = 0;
