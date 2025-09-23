@@ -44,13 +44,6 @@ export default function UsersPage() {
             const usersData = usersSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile));
             setUsers(usersData);
 
-            if(selectedOrganizationId) {
-              const orgDoc = await getDoc(doc(db, 'organizations', selectedOrganizationId));
-              if(orgDoc.exists()){
-                setOrganizations([{id: orgDoc.id, ...orgDoc.data()} as Organization]);
-              }
-            }
-
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Error', description: `Gagal memuat data: ${error.message}` });
         } finally {
@@ -68,7 +61,13 @@ export default function UsersPage() {
     }, [authLoading, selectedOrganizationId, fetchUsersAndOrgs]);
 
     const handleOpenDialog = (user: Partial<UserProfile> | null = null) => {
-        const emptyUser: Partial<UserProfile> = { full_name: '', email: '', role: 'cashier', organization_id: selectedOrganizationId || '' };
+        const emptyUser: Partial<UserProfile & {password?: string}> = { 
+            full_name: '', 
+            email: '', 
+            role: 'cashier', 
+            organization_id: selectedOrganizationId || '',
+            password: ''
+        };
         setEditingUser(user ? { ...user } : emptyUser);
         setDialogOpen(true);
     };
@@ -113,7 +112,7 @@ export default function UsersPage() {
             setDialogOpen(false);
             fetchUsersAndOrgs();
         } catch (error: any) {
-            const errorMessage = (error as any).details?.message || (error as Error).message || "Terjadi kesalahan internal.";
+            const errorMessage = error.details?.message || error.message || "Terjadi kesalahan internal.";
             toast({ variant: 'destructive', title: 'Error', description: errorMessage });
         } finally {
             setIsSubmitting(false);
@@ -130,7 +129,7 @@ export default function UsersPage() {
             toast({ title: 'Sukses', description: 'Pengguna berhasil dihapus.' });
             fetchUsersAndOrgs();
         } catch (error: any) {
-             const errorMessage = (error as any).details?.message || (error as Error).message || "Terjadi kesalahan internal.";
+             const errorMessage = error.details?.message || error.message || "Terjadi kesalahan internal.";
              toast({ variant: 'destructive', title: 'Error', description: errorMessage });
         } finally {
             setIsSubmitting(false);
@@ -226,12 +225,12 @@ export default function UsersPage() {
                                         <TableCell>
                                            <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" className="h-8 w-8 p-0" disabled={user.id === currentProfile?.id}>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0" disabled={isSubmitting || user.id === currentProfile?.id}>
                                                         <MoreHorizontal className="h-4 w-4" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem onClick={() => handleOpenDialog(user)}>Ubah</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleOpenDialog(user)} disabled={user.role === 'owner'}>Ubah</DropdownMenuItem>
                                                     {user.role !== 'owner' && (
                                                         <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteUser(user.id)}>Hapus</DropdownMenuItem>
                                                     )}
@@ -248,3 +247,5 @@ export default function UsersPage() {
         </div>
     );
 }
+
+    
