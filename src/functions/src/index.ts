@@ -11,9 +11,9 @@ const db = admin.firestore();
 const corsMiddleware = cors({ origin: true });
 
 // Helper untuk memverifikasi token otentikasi dari header
-const getAuthenticatedUid = async (request: any): Promise<string> => {
+const getAuthenticatedUid = async (request: any): Promise<string | null> => {
   if (!request.headers.authorization || !request.headers.authorization.startsWith('Bearer ')) {
-    throw new Error('Unauthorized');
+    return null;
   }
   const idToken = request.headers.authorization.split('Bearer ')[1];
   try {
@@ -21,13 +21,17 @@ const getAuthenticatedUid = async (request: any): Promise<string> => {
     return decodedToken.uid;
   } catch (error) {
     logger.error("Error verifying token:", error);
-    throw new Error('Unauthorized');
+    return null;
   }
 };
 
 
 export const createOwner = onRequest({ enforceAppCheck: false }, (req, res) => {
     corsMiddleware(req, res, async () => {
+        if (req.method === 'OPTIONS') {
+            res.status(204).send('');
+            return;
+        }
         if (req.method !== 'POST') {
             res.status(405).send('Method Not Allowed');
             return;
@@ -119,6 +123,10 @@ export const createOwner = onRequest({ enforceAppCheck: false }, (req, res) => {
 
 export const createUser = onRequest({ enforceAppCheck: false }, (req, res) => {
     corsMiddleware(req, res, async () => {
+        if (req.method === 'OPTIONS') {
+            res.status(204).send('');
+            return;
+        }
         if (req.method !== 'POST') {
             res.status(405).send('Method Not Allowed');
             return;
@@ -127,14 +135,14 @@ export const createUser = onRequest({ enforceAppCheck: false }, (req, res) => {
         let newUserRecord;
         try {
             const callingUid = await getAuthenticatedUid(req);
-            const { email, password, fullName, role, organizationId } = req.body;
-            
-            if (!organizationId) {
-                res.status(400).json({ status: 'error', message: 'Organization ID is required to create a user.' });
+            if (!callingUid) {
+                res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
                 return;
             }
-            if (!email || !password || !fullName || !role) {
-                res.status(400).json({ status: 'error', message: 'Missing required fields.' });
+
+            const { email, password, fullName, role, organizationId } = req.body;
+            if (!organizationId) {
+                res.status(400).json({ status: 'error', message: 'Organization ID is required to create a user.' });
                 return;
             }
             
@@ -185,11 +193,7 @@ export const createUser = onRequest({ enforceAppCheck: false }, (req, res) => {
             if (newUserRecord?.uid) {
                 await admin.auth().deleteUser(newUserRecord.uid).catch(e => logger.error("Cleanup failed for UID:", newUserRecord.uid, e));
             }
-            if (error.message === 'Unauthorized') {
-                 res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
-            } else {
-                 res.status(500).json({ status: 'error', message: error.message || "An unknown error occurred." });
-            }
+            res.status(500).json({ status: 'error', message: error.message || "An unknown error occurred." });
         }
     });
 });
@@ -197,6 +201,10 @@ export const createUser = onRequest({ enforceAppCheck: false }, (req, res) => {
 
 export const deleteUser = onRequest({ enforceAppCheck: false }, (req, res) => {
     corsMiddleware(req, res, async () => {
+        if (req.method === 'OPTIONS') {
+            res.status(204).send('');
+            return;
+        }
         if (req.method !== 'POST') {
             res.status(405).send('Method Not Allowed');
             return;
@@ -204,8 +212,12 @@ export const deleteUser = onRequest({ enforceAppCheck: false }, (req, res) => {
         
         try {
             const callingUid = await getAuthenticatedUid(req);
-            const { uid } = req.body;
+            if (!callingUid) {
+                res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
+                return;
+            }
 
+            const { uid } = req.body;
             if (uid === callingUid) {
                 res.status(400).json({ status: 'error', message: 'You cannot delete your own account.' });
                 return;
@@ -241,11 +253,7 @@ export const deleteUser = onRequest({ enforceAppCheck: false }, (req, res) => {
             res.status(200).json({ status: "success", message: `User ${uid} deleted successfully.` });
         } catch (error: any) {
             logger.error("Error deleting user:", error);
-            if (error.message === 'Unauthorized') {
-                 res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
-            } else {
-                res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred while deleting the user.' });
-            }
+            res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred while deleting the user.' });
         }
     });
 });
@@ -253,6 +261,10 @@ export const deleteUser = onRequest({ enforceAppCheck: false }, (req, res) => {
 
 export const createOutlet = onRequest({ enforceAppCheck: false }, (req, res) => {
     corsMiddleware(req, res, async () => {
+        if (req.method === 'OPTIONS') {
+            res.status(204).send('');
+            return;
+        }
         if (req.method !== 'POST') {
             res.status(405).send('Method Not Allowed');
             return;
@@ -260,8 +272,12 @@ export const createOutlet = onRequest({ enforceAppCheck: false }, (req, res) => 
         
         try {
             const callingUid = await getAuthenticatedUid(req);
+            if (!callingUid) {
+                res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
+                return;
+            }
+        
             const { outletName, parentOrganizationId } = req.body;
-
             if (!outletName || !parentOrganizationId) {
                 res.status(400).json({ status: 'error', message: 'Outlet name and parent organization ID are required.' });
                 return;
@@ -294,17 +310,17 @@ export const createOutlet = onRequest({ enforceAppCheck: false }, (req, res) => 
             res.status(200).json({ status: "success", message: "Outlet created successfully.", id: orgDocRef.id });
         } catch (error: any) {
             logger.error("Error creating outlet:", error);
-            if (error.message === 'Unauthorized') {
-                 res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
-            } else {
-                 res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred.' });
-            }
+            res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred.' });
         }
     });
 });
 
 export const updateOutlet = onRequest({ enforceAppCheck: false }, (req, res) => {
     corsMiddleware(req, res, async () => {
+        if (req.method === 'OPTIONS') {
+            res.status(204).send('');
+            return;
+        }
         if (req.method !== 'POST') {
             res.status(405).send('Method Not Allowed');
             return;
@@ -312,8 +328,12 @@ export const updateOutlet = onRequest({ enforceAppCheck: false }, (req, res) => 
         
         try {
             const callingUid = await getAuthenticatedUid(req);
+            if (!callingUid) {
+                res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
+                return;
+            }
+        
             const { outletId, outletName } = req.body;
-
             if (!outletId || !outletName) {
                 res.status(400).json({ status: 'error', message: 'Outlet ID and outlet name are required.' });
                 return;
@@ -336,11 +356,7 @@ export const updateOutlet = onRequest({ enforceAppCheck: false }, (req, res) => 
             res.status(200).json({ status: "success", message: "Outlet updated successfully." });
         } catch (error: any) {
             logger.error("Error updating outlet:", error);
-            if (error.message === 'Unauthorized') {
-                 res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
-            } else {
-                 res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred.' });
-            }
+            res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred.' });
         }
     });
 });
@@ -348,6 +364,10 @@ export const updateOutlet = onRequest({ enforceAppCheck: false }, (req, res) => 
 
 export const deleteOutlet = onRequest({ enforceAppCheck: false }, (req, res) => {
     corsMiddleware(req, res, async () => {
+        if (req.method === 'OPTIONS') {
+            res.status(204).send('');
+            return;
+        }
         if (req.method !== 'POST') {
             res.status(405).send('Method Not Allowed');
             return;
@@ -355,13 +375,17 @@ export const deleteOutlet = onRequest({ enforceAppCheck: false }, (req, res) => 
 
         try {
             const callingUid = await getAuthenticatedUid(req);
+            if (!callingUid) {
+                res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
+                return;
+            }
+
             const { outletId } = req.body;
-            
             if (!outletId) {
                 res.status(400).json({ status: 'error', message: 'Outlet ID is required.' });
                 return;
             }
-
+        
             const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
             const callingUserData = callingUserDoc.data();
             if (!callingUserData || !['owner', 'superadmin', 'admin'].includes(callingUserData.role)) {
@@ -387,13 +411,7 @@ export const deleteOutlet = onRequest({ enforceAppCheck: false }, (req, res) => 
             res.status(200).json({ status: "success", message: "Outlet deleted successfully." });
         } catch (error: any) {
             logger.error("Error deleting outlet:", error);
-            if (error.message === 'Unauthorized') {
-                 res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
-            } else {
-                 res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred.' });
-            }
+            res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred.' });
         }
     });
 });
-
-    
