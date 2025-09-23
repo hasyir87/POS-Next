@@ -3,13 +3,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tag, User, Languages, Key, Store, MoreHorizontal, PlusCircle, Package, Bell, Star, Loader2 } from "lucide-react";
+import { Tag, User, Languages, Key, Store, MoreHorizontal, PlusCircle, Package, Bell, Star, Loader2, Save } from "lucide-react";
 import Link from "next/link";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -36,7 +36,7 @@ type Attribute = { id: string; name: string };
 
 export default function SettingsPage() {
     const { toast } = useToast();
-    const { profile, selectedOrganizationId, loading: authLoading } = useAuth();
+    const { profile, selectedOrganizationId, loading: authLoading, refreshProfile } = useAuth();
     const db = getFirestore(firebaseApp);
     const functions = getFunctions(firebaseApp);
 
@@ -51,8 +51,8 @@ export default function SettingsPage() {
     const [isGradeDialogOpen, setGradeDialogOpen] = useState(false);
     const [editingGrade, setEditingGrade] = useState<Partial<Grade> | null>(null);
     
-    // In a real app, this would be saved to a database and probably managed via context/global state
     const [lowStockThreshold, setLowStockThreshold] = useState(200);
+    const [isSavingSettings, setIsSavingSettings] = useState(false);
 
     const fetchGrades = useCallback(async () => {
         if (!selectedOrganizationId) {
@@ -99,15 +99,33 @@ export default function SettingsPage() {
             const orgMap = new Map<string, Organization>();
             if (parentSnap.exists()) orgMap.set(parentSnap.id, { id: parentSnap.id, ...parentSnap.data() } as Organization);
             childrenSnap.forEach(doc => orgMap.set(doc.id, { id: doc.id, ...doc.data() } as Organization));
+
+             // Make sure the main organization is included if it's not a child
+            if (profile.organization_id && !orgMap.has(profile.organization_id)) {
+                const mainOrgDoc = await getDoc(doc(db, 'organizations', profile.organization_id));
+                if (mainOrgDoc.exists()) {
+                    orgMap.set(mainOrgDoc.id, { id: mainOrgDoc.id, ...mainOrgDoc.data() } as Organization);
+                }
+            }
             
-            setOutlets(Array.from(orgMap.values()));
+            const allOrgs = Array.from(orgMap.values());
+            
+            setOutlets(allOrgs);
+
+            const selectedOrgData = allOrgs.find(o => o.id === selectedOrganizationId);
+            if (selectedOrgData && typeof selectedOrgData.low_stock_threshold === 'number') {
+                setLowStockThreshold(selectedOrgData.low_stock_threshold);
+            } else {
+                setLowStockThreshold(200); // Default value
+            }
+
         } catch (error: any) {
             console.error("Error fetching outlets:", error);
             toast({ variant: "destructive", title: "Error", description: `Gagal mengambil data outlet: ${error.message}`});
         } finally {
             setIsLoadingOutlets(false);
         }
-    }, [profile, db, toast]);
+    }, [profile, db, toast, selectedOrganizationId]);
 
 
     useEffect(() => {
@@ -128,7 +146,7 @@ export default function SettingsPage() {
     };
 
     const handleSaveOutlet = async () => {
-        if (!editingOutlet || !editingOutlet.name || !profile?.organization) {
+        if (!editingOutlet || !editingOutlet.name || !profile?.organization_id) {
             toast({ variant: "destructive", title: "Error", description: "Nama outlet atau organisasi induk tidak valid." });
             return;
         }
@@ -143,14 +161,14 @@ export default function SettingsPage() {
                 const createOutlet = httpsCallable(functions, 'createOutlet');
                 await createOutlet({
                     outletName: editingOutlet.name,
-                    // Determine the parent organization ID correctly
-                    parentOrganizationId: profile.organization.parent_organization_id || profile.organization_id
+                    parentOrganizationId: profile.organization?.parent_organization_id || profile.organization_id
                 });
             }
             toast({ title: "Sukses", description: "Outlet berhasil disimpan." });
             setOutletDialogOpen(false);
             setEditingOutlet(null);
             fetchOutlets();
+            refreshProfile(); // Refresh context data
         } catch (error: any) {
             console.error("Error saving outlet:", error);
             const errorMessage = error.details?.message || error.message || "Terjadi kesalahan yang tidak diketahui.";
@@ -165,6 +183,7 @@ export default function SettingsPage() {
             await deleteOutlet({ outletId: id });
             toast({ title: "Sukses", description: "Outlet berhasil dihapus." });
             fetchOutlets();
+            refreshProfile();
         } catch (error: any) {
              const errorMessage = error.details?.message || error.message || "Terjadi kesalahan yang tidak diketahui.";
             toast({ variant: "destructive", title: "Gagal Menghapus", description: errorMessage });
@@ -214,6 +233,26 @@ export default function SettingsPage() {
         fetchGrades();
     };
 
+    const handleSaveSettings = async () => {
+        if (!selectedOrganizationId) {
+            toast({ variant: "destructive", title: "Error", description: "Pilih outlet terlebih dahulu."});
+            return;
+        }
+        setIsSavingSettings(true);
+        try {
+            const orgRef = doc(db, 'organizations', selectedOrganizationId);
+            await updateDoc(orgRef, {
+                low_stock_threshold: lowStockThreshold
+            });
+            toast({ title: "Sukses", description: "Pengaturan berhasil disimpan."});
+        } catch (error: any) {
+            console.error("Error saving settings:", error);
+            toast({ variant: "destructive", title: "Error", description: "Gagal menyimpan pengaturan."});
+        } finally {
+            setIsSavingSettings(false);
+        }
+    };
+
 
     if (authLoading) {
       return <div className="p-6 flex justify-center items-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
@@ -254,6 +293,12 @@ export default function SettingsPage() {
                             </p>
                         </div>
                     </CardContent>
+                    <CardFooter>
+                        <Button onClick={handleSaveSettings} disabled={!selectedOrganizationId || isSavingSettings}>
+                            {isSavingSettings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                            Simpan Pengaturan
+                        </Button>
+                    </CardFooter>
                 </Card>
 
                  <Card>
@@ -337,7 +382,7 @@ export default function SettingsPage() {
                     <CardContent>
                          <div className="flex justify-end">
                              <Dialog open={isOutletDialogOpen} onOpenChange={setOutletDialogOpen}>
-                                <DialogTrigger asChild><Button onClick={() => handleOpenOutletDialog()} disabled={!selectedOrganizationId}><PlusCircle className="mr-2" /> Tambah Outlet Baru</Button></DialogTrigger>
+                                <DialogTrigger asChild><Button onClick={() => handleOpenOutletDialog()} disabled={!selectedOrganizationId || (profile?.role !== 'owner' && profile?.role !== 'superadmin')}><PlusCircle className="mr-2" /> Tambah Outlet Baru</Button></DialogTrigger>
                                 <DialogContent>
                                     <DialogHeader>
                                       <DialogTitle className="font-headline">{editingOutlet?.id ? 'Ubah Outlet' : 'Tambah Outlet Baru'}</DialogTitle>
@@ -368,7 +413,7 @@ export default function SettingsPage() {
                                     <TableRow><TableCell colSpan={3} className="text-center p-4">Pilih outlet untuk melihat daftar.</TableCell></TableRow>
                                  ) : outlets.map(outlet => (
                                      <TableRow key={outlet.id}>
-                                         <TableCell className="font-medium">{outlet.name}</TableCell>
+                                         <TableCell className="font-medium">{outlet.name} {outlet.id === profile?.organization?.parent_organization_id || (outlet.id === profile?.organization_id && !profile?.organization?.parent_organization_id) ? '(Induk)' : ''}</TableCell>
                                          <TableCell className="font-mono text-xs">{outlet.id}</TableCell>
                                          <TableCell className="text-right">
                                             <DropdownMenu>
@@ -406,5 +451,7 @@ export default function SettingsPage() {
         </div>
     )
 }
+
+    
 
     
