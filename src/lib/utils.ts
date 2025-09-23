@@ -31,24 +31,40 @@ export async function fetchWithAuth(functionName: string, body: object, requireA
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // Construct the URL based on the Firebase project ID and region.
-  // This needs to be configured correctly for your project.
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const region = "us-central1"; // Ganti dengan region fungsi Anda jika berbeda
-  const url = `https://${region}-${projectId}.cloudfunctions.net/${functionName}`;
+  // Correct URL format for Firebase App Hosting with Next.js
+  const url = `/api/${functionName}`;
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  });
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
 
-  const responseData = await response.json();
+    // Check if the response is successful, but also if it has content
+    if (!response.ok) {
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorMessage;
+        } catch (e) {
+            // If response is not JSON, use the status text
+            errorMessage = response.statusText;
+        }
+        throw new Error(errorMessage);
+    }
+    
+    // Handle cases where the response might be empty (e.g., for a 204 No Content)
+    const responseText = await response.text();
+    if (!responseText) {
+        return { status: "success", message: "Operation successful with no content." };
+    }
+    
+    return JSON.parse(responseText);
 
-  if (!response.ok) {
-    // Melemparkan error dengan pesan dari backend jika ada
-    throw new Error(responseData.message || `HTTP error! status: ${response.status}`);
+  } catch (error) {
+    console.error(`Fetch error for ${functionName}:`, error);
+    // Re-throw the error to be caught by the calling function
+    throw error;
   }
-
-  return responseData;
 }

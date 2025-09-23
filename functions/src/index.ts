@@ -1,393 +1,393 @@
 
-/**
- * Import function triggers from their respective submodules:
- *
- * import {onCall} from "firebase-functions/v2/https";
- * import {onDocumentWritten} from "firebase-functions/v2/firestore";
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
-
-import { onCall } from "firebase-functions/v2/https";
+import { onRequest } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
+import * as cors from "cors";
 
 admin.initializeApp();
 const db = admin.firestore();
 
-/**
- * Creates a new owner user, an organization, and initial data in a single transaction.
- * This function is callable without authentication.
- */
-export const createOwner = onCall({ enforceAppCheck: false }, async (request) => {
-  const { email, password, fullName, organizationName } = request.data;
+// Inisialisasi CORS middleware
+const corsMiddleware = cors({ origin: true });
 
-  // Validate required fields
-  if (!email || !password || !fullName || !organizationName) {
-    throw new onCall.HttpsError("invalid-argument", "Missing required fields.");
+// Helper untuk memverifikasi token otentikasi dari header
+const getAuthenticatedUid = async (request: any): Promise<string | null> => {
+  if (!request.headers.authorization || !request.headers.authorization.startsWith('Bearer ')) {
+    return null;
   }
-  if (password.length < 6) {
-    throw new onCall.HttpsError("invalid-argument", "Password must be at least 6 characters long.");
-  }
-
-  const orgsRef = db.collection("organizations");
-  const usersRef = db.collection("profiles");
-  const organizationNameLower = organizationName.toLowerCase();
-
-  let newUserRecord;
+  const idToken = request.headers.authorization.split('Bearer ')[1];
   try {
-    // Check for duplicate organization name (case-insensitive)
-    const orgQuery = orgsRef.where("name_lowercase", "==", organizationNameLower);
-    const orgSnapshot = await orgQuery.get();
-    if (!orgSnapshot.empty) {
-      throw new onCall.HttpsError("already-exists", "Organization name is already in use.", { field: 'organization' });
-    }
-
-    // Check for duplicate email
-    try {
-      await admin.auth().getUserByEmail(email);
-      // If the above line doesn't throw, the user exists.
-      throw new onCall.HttpsError("already-exists", "Email is already in use.", { field: 'email' });
-    } catch (error: any) {
-      // "user-not-found" is the expected error if the email is available.
-      if (error.code !== 'auth/user-not-found') {
-        throw error; // Re-throw other auth errors
-      }
-    }
-
-    // Create user in Firebase Auth
-    newUserRecord = await admin.auth().createUser({
-      email: email,
-      password: password,
-      displayName: fullName,
-    });
-
-    const batch = db.batch();
-
-    // Create organization document
-    const orgDocRef = orgsRef.doc();
-    batch.set(orgDocRef, {
-      name: organizationName,
-      name_lowercase: organizationNameLower,
-      owner_id: newUserRecord.uid,
-      created_at: admin.firestore.FieldValue.serverTimestamp(),
-      updated_at: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    // Create user profile document
-    const profileDocRef = usersRef.doc(newUserRecord.uid);
-    batch.set(profileDocRef, {
-      id: newUserRecord.uid,
-      email: email,
-      full_name: fullName,
-      organization_id: orgDocRef.id,
-      role: 'owner',
-      created_at: admin.firestore.FieldValue.serverTimestamp(),
-      updated_at: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    // Create initial grades
-    const initialGrades = [
-      { name: "Standard", price_multiplier: 1.0, extra_essence_price: 1000 },
-      { name: "Premium", price_multiplier: 1.5, extra_essence_price: 1500 },
-    ];
-    
-    initialGrades.forEach(grade => {
-      const gradeRef = db.collection("grades").doc();
-      batch.set(gradeRef, { ...grade, organization_id: orgDocRef.id });
-    });
-
-    await batch.commit();
-
-    return {
-      status: "success",
-      message: `Owner ${fullName} and organization ${organizationName} created successfully.`,
-      uid: newUserRecord.uid,
-      organizationId: orgDocRef.id,
-    };
-
-  } catch (error: any) {
-    logger.error("Error creating owner:", error);
-    // Clean up failed user creation in Auth if it exists
-    if (newUserRecord?.uid) {
-      await admin.auth().deleteUser(newUserRecord.uid).catch(e => logger.error("Cleanup failed for UID:", newUserRecord!.uid, e));
-    }
-    // Re-throw HttpsError to be caught by the client
-    if (error instanceof onCall.HttpsError) {
-      throw error;
-    }
-    // Throw a generic internal error for other cases
-    throw new onCall.HttpsError("internal", error.message || "An unknown error occurred.");
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    return decodedToken.uid;
+  } catch (error) {
+    logger.error("Error verifying token:", error);
+    return null;
   }
-});
+};
 
 
-/**
- * Creates a new user in Firebase Auth and a corresponding profile
- * in Firestore.
- * - This function is callable by 'owner' or 'admin' roles.
- */
-export const createUser = onCall(
-  { enforceAppCheck: false },
-  async (request) => {
-    const { email, password, fullName, role, organizationId } = request.data;
-    const callingUid = request.auth?.uid;
-
-    if (!callingUid) {
-      throw new onCall.HttpsError(
-        "unauthenticated",
-        "The function must be called while authenticated."
-      );
-    }
-    
-    if (!organizationId) {
-       throw new onCall.HttpsError("invalid-argument", "Organization ID is required to create a user.");
-    }
-
-    let newUserRecord;
-    try {
-      const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
-      const callingUserData = callingUserDoc.data();
-
-      if (
-        !callingUserData ||
-        (callingUserData.role !== "owner" &&
-          callingUserData.role !== "admin" &&
-          callingUserData.role !== "superadmin")
-      ) {
-        throw new onCall.HttpsError(
-          "permission-denied",
-          "You do not have permission to create users."
-        );
-      }
-      
-      if (callingUserData.organization_id !== organizationId && callingUserData.role !== "superadmin") {
-        const callerParentOrgId = (await db.doc(`organizations/${callingUserData.organization_id}`).get()).data()?.parent_organization_id || callingUserData.organization_id;
-        const targetParentOrgId = (await db.doc(`organizations/${organizationId}`).get()).data()?.parent_organization_id || organizationId;
-        if(callerParentOrgId !== targetParentOrgId) {
-            throw new onCall.HttpsError(
-              "permission-denied",
-              "You can only create users for your own organization structure."
-            );
+export const createOwner = onRequest({ enforceAppCheck: false }, (req, res) => {
+    corsMiddleware(req, res, async () => {
+        if (req.method !== 'POST') {
+            res.status(405).send('Method Not Allowed');
+            return;
         }
-      }
-      
-      // Check for duplicate email before creating user
-      try {
-        await admin.auth().getUserByEmail(email);
-        // If the above line doesn't throw, the user exists.
-        throw new onCall.HttpsError("already-exists", "Email is already in use.");
-      } catch (error: any) {
-        // "user-not-found" is the expected error if the email is available.
-        if (error.code !== 'auth/user-not-found') {
-          throw error; // Re-throw other auth errors, including the one we just threw
+
+        const { email, password, fullName, organizationName } = req.body;
+
+        if (!email || !password || !fullName || !organizationName) {
+            res.status(400).json({ status: "error", message: "Missing required fields." });
+            return;
         }
-      }
+        if (password.length < 6) {
+            res.status(400).json({ status: "error", message: "Password must be at least 6 characters long." });
+            return;
+        }
 
-      newUserRecord = await admin.auth().createUser({
-        email: email,
-        password: password,
-        displayName: fullName,
-      });
+        const orgsRef = db.collection("organizations");
+        const usersRef = db.collection("profiles");
+        const organizationNameLower = organizationName.toLowerCase();
 
-      await db.doc(`profiles/${newUserRecord.uid}`).set({
-        id: newUserRecord.uid,
-        email: email,
-        full_name: fullName,
-        role: role,
-        organization_id: organizationId,
-        created_at: admin.firestore.FieldValue.serverTimestamp(),
-        updated_at: admin.firestore.FieldValue.serverTimestamp(),
-      });
+        let newUserRecord;
+        try {
+            const orgQuery = orgsRef.where("name_lowercase", "==", organizationNameLower);
+            const orgSnapshot = await orgQuery.get();
+            if (!orgSnapshot.empty) {
+                res.status(409).json({ status: "error", message: "Organization name is already in use.", field: 'organization' });
+                return;
+            }
 
-      return {
-        status: "success",
-        message: `User ${fullName} created successfully.`,
-        uid: newUserRecord.uid,
-      };
-    } catch (error: any)
-    {
-      logger.error("Error creating user:", error);
-      // Clean up failed user creation in Auth
-      if (newUserRecord?.uid) {
-        await admin.auth().deleteUser(newUserRecord.uid).catch(e => logger.error("Cleanup failed for UID:", newUserRecord.uid, e));
-      }
+            try {
+                await admin.auth().getUserByEmail(email);
+                res.status(409).json({ status: "error", message: "Email is already in use.", field: 'email' });
+                return;
+            } catch (error: any) {
+                if (error.code !== 'auth/user-not-found') throw error;
+            }
 
-      if (error instanceof onCall.HttpsError) {
-        throw error;
-      }
-      throw new onCall.HttpsError("internal", error.message || "An unknown error occurred.");
-    }
-  }
-);
+            newUserRecord = await admin.auth().createUser({ email, password, displayName: fullName });
 
+            const batch = db.batch();
+            const orgDocRef = orgsRef.doc();
+            batch.set(orgDocRef, {
+                name: organizationName,
+                name_lowercase: organizationNameLower,
+                owner_id: newUserRecord.uid,
+                created_at: admin.firestore.FieldValue.serverTimestamp(),
+                updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            });
 
-/**
- * Deletes a user from Firebase Auth and their profile from Firestore.
- * - This function is callable by 'owner' or 'admin' roles.
- */
-export const deleteUser = onCall(
-  { enforceAppCheck: false },
-  async (request) => {
-    const { uid } = request.data;
-    const callingUid = request.auth?.uid;
+            const profileDocRef = usersRef.doc(newUserRecord.uid);
+            batch.set(profileDocRef, {
+                id: newUserRecord.uid,
+                email,
+                full_name: fullName,
+                organization_id: orgDocRef.id,
+                role: 'owner',
+                created_at: admin.firestore.FieldValue.serverTimestamp(),
+                updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            });
 
-    if (!callingUid) {
-      throw new onCall.HttpsError("unauthenticated", "The function must be called while authenticated.");
-    }
-    
-    if (uid === callingUid) {
-       throw new onCall.HttpsError("invalid-argument", "You cannot delete your own account.");
-    }
+            const initialGrades = [
+                { name: "Standard", price_multiplier: 1.0, extra_essence_price: 1000 },
+                { name: "Premium", price_multiplier: 1.5, extra_essence_price: 1500 },
+            ];
+            initialGrades.forEach(grade => {
+                const gradeRef = db.collection("grades").doc();
+                batch.set(gradeRef, { ...grade, organization_id: orgDocRef.id });
+            });
 
-    try {
-      const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
-      const callingUserData = callingUserDoc.data();
+            await batch.commit();
 
-      if (
-        !callingUserData ||
-        (callingUserData.role !== "owner" &&
-          callingUserData.role !== "admin" &&
-          callingUserData.role !== "superadmin")
-      ) {
-        throw new onCall.HttpsError("permission-denied", "You do not have permission to delete users.");
-      }
+            res.status(200).json({
+                status: "success",
+                message: `Owner ${fullName} and organization ${organizationName} created successfully.`,
+                uid: newUserRecord.uid,
+                organizationId: orgDocRef.id,
+            });
 
-      const userToDeleteDoc = await db.doc(`profiles/${uid}`).get();
-      if (!userToDeleteDoc.exists) {
-          throw new onCall.HttpsError("not-found", "User to delete not found in Firestore.");
-      }
-      const userToDeleteData = userToDeleteDoc.data();
-
-      // Owners can't delete other owners. Only superadmin can.
-      if (userToDeleteData?.role === 'owner' && callingUserData.role !== 'superadmin') {
-          throw new onCall.HttpsError("permission-denied", "Owners cannot delete other owners.");
-      }
-      
-      // Admins cannot delete owners or other admins.
-      if (callingUserData.role === 'admin' && (userToDeleteData?.role === 'owner' || userToDeleteData?.role === 'admin')) {
-        throw new onCall.HttpsError("permission-denied", "Admins cannot delete owners or other admins.");
-      }
-      
-      // Ensure user is being deleted from the same organization
-      if (userToDeleteData?.organization_id !== callingUserData.organization_id && callingUserData.role !== 'superadmin') {
-         const callerParentOrgId = (await db.doc(`organizations/${callingUserData.organization_id}`).get()).data()?.parent_organization_id || callingUserData.organization_id;
-         const targetOrgDoc = await db.doc(`organizations/${userToDeleteData?.organization_id}`).get();
-         if (!targetOrgDoc.exists()) {
-             throw new onCall.HttpsError("not-found", "Organization of user to delete not found.");
-         }
-         const targetParentOrgId = targetOrgDoc.data()?.parent_organization_id || userToDeleteData?.organization_id;
-         
-         if(callerParentOrgId !== targetParentOrgId) {
-             throw new onCall.HttpsError("permission-denied", "You can only delete users from your own organization structure.");
-         }
-      }
-      
-      await admin.auth().deleteUser(uid);
-      await db.doc(`profiles/${uid}`).delete();
-
-      return {
-        status: "success",
-        message: `User ${uid} deleted successfully.`,
-      };
-
-    } catch (error: any) {
-      logger.error("Error deleting user:", error);
-      if (error instanceof onCall.HttpsError) {
-        throw error;
-      }
-      throw new onCall.HttpsError("internal", error.message || "An unknown error occurred while deleting the user.");
-    }
-  }
-);
-
-
-export const createOutlet = onCall({ enforceAppCheck: false }, async (request) => {
-    const { outletName, parentOrganizationId } = request.data;
-    const callingUid = request.auth?.uid;
-
-    if (!callingUid) {
-      throw new onCall.HttpsError("unauthenticated", "The function must be called while authenticated.");
-    }
-    if (!outletName || !parentOrganizationId) {
-        throw new onCall.HttpsError("invalid-argument", "Outlet name and parent organization ID are required.");
-    }
-    
-    const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
-    const callingUserData = callingUserDoc.data();
-    if (!callingUserData || (callingUserData.role !== "owner" && callingUserData.role !== "superadmin" && callingUserData.role !== "admin")) {
-        throw new onCall.HttpsError("permission-denied", "You do not have permission to create outlets.");
-    }
-    
-    const parentOrgDoc = await db.doc(`organizations/${parentOrganizationId}`).get();
-    if (!parentOrgDoc.exists) {
-        throw new onCall.HttpsError("not-found", "Parent organization not found.");
-    }
-
-    const orgsRef = db.collection("organizations");
-    const orgDocRef = orgsRef.doc();
-    
-    await orgDocRef.set({
-        name: outletName,
-        name_lowercase: outletName.toLowerCase(),
-        owner_id: parentOrgDoc.data()?.owner_id, // Inherit owner from parent
-        parent_organization_id: parentOrganizationId,
-        created_at: admin.firestore.FieldValue.serverTimestamp(),
-        updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        } catch (error: any) {
+            logger.error("Error creating owner:", error);
+            if (newUserRecord?.uid) {
+                await admin.auth().deleteUser(newUserRecord.uid).catch(e => logger.error("Cleanup failed for UID:", newUserRecord!.uid, e));
+            }
+            res.status(500).json({ status: "error", message: error.message || "An unknown error occurred." });
+        }
     });
-
-    return { status: "success", message: "Outlet created successfully.", id: orgDocRef.id };
 });
 
-export const deleteOutlet = onCall({ enforceAppCheck: false }, async (request) => {
-    const { outletId } = request.data;
-    const callingUid = request.auth?.uid;
 
-    if (!callingUid) {
-      throw new onCall.HttpsError("unauthenticated", "The function must be called while authenticated.");
-    }
-    if (!outletId) {
-        throw new onCall.HttpsError("invalid-argument", "Outlet ID is required.");
-    }
-    
-    const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
-    const callingUserData = callingUserDoc.data();
-     if (!callingUserData || (callingUserData.role !== "owner" && callingUserData.role !== "superadmin" && callingUserData.role !== "admin")) {
-        throw new onCall.HttpsError("permission-denied", "You do not have permission to delete outlets.");
-    }
+export const createUser = onRequest({ enforceAppCheck: false }, (req, res) => {
+    corsMiddleware(req, res, async () => {
+        if (req.method !== 'POST') {
+            res.status(405).send('Method Not Allowed');
+            return;
+        }
 
-    const outletRef = db.doc(`organizations/${outletId}`);
-    const outletDoc = await outletRef.get();
-    if (!outletDoc.exists) {
-        throw new onCall.HttpsError("not-found", "Outlet not found.");
-    }
-    const outletData = outletDoc.data();
+        const callingUid = await getAuthenticatedUid(req);
+        if (!callingUid) {
+            res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
+            return;
+        }
 
-    // Prevent deleting parent organization from here
-    if (!outletData?.parent_organization_id) {
-        throw new onCall.HttpsError("permission-denied", "Cannot delete the main organization from this interface.");
-    }
-    
-    // Security check: ensure the caller belongs to the same parent organization
-    const parentOrgIdFromOutlet = outletData?.parent_organization_id;
-    
-    const callerOrgDoc = await db.doc(`organizations/${callingUserData.organization_id}`).get();
-    if (!callerOrgDoc.exists()) {
-        throw new onCall.HttpsError("not-found", "Caller's organization not found.");
-    }
-    const callerParentOrgId = callerOrgDoc.data()?.parent_organization_id || callingUserData.organization_id;
+        const { email, password, fullName, role, organizationId } = req.body;
+        if (!organizationId) {
+            res.status(400).json({ status: 'error', message: 'Organization ID is required to create a user.' });
+            return;
+        }
 
-    if (callerParentOrgId !== parentOrgIdFromOutlet && callingUserData.role !== 'superadmin') {
-         throw new onCall.HttpsError("permission-denied", "You can only delete outlets within your own organization structure.");
-    }
-    
-    await outletRef.delete();
+        let newUserRecord;
+        try {
+            const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
+            const callingUserData = callingUserDoc.data();
 
-    return { status: "success", message: "Outlet deleted successfully." };
+            if (!callingUserData || !['owner', 'admin', 'superadmin'].includes(callingUserData.role)) {
+                res.status(403).json({ status: 'error', message: 'You do not have permission to create users.' });
+                return;
+            }
+
+            if (callingUserData.role !== "superadmin") {
+                const callerParentOrgId = (await db.doc(`organizations/${callingUserData.organization_id}`).get()).data()?.parent_organization_id || callingUserData.organization_id;
+                const targetParentOrgId = (await db.doc(`organizations/${organizationId}`).get()).data()?.parent_organization_id || organizationId;
+                if (callerParentOrgId !== targetParentOrgId) {
+                    res.status(403).json({ status: 'error', message: 'You can only create users for your own organization structure.' });
+                    return;
+                }
+            }
+            
+            try {
+                await admin.auth().getUserByEmail(email);
+                res.status(409).json({ status: 'error', message: 'Email is already in use.' });
+                return;
+            } catch (error: any) {
+                if (error.code !== 'auth/user-not-found') throw error;
+            }
+
+            newUserRecord = await admin.auth().createUser({ email, password, displayName: fullName });
+
+            await db.doc(`profiles/${newUserRecord.uid}`).set({
+                id: newUserRecord.uid,
+                email,
+                full_name: fullName,
+                role,
+                organization_id: organizationId,
+                created_at: admin.firestore.FieldValue.serverTimestamp(),
+                updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            res.status(200).json({
+                status: "success",
+                message: `User ${fullName} created successfully.`,
+                uid: newUserRecord.uid,
+            });
+        } catch (error: any) {
+            logger.error("Error creating user:", error);
+            if (newUserRecord?.uid) {
+                await admin.auth().deleteUser(newUserRecord.uid).catch(e => logger.error("Cleanup failed for UID:", newUserRecord.uid, e));
+            }
+            res.status(500).json({ status: 'error', message: error.message || "An unknown error occurred." });
+        }
+    });
 });
-    
-
-    
 
 
-    
+export const deleteUser = onRequest({ enforceAppCheck: false }, (req, res) => {
+    corsMiddleware(req, res, async () => {
+        if (req.method !== 'POST') {
+            res.status(405).send('Method Not Allowed');
+            return;
+        }
+        
+        const callingUid = await getAuthenticatedUid(req);
+        if (!callingUid) {
+            res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
+            return;
+        }
+
+        const { uid } = req.body;
+        if (uid === callingUid) {
+            res.status(400).json({ status: 'error', message: 'You cannot delete your own account.' });
+            return;
+        }
+
+        try {
+            const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
+            const callingUserData = callingUserDoc.data();
+
+            if (!callingUserData || !['owner', 'admin', 'superadmin'].includes(callingUserData.role)) {
+                res.status(403).json({ status: 'error', message: 'You do not have permission to delete users.' });
+                return;
+            }
+            
+            const userToDeleteDoc = await db.doc(`profiles/${uid}`).get();
+            if (!userToDeleteDoc.exists) {
+                res.status(404).json({ status: 'error', message: 'User to delete not found in Firestore.' });
+                return;
+            }
+            const userToDeleteData = userToDeleteDoc.data();
+
+            if (userToDeleteData?.role === 'owner' && callingUserData.role !== 'superadmin') {
+                res.status(403).json({ status: 'error', message: 'Owners cannot delete other owners.' });
+                return;
+            }
+            if (callingUserData.role === 'admin' && ['owner', 'admin'].includes(userToDeleteData?.role)) {
+                res.status(403).json({ status: 'error', message: 'Admins cannot delete owners or other admins.' });
+                return;
+            }
+
+            await admin.auth().deleteUser(uid);
+            await db.doc(`profiles/${uid}`).delete();
+
+            res.status(200).json({ status: "success", message: `User ${uid} deleted successfully.` });
+        } catch (error: any) {
+            logger.error("Error deleting user:", error);
+            res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred while deleting the user.' });
+        }
+    });
+});
+
+
+export const createOutlet = onRequest({ enforceAppCheck: false }, (req, res) => {
+    corsMiddleware(req, res, async () => {
+        if (req.method !== 'POST') {
+            res.status(405).send('Method Not Allowed');
+            return;
+        }
+        
+        const callingUid = await getAuthenticatedUid(req);
+        if (!callingUid) {
+            res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
+            return;
+        }
+        
+        const { outletName, parentOrganizationId } = req.body;
+        if (!outletName || !parentOrganizationId) {
+            res.status(400).json({ status: 'error', message: 'Outlet name and parent organization ID are required.' });
+            return;
+        }
+
+        try {
+            const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
+            const callingUserData = callingUserDoc.data();
+            if (!callingUserData || !['owner', 'superadmin', 'admin'].includes(callingUserData.role)) {
+                res.status(403).json({ status: 'error', message: 'You do not have permission to create outlets.' });
+                return;
+            }
+
+            const parentOrgDoc = await db.doc(`organizations/${parentOrganizationId}`).get();
+            if (!parentOrgDoc.exists) {
+                res.status(404).json({ status: 'error', message: 'Parent organization not found.' });
+                return;
+            }
+
+            const orgsRef = db.collection("organizations");
+            const orgDocRef = orgsRef.doc();
+            await orgDocRef.set({
+                name: outletName,
+                name_lowercase: outletName.toLowerCase(),
+                owner_id: parentOrgDoc.data()?.owner_id,
+                parent_organization_id: parentOrganizationId,
+                created_at: admin.firestore.FieldValue.serverTimestamp(),
+                updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            res.status(200).json({ status: "success", message: "Outlet created successfully.", id: orgDocRef.id });
+        } catch (error: any) {
+            logger.error("Error creating outlet:", error);
+            res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred.' });
+        }
+    });
+});
+
+export const updateOutlet = onRequest({ enforceAppCheck: false }, (req, res) => {
+    corsMiddleware(req, res, async () => {
+        if (req.method !== 'POST') {
+            res.status(405).send('Method Not Allowed');
+            return;
+        }
+        
+        const callingUid = await getAuthenticatedUid(req);
+        if (!callingUid) {
+            res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
+            return;
+        }
+        
+        const { outletId, outletName } = req.body;
+        if (!outletId || !outletName) {
+            res.status(400).json({ status: 'error', message: 'Outlet ID and outlet name are required.' });
+            return;
+        }
+
+        try {
+            const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
+            const callingUserData = callingUserDoc.data();
+            if (!callingUserData || !['owner', 'superadmin', 'admin'].includes(callingUserData.role)) {
+                res.status(403).json({ status: 'error', message: 'You do not have permission to update outlets.' });
+                return;
+            }
+
+            const outletRef = db.doc(`organizations/${outletId}`);
+            await outletRef.update({
+                name: outletName,
+                name_lowercase: outletName.toLowerCase(),
+                updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            res.status(200).json({ status: "success", message: "Outlet updated successfully." });
+        } catch (error: any) {
+            logger.error("Error updating outlet:", error);
+            res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred.' });
+        }
+    });
+});
+
+
+export const deleteOutlet = onRequest({ enforceAppCheck: false }, (req, res) => {
+    corsMiddleware(req, res, async () => {
+        if (req.method !== 'POST') {
+            res.status(405).send('Method Not Allowed');
+            return;
+        }
+
+        const callingUid = await getAuthenticatedUid(req);
+        if (!callingUid) {
+            res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
+            return;
+        }
+
+        const { outletId } = req.body;
+        if (!outletId) {
+            res.status(400).json({ status: 'error', message: 'Outlet ID is required.' });
+            return;
+        }
+        
+        try {
+            const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
+            const callingUserData = callingUserDoc.data();
+            if (!callingUserData || !['owner', 'superadmin', 'admin'].includes(callingUserData.role)) {
+                res.status(403).json({ status: 'error', message: 'You do not have permission to delete outlets.' });
+                return;
+            }
+
+            const outletRef = db.doc(`organizations/${outletId}`);
+            const outletDoc = await outletRef.get();
+            if (!outletDoc.exists) {
+                res.status(404).json({ status: 'error', message: 'Outlet not found.' });
+                return;
+            }
+            const outletData = outletDoc.data();
+
+            if (!outletData?.parent_organization_id) {
+                res.status(403).json({ status: 'error', message: 'Cannot delete the main organization from this interface.' });
+                return;
+            }
+            
+            await outletRef.delete();
+
+            res.status(200).json({ status: "success", message: "Outlet deleted successfully." });
+        } catch (error: any) {
+            logger.error("Error deleting outlet:", error);
+            res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred.' });
+        }
+    });
+});

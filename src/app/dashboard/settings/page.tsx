@@ -154,9 +154,11 @@ export default function SettingsPage() {
         setIsSubmitting(true);
         try {
             if (editingOutlet.id) {
-                // UPDATE logic: still uses client-side updateDoc as it's simpler
-                const outletRef = doc(db, 'organizations', editingOutlet.id);
-                await updateDoc(outletRef, { name: editingOutlet.name });
+                // UPDATE logic
+                await fetchWithAuth('updateOutlet', {
+                    outletId: editingOutlet.id,
+                    outletName: editingOutlet.name,
+                });
                 toast({ title: "Sukses", description: "Nama outlet berhasil diperbarui." });
             } else {
                 // CREATE logic
