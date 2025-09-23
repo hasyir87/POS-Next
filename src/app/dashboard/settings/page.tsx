@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth, type Organization } from "@/context/auth-context";
 import { getFirestore, doc, updateDoc, addDoc, deleteDoc, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
-import { fetchWithAuth } from "@/lib/utils";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 // Local types
 interface Grade {
@@ -31,6 +31,7 @@ export default function SettingsPage() {
     const { toast } = useToast();
     const { profile, selectedOrganizationId, loading: authLoading, refreshProfile } = useAuth();
     const db = getFirestore(firebaseApp);
+    const functions = getFunctions(firebaseApp);
 
     const [outlets, setOutlets] = useState<Organization[]>([]);
     const [isLoadingOutlets, setIsLoadingOutlets] = useState(true);
@@ -155,7 +156,8 @@ export default function SettingsPage() {
         try {
             if (editingOutlet.id) {
                 // UPDATE logic
-                await fetchWithAuth('updateOutlet', {
+                const updateOutletFn = httpsCallable(functions, 'updateOutlet');
+                await updateOutletFn({
                     outletId: editingOutlet.id,
                     outletName: editingOutlet.name,
                 });
@@ -165,7 +167,8 @@ export default function SettingsPage() {
                 const mainOrganization = await getDoc(doc(db, 'organizations', profile.organization_id));
                 const parentId = mainOrganization.data()?.parent_organization_id || profile.organization_id;
                 
-                await fetchWithAuth('createOutlet', {
+                const createOutletFn = httpsCallable(functions, 'createOutlet');
+                await createOutletFn({
                     outletName: editingOutlet.name,
                     parentOrganizationId: parentId,
                 });
@@ -189,7 +192,8 @@ export default function SettingsPage() {
         
         setIsSubmitting(true);
         try {
-            await fetchWithAuth('deleteOutlet', { outletId });
+            const deleteOutletFn = httpsCallable(functions, 'deleteOutlet');
+            await deleteOutletFn({ outletId });
             toast({ title: "Sukses", description: "Outlet berhasil dihapus." });
             await fetchOutlets();
             await refreshProfile();
@@ -474,3 +478,5 @@ export default function SettingsPage() {
         </div>
     )
 }
+
+    

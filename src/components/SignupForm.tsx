@@ -15,7 +15,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SniposLogo } from "./snipos-logo";
 import { AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { fetchWithAuth } from "@/lib/utils";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { firebaseApp } from "@/lib/firebase/config";
 
 const formSchema = z.object({
   fullName: z.string().min(3, { message: "Nama lengkap minimal 3 karakter." }),
@@ -33,6 +34,7 @@ export default function SignupForm() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
+  const functions = getFunctions(firebaseApp);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -53,12 +55,17 @@ export default function SignupForm() {
     setLoading(true);
 
     try {
-      await fetchWithAuth('createOwner', {
+      const createOwnerFn = httpsCallable(functions, 'createOwner');
+      const result: any = await createOwnerFn({
         email: values.email,
         password: values.password,
         fullName: values.fullName,
         organizationName: values.organizationName,
-      }, false); // `false` karena ini adalah panggilan tanpa otentikasi
+      });
+
+      if (result.data.status === 'error') {
+        throw new Error(result.data.message);
+      }
       
       setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke halaman login untuk masuk dengan akun baru Anda.");
       setTimeout(() => {
@@ -70,16 +77,14 @@ export default function SignupForm() {
       let errorMessage = err.message || "Terjadi kesalahan yang tidak terduga.";
       
       // Menangani error spesifik dari backend
-      if (err.field) {
-         if(err.field === 'email'){
-            errorMessage = "Email ini sudah terdaftar. Silakan gunakan email lain.";
-            setError('email', { type: 'manual', message: errorMessage });
-         } else if(err.field === 'organization') {
-            errorMessage = "Nama organisasi sudah digunakan. Silakan pilih nama lain.";
-            setError('organizationName', { type: 'manual', message: errorMessage });
-         }
+      if (errorMessage.includes("Organization name is already in use")) {
+         errorMessage = "Nama organisasi sudah digunakan. Silakan pilih nama lain.";
+         setError('organizationName', { type: 'manual', message: errorMessage });
+      } else if (errorMessage.includes("Email is already in use")) {
+         errorMessage = "Email ini sudah terdaftar. Silakan gunakan email lain.";
+         setError('email', { type: 'manual', message: errorMessage });
       }
-
+      
       setErrorState(errorMessage);
     } finally {
       setLoading(false);
@@ -191,3 +196,5 @@ export default function SignupForm() {
     </div>
   );
 }
+
+    

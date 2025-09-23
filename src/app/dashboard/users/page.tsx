@@ -15,14 +15,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from '@/components/ui/badge';
 import { getFirestore, collection, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { firebaseApp } from '@/lib/firebase/config';
-import { fetchWithAuth } from '@/lib/utils';
-
 
 export default function UsersPage() {
     const { toast } = useToast();
     const { profile: currentProfile, loading: authLoading, selectedOrganizationId } = useAuth();
     const db = getFirestore(firebaseApp);
+    const functions = getFunctions(firebaseApp);
 
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -96,7 +96,8 @@ export default function UsersPage() {
                 toast({ title: 'Sukses', description: `Pengguna berhasil diperbarui.` });
 
             } else { // Create new user
-                await fetchWithAuth('createUser', {
+                const createUserFn = httpsCallable(functions, 'createUser');
+                await createUserFn({
                     email: editingUser.email,
                     password: editingUser.password,
                     fullName: editingUser.full_name,
@@ -120,7 +121,8 @@ export default function UsersPage() {
         
         setIsSubmitting(true);
         try {
-            await fetchWithAuth('deleteUser', { uid: userId });
+            const deleteUserFn = httpsCallable(functions, 'deleteUser');
+            await deleteUserFn({ uid: userId });
             toast({ title: 'Sukses', description: 'Pengguna berhasil dihapus.' });
             fetchUsers();
         } catch (error: any) {
@@ -242,3 +244,5 @@ export default function UsersPage() {
         </div>
     );
 }
+
+    
