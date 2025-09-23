@@ -140,6 +140,7 @@ export const createUser = onCall(
       );
     }
 
+    let newUserRecord;
     try {
       const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
       const callingUserData = callingUserDoc.data();
@@ -162,15 +163,27 @@ export const createUser = onCall(
           "You can only create users for your own organization."
         );
       }
+      
+      // Check for duplicate email before creating user
+      try {
+        await admin.auth().getUserByEmail(email);
+        // If the above line doesn't throw, the user exists.
+        throw new onCall.HttpsError("already-exists", "Email is already in use.");
+      } catch (error: any) {
+        // "user-not-found" is the expected error if the email is available.
+        if (error.code !== 'auth/user-not-found') {
+          throw error; // Re-throw other auth errors, including the one we just threw
+        }
+      }
 
-      const userRecord = await admin.auth().createUser({
+      newUserRecord = await admin.auth().createUser({
         email: email,
         password: password,
         displayName: fullName,
       });
 
-      await db.doc(`profiles/${userRecord.uid}`).set({
-        id: userRecord.uid,
+      await db.doc(`profiles/${newUserRecord.uid}`).set({
+        id: newUserRecord.uid,
         email: email,
         full_name: fullName,
         role: role,
@@ -182,13 +195,17 @@ export const createUser = onCall(
       return {
         status: "success",
         message: `User ${fullName} created successfully.`,
-        uid: userRecord.uid,
+        uid: newUserRecord.uid,
       };
     } catch (error: any) {
       logger.error("Error creating user:", error);
       // Clean up failed user creation in Auth
-      if (error.uid) {
-        await admin.auth().deleteUser(error.uid).catch(e => logger.error("Cleanup failed for UID:", error.uid, e));
+      if (newUserRecord?.uid) {
+        await admin.auth().deleteUser(newUserRecord.uid).catch(e => logger.error("Cleanup failed for UID:", newUserRecord.uid, e));
+      }
+
+      if (error instanceof onCall.HttpsError) {
+        throw error;
       }
       throw new onCall.HttpsError("internal", error.message || "An unknown error occurred.");
     }
@@ -258,6 +275,9 @@ export const deleteUser = onCall(
 
     } catch (error: any) {
       logger.error("Error deleting user:", error);
+      if (error instanceof onCall.HttpsError) {
+        throw error;
+      }
       throw new onCall.HttpsError("internal", error.message || "An unknown error occurred while deleting the user.");
     }
   }
@@ -287,7 +307,7 @@ export const createOutlet = onCall({ enforceAppCheck: false }, async (request) =
     await orgDocRef.set({
         name: outletName,
         name_lowercase: outletName.toLowerCase(),
-        owner_id: callingUid, // Should this be the parent org owner? For now, creator.
+        owner_id: callingUserData.role === 'owner' ? callingUid : (await db.doc(`organizations/${parentOrganizationId}`).get()).data()?.owner_id,
         parent_organization_id: parentOrganizationId,
         created_at: admin.firestore.FieldValue.serverTimestamp(),
         updated_at: admin.firestore.FieldValue.serverTimestamp(),
@@ -318,10 +338,19 @@ export const deleteOutlet = onCall({ enforceAppCheck: false }, async (request) =
     if (!outletDoc.exists) {
         throw new onCall.HttpsError("not-found", "Outlet not found.");
     }
+    const outletData = outletDoc.data();
 
     // Prevent deleting parent organization from here
-    if (!outletDoc.data()?.parent_organization_id) {
+    if (!outletData?.parent_organization_id) {
         throw new onCall.HttpsError("permission-denied", "Cannot delete the main organization from this interface.");
+    }
+    
+    // Security check: ensure the caller belongs to the same parent organization
+    const parentOrgId = outletData?.parent_organization_id;
+    const callerParentOrgId = (await db.doc(`organizations/${callingUserData.organization_id}`).get()).data()?.parent_organization_id || callingUserData.organization_id;
+
+    if (callerParentOrgId !== parentOrgId && callingUserData.role !== 'superadmin') {
+         throw new onCall.HttpsError("permission-denied", "You can only delete outlets within your own organization structure.");
     }
     
     await outletRef.delete();

@@ -109,7 +109,8 @@ export default function UsersPage() {
             setDialogOpen(false);
             fetchUsersAndOrgs();
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Error', description: error.message });
+            const errorMessage = (error as any).details?.message || (error as Error).message;
+            toast({ variant: 'destructive', title: 'Error', description: errorMessage });
         } finally {
             setIsSubmitting(false);
         }
@@ -125,7 +126,8 @@ export default function UsersPage() {
             toast({ title: 'Sukses', description: 'Pengguna berhasil dihapus.' });
             fetchUsersAndOrgs();
         } catch (error: any) {
-             toast({ variant: 'destructive', title: 'Error', description: error.message });
+             const errorMessage = (error as any).details?.message || (error as Error).message;
+             toast({ variant: 'destructive', title: 'Error', description: errorMessage });
         } finally {
             setIsSubmitting(false);
         }
@@ -226,7 +228,9 @@ export default function UsersPage() {
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuItem onClick={() => handleOpenDialog(user)}>Ubah</DropdownMenuItem>
-                                                    <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteUser(user.id)}>Hapus</DropdownMenuItem>
+                                                    {user.role !== 'owner' && (
+                                                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteUser(user.id)}>Hapus</DropdownMenuItem>
+                                                    )}
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </TableCell>
