@@ -139,6 +139,10 @@ export const createUser = onCall(
         "The function must be called while authenticated."
       );
     }
+    
+    if (!organizationId) {
+       throw new onCall.HttpsError("invalid-argument", "Organization ID is required to create a user.");
+    }
 
     let newUserRecord;
     try {

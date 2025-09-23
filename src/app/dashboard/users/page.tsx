@@ -33,8 +33,6 @@ export default function UsersPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingUser, setEditingUser] = useState<Partial<UserProfile & {password?: string}>>({});
 
-    const emptyUser: Partial<UserProfile> = { full_name: '', email: '', role: 'cashier', organization_id: selectedOrganizationId || '' };
-
     const fetchUsersAndOrgs = useCallback(async () => {
         if (!selectedOrganizationId) return;
         setIsLoading(true);
@@ -70,7 +68,8 @@ export default function UsersPage() {
     }, [authLoading, selectedOrganizationId, fetchUsersAndOrgs]);
 
     const handleOpenDialog = (user: Partial<UserProfile> | null = null) => {
-        setEditingUser(user ? { ...user } : { ...emptyUser, organization_id: selectedOrganizationId || '' });
+        const emptyUser: Partial<UserProfile> = { full_name: '', email: '', role: 'cashier', organization_id: selectedOrganizationId || '' };
+        setEditingUser(user ? { ...user } : emptyUser);
         setDialogOpen(true);
     };
 
@@ -82,6 +81,11 @@ export default function UsersPage() {
         
         if(!editingUser.id && (!editingUser.password || editingUser.password.length < 6)){
              toast({ variant: 'destructive', title: 'Error', description: 'Password harus diisi minimal 6 karakter.' });
+            return;
+        }
+        
+        if (!selectedOrganizationId) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Outlet belum dipilih.' });
             return;
         }
 
