@@ -8,14 +8,12 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // Inisialisasi CORS middleware
-// 'true' akan merefleksikan origin dari permintaan, yang aman untuk development
-// dan sebagian besar kasus penggunaan.
 const corsMiddleware = cors({ origin: true });
 
 // Helper untuk memverifikasi token otentikasi dari header
-const getAuthenticatedUid = async (request: any): Promise<string | null> => {
+const getAuthenticatedUid = async (request: any): Promise<string> => {
   if (!request.headers.authorization || !request.headers.authorization.startsWith('Bearer ')) {
-    return null;
+    throw new Error('Unauthorized');
   }
   const idToken = request.headers.authorization.split('Bearer ')[1];
   try {
@@ -23,7 +21,7 @@ const getAuthenticatedUid = async (request: any): Promise<string | null> => {
     return decodedToken.uid;
   } catch (error) {
     logger.error("Error verifying token:", error);
-    return null;
+    throw new Error('Unauthorized');
   }
 };
 
@@ -126,20 +124,20 @@ export const createUser = onRequest({ enforceAppCheck: false }, (req, res) => {
             return;
         }
 
-        const callingUid = await getAuthenticatedUid(req);
-        if (!callingUid) {
-            res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
-            return;
-        }
-
-        const { email, password, fullName, role, organizationId } = req.body;
-        if (!organizationId) {
-            res.status(400).json({ status: 'error', message: 'Organization ID is required to create a user.' });
-            return;
-        }
-
         let newUserRecord;
         try {
+            const callingUid = await getAuthenticatedUid(req);
+            const { email, password, fullName, role, organizationId } = req.body;
+            
+            if (!organizationId) {
+                res.status(400).json({ status: 'error', message: 'Organization ID is required to create a user.' });
+                return;
+            }
+            if (!email || !password || !fullName || !role) {
+                res.status(400).json({ status: 'error', message: 'Missing required fields.' });
+                return;
+            }
+            
             const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
             const callingUserData = callingUserDoc.data();
 
@@ -187,7 +185,11 @@ export const createUser = onRequest({ enforceAppCheck: false }, (req, res) => {
             if (newUserRecord?.uid) {
                 await admin.auth().deleteUser(newUserRecord.uid).catch(e => logger.error("Cleanup failed for UID:", newUserRecord.uid, e));
             }
-            res.status(500).json({ status: 'error', message: error.message || "An unknown error occurred." });
+            if (error.message === 'Unauthorized') {
+                 res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
+            } else {
+                 res.status(500).json({ status: 'error', message: error.message || "An unknown error occurred." });
+            }
         }
     });
 });
@@ -200,19 +202,15 @@ export const deleteUser = onRequest({ enforceAppCheck: false }, (req, res) => {
             return;
         }
         
-        const callingUid = await getAuthenticatedUid(req);
-        if (!callingUid) {
-            res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
-            return;
-        }
-
-        const { uid } = req.body;
-        if (uid === callingUid) {
-            res.status(400).json({ status: 'error', message: 'You cannot delete your own account.' });
-            return;
-        }
-
         try {
+            const callingUid = await getAuthenticatedUid(req);
+            const { uid } = req.body;
+
+            if (uid === callingUid) {
+                res.status(400).json({ status: 'error', message: 'You cannot delete your own account.' });
+                return;
+            }
+
             const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
             const callingUserData = callingUserDoc.data();
 
@@ -243,7 +241,11 @@ export const deleteUser = onRequest({ enforceAppCheck: false }, (req, res) => {
             res.status(200).json({ status: "success", message: `User ${uid} deleted successfully.` });
         } catch (error: any) {
             logger.error("Error deleting user:", error);
-            res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred while deleting the user.' });
+            if (error.message === 'Unauthorized') {
+                 res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
+            } else {
+                res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred while deleting the user.' });
+            }
         }
     });
 });
@@ -256,19 +258,15 @@ export const createOutlet = onRequest({ enforceAppCheck: false }, (req, res) => 
             return;
         }
         
-        const callingUid = await getAuthenticatedUid(req);
-        if (!callingUid) {
-            res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
-            return;
-        }
-        
-        const { outletName, parentOrganizationId } = req.body;
-        if (!outletName || !parentOrganizationId) {
-            res.status(400).json({ status: 'error', message: 'Outlet name and parent organization ID are required.' });
-            return;
-        }
-
         try {
+            const callingUid = await getAuthenticatedUid(req);
+            const { outletName, parentOrganizationId } = req.body;
+
+            if (!outletName || !parentOrganizationId) {
+                res.status(400).json({ status: 'error', message: 'Outlet name and parent organization ID are required.' });
+                return;
+            }
+
             const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
             const callingUserData = callingUserDoc.data();
             if (!callingUserData || !['owner', 'superadmin', 'admin'].includes(callingUserData.role)) {
@@ -296,10 +294,57 @@ export const createOutlet = onRequest({ enforceAppCheck: false }, (req, res) => 
             res.status(200).json({ status: "success", message: "Outlet created successfully.", id: orgDocRef.id });
         } catch (error: any) {
             logger.error("Error creating outlet:", error);
-            res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred.' });
+            if (error.message === 'Unauthorized') {
+                 res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
+            } else {
+                 res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred.' });
+            }
         }
     });
 });
+
+export const updateOutlet = onRequest({ enforceAppCheck: false }, (req, res) => {
+    corsMiddleware(req, res, async () => {
+        if (req.method !== 'POST') {
+            res.status(405).send('Method Not Allowed');
+            return;
+        }
+        
+        try {
+            const callingUid = await getAuthenticatedUid(req);
+            const { outletId, outletName } = req.body;
+
+            if (!outletId || !outletName) {
+                res.status(400).json({ status: 'error', message: 'Outlet ID and outlet name are required.' });
+                return;
+            }
+
+            const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
+            const callingUserData = callingUserDoc.data();
+            if (!callingUserData || !['owner', 'superadmin', 'admin'].includes(callingUserData.role)) {
+                res.status(403).json({ status: 'error', message: 'You do not have permission to update outlets.' });
+                return;
+            }
+
+            const outletRef = db.doc(`organizations/${outletId}`);
+            await outletRef.update({
+                name: outletName,
+                name_lowercase: outletName.toLowerCase(),
+                updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            res.status(200).json({ status: "success", message: "Outlet updated successfully." });
+        } catch (error: any) {
+            logger.error("Error updating outlet:", error);
+            if (error.message === 'Unauthorized') {
+                 res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
+            } else {
+                 res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred.' });
+            }
+        }
+    });
+});
+
 
 export const deleteOutlet = onRequest({ enforceAppCheck: false }, (req, res) => {
     corsMiddleware(req, res, async () => {
@@ -308,19 +353,15 @@ export const deleteOutlet = onRequest({ enforceAppCheck: false }, (req, res) => 
             return;
         }
 
-        const callingUid = await getAuthenticatedUid(req);
-        if (!callingUid) {
-            res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
-            return;
-        }
-
-        const { outletId } = req.body;
-        if (!outletId) {
-            res.status(400).json({ status: 'error', message: 'Outlet ID is required.' });
-            return;
-        }
-        
         try {
+            const callingUid = await getAuthenticatedUid(req);
+            const { outletId } = req.body;
+            
+            if (!outletId) {
+                res.status(400).json({ status: 'error', message: 'Outlet ID is required.' });
+                return;
+            }
+
             const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
             const callingUserData = callingUserDoc.data();
             if (!callingUserData || !['owner', 'superadmin', 'admin'].includes(callingUserData.role)) {
@@ -346,7 +387,13 @@ export const deleteOutlet = onRequest({ enforceAppCheck: false }, (req, res) => 
             res.status(200).json({ status: "success", message: "Outlet deleted successfully." });
         } catch (error: any) {
             logger.error("Error deleting outlet:", error);
-            res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred.' });
+            if (error.message === 'Unauthorized') {
+                 res.status(401).json({ status: 'error', message: 'The function must be called while authenticated.' });
+            } else {
+                 res.status(500).json({ status: 'error', message: error.message || 'An unknown error occurred.' });
+            }
         }
     });
 });
+
+    
