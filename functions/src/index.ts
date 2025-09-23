@@ -162,10 +162,14 @@ export const createUser = onCall(
       }
       
       if (callingUserData.organization_id !== organizationId && callingUserData.role !== "superadmin") {
-        throw new onCall.HttpsError(
-          "permission-denied",
-          "You can only create users for your own organization."
-        );
+        const callerParentOrgId = (await db.doc(`organizations/${callingUserData.organization_id}`).get()).data()?.parent_organization_id || callingUserData.organization_id;
+        const targetParentOrgId = (await db.doc(`organizations/${organizationId}`).get()).data()?.parent_organization_id || organizationId;
+        if(callerParentOrgId !== targetParentOrgId) {
+            throw new onCall.HttpsError(
+              "permission-denied",
+              "You can only create users for your own organization structure."
+            );
+        }
       }
       
       // Check for duplicate email before creating user
@@ -201,7 +205,8 @@ export const createUser = onCall(
         message: `User ${fullName} created successfully.`,
         uid: newUserRecord.uid,
       };
-    } catch (error: any) {
+    } catch (error: any)
+    {
       logger.error("Error creating user:", error);
       // Clean up failed user creation in Auth
       if (newUserRecord?.uid) {
@@ -266,7 +271,16 @@ export const deleteUser = onCall(
       
       // Ensure user is being deleted from the same organization
       if (userToDeleteData?.organization_id !== callingUserData.organization_id && callingUserData.role !== 'superadmin') {
-         throw new onCall.HttpsError("permission-denied", "You can only delete users from your own organization.");
+         const callerParentOrgId = (await db.doc(`organizations/${callingUserData.organization_id}`).get()).data()?.parent_organization_id || callingUserData.organization_id;
+         const targetOrgDoc = await db.doc(`organizations/${userToDeleteData?.organization_id}`).get();
+         if (!targetOrgDoc.exists()) {
+             throw new onCall.HttpsError("not-found", "Organization of user to delete not found.");
+         }
+         const targetParentOrgId = targetOrgDoc.data()?.parent_organization_id || userToDeleteData?.organization_id;
+         
+         if(callerParentOrgId !== targetParentOrgId) {
+             throw new onCall.HttpsError("permission-denied", "You can only delete users from your own organization structure.");
+         }
       }
       
       await admin.auth().deleteUser(uid);
@@ -304,6 +318,11 @@ export const createOutlet = onCall({ enforceAppCheck: false }, async (request) =
     if (!callingUserData || (callingUserData.role !== "owner" && callingUserData.role !== "superadmin" && callingUserData.role !== "admin")) {
         throw new onCall.HttpsError("permission-denied", "You do not have permission to create outlets.");
     }
+    
+    const parentOrgDoc = await db.doc(`organizations/${parentOrganizationId}`).get();
+    if (!parentOrgDoc.exists) {
+        throw new onCall.HttpsError("not-found", "Parent organization not found.");
+    }
 
     const orgsRef = db.collection("organizations");
     const orgDocRef = orgsRef.doc();
@@ -311,7 +330,7 @@ export const createOutlet = onCall({ enforceAppCheck: false }, async (request) =
     await orgDocRef.set({
         name: outletName,
         name_lowercase: outletName.toLowerCase(),
-        owner_id: callingUserData.role === 'owner' ? callingUid : (await db.doc(`organizations/${parentOrganizationId}`).get()).data()?.owner_id,
+        owner_id: parentOrgDoc.data()?.owner_id, // Inherit owner from parent
         parent_organization_id: parentOrganizationId,
         created_at: admin.firestore.FieldValue.serverTimestamp(),
         updated_at: admin.firestore.FieldValue.serverTimestamp(),
@@ -350,10 +369,15 @@ export const deleteOutlet = onCall({ enforceAppCheck: false }, async (request) =
     }
     
     // Security check: ensure the caller belongs to the same parent organization
-    const parentOrgId = outletData?.parent_organization_id;
-    const callerParentOrgId = (await db.doc(`organizations/${callingUserData.organization_id}`).get()).data()?.parent_organization_id || callingUserData.organization_id;
+    const parentOrgIdFromOutlet = outletData?.parent_organization_id;
+    
+    const callerOrgDoc = await db.doc(`organizations/${callingUserData.organization_id}`).get();
+    if (!callerOrgDoc.exists()) {
+        throw new onCall.HttpsError("not-found", "Caller's organization not found.");
+    }
+    const callerParentOrgId = callerOrgDoc.data()?.parent_organization_id || callingUserData.organization_id;
 
-    if (callerParentOrgId !== parentOrgId && callingUserData.role !== 'superadmin') {
+    if (callerParentOrgId !== parentOrgIdFromOutlet && callingUserData.role !== 'superadmin') {
          throw new onCall.HttpsError("permission-denied", "You can only delete outlets within your own organization structure.");
     }
     
@@ -362,5 +386,8 @@ export const deleteOutlet = onCall({ enforceAppCheck: false }, async (request) =
     return { status: "success", message: "Outlet deleted successfully." };
 });
     
+
+    
+
 
     

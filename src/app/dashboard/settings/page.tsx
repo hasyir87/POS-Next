@@ -53,6 +53,7 @@ export default function SettingsPage() {
     
     const [lowStockThreshold, setLowStockThreshold] = useState(200);
     const [isSavingSettings, setIsSavingSettings] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const fetchGrades = useCallback(async () => {
         if (!selectedOrganizationId) {
@@ -150,34 +151,41 @@ export default function SettingsPage() {
             toast({ variant: "destructive", title: "Error", description: "Nama outlet atau organisasi induk tidak valid." });
             return;
         }
-    
+        
+        setIsSubmitting(true);
         try {
             if (editingOutlet.id) {
                 // Update existing outlet
                 const outletRef = doc(db, 'organizations', editingOutlet.id);
                 await updateDoc(outletRef, { name: editingOutlet.name });
+                 toast({ title: "Sukses", description: "Nama outlet berhasil diperbarui." });
             } else {
                 // Create new outlet using httpsCallable
                 const createOutlet = httpsCallable(functions, 'createOutlet');
+                const parentOrgId = profile.organization?.parent_organization_id || profile.organization_id;
+                
                 await createOutlet({
                     outletName: editingOutlet.name,
-                    parentOrganizationId: profile.organization?.parent_organization_id || profile.organization_id
+                    parentOrganizationId: parentOrgId,
                 });
+                toast({ title: "Sukses", description: "Outlet baru berhasil dibuat." });
             }
-            toast({ title: "Sukses", description: "Outlet berhasil disimpan." });
             setOutletDialogOpen(false);
             setEditingOutlet(null);
             fetchOutlets();
             refreshProfile(); // Refresh context data
         } catch (error: any) {
             console.error("Error saving outlet:", error);
-            const errorMessage = (error as any).details?.message || error.message || "Terjadi kesalahan yang tidak diketahui.";
+            const errorMessage = error.message || "Terjadi kesalahan yang tidak diketahui.";
             toast({ variant: "destructive", title: "Gagal Menyimpan", description: errorMessage });
+        } finally {
+            setIsSubmitting(false);
         }
     };
     
     const handleDeleteOutlet = async (id: string) => {
         if (!confirm("Apakah Anda yakin? Menghapus outlet akan membuat semua pengguna di dalamnya tidak bisa diakses.")) return;
+        setIsSubmitting(true);
         try {
             const deleteOutlet = httpsCallable(functions, 'deleteOutlet');
             await deleteOutlet({ outletId: id });
@@ -185,8 +193,10 @@ export default function SettingsPage() {
             fetchOutlets();
             refreshProfile();
         } catch (error: any) {
-             const errorMessage = (error as any).details?.message || error.message || "Terjadi kesalahan yang tidak diketahui.";
+             const errorMessage = error.message || "Terjadi kesalahan yang tidak diketahui.";
             toast({ variant: "destructive", title: "Gagal Menghapus", description: errorMessage });
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -201,6 +211,7 @@ export default function SettingsPage() {
             return;
         }
         
+        setIsSubmitting(true);
         const gradeData = {
             name: editingGrade.name,
             price_multiplier: editingGrade.price_multiplier,
@@ -215,22 +226,27 @@ export default function SettingsPage() {
                 await addDoc(collection(db, 'grades'), gradeData);
             }
              toast({ title: "Sukses", description: "Grade berhasil disimpan." });
+             setGradeDialogOpen(false);
+             fetchGrades();
         } catch (error: any) {
              toast({ variant: "destructive", title: "Error", description: `Gagal menyimpan grade: ${error.message}` });
+        } finally {
+            setIsSubmitting(false);
         }
-
-        setGradeDialogOpen(false);
-        fetchGrades();
     };
 
     const handleDeleteGrade = async (id: string) => {
+        if (!confirm("Anda yakin ingin menghapus grade ini?")) return;
+        setIsSubmitting(true);
         try {
             await deleteDoc(doc(db, 'grades', id));
             toast({ title: "Sukses", description: "Grade berhasil dihapus." });
+            fetchGrades();
         } catch (error: any) {
             toast({ variant: "destructive", title: "Error", description: `Gagal menghapus grade: ${error.message}` });
+        } finally {
+            setIsSubmitting(false);
         }
-        fetchGrades();
     };
 
     const handleSaveSettings = async () => {
@@ -329,7 +345,7 @@ export default function SettingsPage() {
                                         <Input id="extra-essence-price" type="number" step="100" value={editingGrade?.extra_essence_price || 0} onChange={e => setEditingGrade(prev => prev ? {...prev, extra_essence_price: parseFloat(e.target.value)} : null)} className="col-span-3" />
                                     </div>
                                 </div>
-                                <DialogFooter><Button onClick={handleSaveGrade}>Simpan</Button></DialogFooter>
+                                <DialogFooter><Button onClick={handleSaveGrade} disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Simpan</Button></DialogFooter>
                             </DialogContent>
                         </Dialog>
                         <div className="flex justify-end mb-4">
@@ -393,7 +409,7 @@ export default function SettingsPage() {
                                             <Input id="outlet-name" value={editingOutlet?.name || ''} onChange={e => setEditingOutlet(prev => prev ? {...prev, name: e.target.value} : null)} className="col-span-3" />
                                         </div>
                                     </div>
-                                    <DialogFooter><Button onClick={handleSaveOutlet}>Simpan</Button></DialogFooter>
+                                    <DialogFooter><Button onClick={handleSaveOutlet} disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Simpan</Button></DialogFooter>
                                 </DialogContent>
                              </Dialog>
                          </div>
@@ -418,7 +434,7 @@ export default function SettingsPage() {
                                          <TableCell className="text-right">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" className="h-8 w-8 p-0" disabled={!selectedOrganizationId || outlet.id === profile?.organization?.parent_organization_id || (outlet.id === profile?.organization_id && !profile?.organization?.parent_organization_id)}>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0" disabled={isSubmitting || !selectedOrganizationId || outlet.id === profile?.organization?.parent_organization_id || (outlet.id === profile?.organization_id && !profile?.organization?.parent_organization_id)}>
                                                       <span className="sr-only">Buka menu</span><MoreHorizontal className="h-4 w-4" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
@@ -451,3 +467,5 @@ export default function SettingsPage() {
         </div>
     )
 }
+
+    
