@@ -15,14 +15,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from '@/components/ui/badge';
 import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { firebaseApp } from '@/lib/firebase/config';
+import { callFirebaseFunction } from '@/lib/utils';
 
 export default function UsersPage() {
     const { toast } = useToast();
     const { profile: currentProfile, loading: authLoading, selectedOrganizationId } = useAuth();
     const db = getFirestore(firebaseApp);
-    const functions = getFunctions(firebaseApp);
 
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -86,8 +85,7 @@ export default function UsersPage() {
                 // For now, we keep it simple and maybe add it later.
                 toast({ title: "Info", description: "Mengubah pengguna belum diimplementasikan." });
             } else {
-                const createUserFn = httpsCallable(functions, 'createUser');
-                await createUserFn({
+                await callFirebaseFunction('createUser', {
                     email: editingUser.email,
                     password: editingUser.password,
                     fullName: editingUser.full_name,
@@ -110,8 +108,7 @@ export default function UsersPage() {
         if (!confirm("Anda yakin ingin menghapus pengguna ini? Tindakan ini tidak bisa dibatalkan.")) return;
         setIsSubmitting(true);
         try {
-            const deleteUserFn = httpsCallable(functions, 'deleteUser');
-            await deleteUserFn({ uid: userId });
+            await callFirebaseFunction('deleteUser', { uid: userId });
             toast({ title: 'Sukses', description: 'Pengguna berhasil dihapus.' });
             fetchUsers();
         } catch (error: any) {
@@ -233,5 +230,3 @@ export default function UsersPage() {
         </div>
     );
 }
-
-    

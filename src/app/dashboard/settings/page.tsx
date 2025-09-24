@@ -15,8 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, type Organization } from "@/context/auth-context";
 import { getFirestore, doc, updateDoc, addDoc, deleteDoc, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { firebaseApp } from '@/lib/firebase/config';
+import { callFirebaseFunction } from '@/lib/utils';
 
 // Local types
 interface Grade {
@@ -31,7 +31,6 @@ export default function SettingsPage() {
     const { toast } = useToast();
     const { user, profile, selectedOrganizationId, loading: authLoading, refreshProfile } = useAuth();
     const db = getFirestore(firebaseApp);
-    const functions = getFunctions(firebaseApp);
 
     const [outlets, setOutlets] = useState<Organization[]>([]);
     const [isLoadingOutlets, setIsLoadingOutlets] = useState(true);
@@ -70,7 +69,9 @@ export default function SettingsPage() {
     }, [selectedOrganizationId, db, toast]);
     
     const getRootOrganizationId = useCallback(async (orgId: string) => {
-        const orgDoc = await getDoc(doc(db, 'organizations', orgId));
+        if (!orgId) return null;
+        const orgDocRef = doc(db, 'organizations', orgId);
+        const orgDoc = await getDoc(orgDocRef);
         if (!orgDoc.exists()) return orgId; // fallback
         const orgData = orgDoc.data();
         return orgData.parent_organization_id || orgId;
@@ -86,6 +87,10 @@ export default function SettingsPage() {
         setIsLoadingOutlets(true);
         try {
             const rootOrgId = await getRootOrganizationId(profile.organization_id);
+            if (!rootOrgId) {
+                setOutlets([]);
+                return;
+            }
 
             const orgsRef = collection(db, 'organizations');
             const parentQuery = query(orgsRef, where('__name__', '==', rootOrgId));
@@ -104,8 +109,8 @@ export default function SettingsPage() {
             setOutlets(allOrgs);
 
             const selectedOrgData = allOrgs.find(o => o.id === selectedOrganizationId);
-            if (selectedOrgData && typeof selectedOrgData.low_stock_threshold === 'number') {
-                setLowStockThreshold(selectedOrgData.low_stock_threshold);
+            if (selectedOrgData && typeof (selectedOrgData as any).low_stock_threshold === 'number') {
+                setLowStockThreshold((selectedOrgData as any).low_stock_threshold);
             } else {
                 setLowStockThreshold(200); // Default value
             }
@@ -147,12 +152,9 @@ export default function SettingsPage() {
         setIsSubmitting(true);
         try {
             if (editingOutlet.id) { // Update
-                const updateOutletFn = httpsCallable(functions, 'updateOutlet');
-                await updateOutletFn({ outletId: editingOutlet.id, outletName: editingOutlet.name });
+                await callFirebaseFunction('updateOutlet', { outletId: editingOutlet.id, outletName: editingOutlet.name });
             } else { // Create
-                const rootOrgId = await getRootOrganizationId(profile!.organization_id);
-                const createOutletFn = httpsCallable(functions, 'createOutlet');
-                await createOutletFn({ outletName: editingOutlet.name, parentOrganizationId: rootOrgId });
+                await callFirebaseFunction('createOutlet', { outletName: editingOutlet.name });
             }
             toast({ title: "Sukses", description: "Data outlet berhasil disimpan." });
             setOutletDialogOpen(false);
@@ -169,8 +171,7 @@ export default function SettingsPage() {
        if (!confirm("Anda yakin ingin menghapus outlet ini? Ini tidak dapat dibatalkan.")) return;
        setIsSubmitting(true);
        try {
-           const deleteOutletFn = httpsCallable(functions, 'deleteOutlet');
-           await deleteOutletFn({ outletId });
+           await callFirebaseFunction('deleteOutlet', { outletId });
            toast({ title: "Sukses", description: "Outlet berhasil dihapus." });
            fetchOutlets();
        } catch (error: any) {
@@ -328,7 +329,9 @@ export default function SettingsPage() {
                                 </DialogContent>
                             </Dialog>
                             <div className="flex justify-end mb-4">
-                                <Button onClick={() => handleOpenGradeDialog(null)} disabled={!selectedOrganizationId}><PlusCircle className="mr-2" /> Tambah Grade</Button>
+                                <Button onClick={() => handleOpenGradeDialog(null)} disabled={!selectedOrganizationId}>
+                                    <PlusCircle className="mr-2" /> Tambah Grade
+                                </Button>
                             </div>
                             <div className="border rounded-md">
                             <Table>
@@ -453,5 +456,3 @@ export default function SettingsPage() {
         </div>
     )
 }
-
-    

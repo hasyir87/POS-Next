@@ -16,8 +16,7 @@ import { SniposLogo } from "./snipos-logo";
 import { AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { firebaseApp } from "@/lib/firebase/config";
+import { callFirebaseFunction } from "@/lib/utils";
 
 const formSchema = z.object({
   fullName: z.string().min(3, { message: "Nama lengkap minimal 3 karakter." }),
@@ -31,13 +30,10 @@ const formSchema = z.object({
 });
 
 export default function SignupForm() {
-  const { toast } = useToast();
   const [error, setErrorState] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
-
-  const functions = getFunctions(firebaseApp);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -50,29 +46,36 @@ export default function SignupForm() {
     },
   });
 
-  const { setError } = form;
-
   const handleSignup = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     setErrorState(null);
     setSuccess(null);
 
     try {
-        const createOwnerFn = httpsCallable(functions, 'createOwner');
-        const result = await createOwnerFn({
-            email: values.email,
-            password: values.password,
-            fullName: values.fullName,
-            organizationName: values.organizationName,
+        const result = await fetch('/api/functions/createOwner', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({
+                email: values.email,
+                password: values.password,
+                fullName: values.fullName,
+                organizationName: values.organizationName,
+            })
         });
 
-        if ((result.data as any)?.status === 'success') {
+        const data = await result.json();
+
+        if (!result.ok) {
+            throw new Error(data.message || 'Terjadi kesalahan yang tidak diketahui.');
+        }
+
+        if (data?.status === 'success') {
             setSuccess("Akun berhasil dibuat! Anda akan dialihkan ke halaman login untuk masuk.");
             setTimeout(() => {
                 router.push('/');
             }, 3000);
         } else {
-            throw new Error((result.data as any)?.message || 'Terjadi kesalahan yang tidak diketahui.');
+            throw new Error(data?.message || 'Terjadi kesalahan yang tidak diketahui.');
         }
     } catch (error: any) {
         console.error("Signup error:", error);
@@ -187,5 +190,3 @@ export default function SignupForm() {
     </div>
   );
 }
-
-    
