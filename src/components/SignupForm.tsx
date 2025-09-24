@@ -16,6 +16,8 @@ import { SniposLogo } from "./snipos-logo";
 import { AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { firebaseApp } from "@/lib/firebase/config";
 
 const formSchema = z.object({
   fullName: z.string().min(3, { message: "Nama lengkap minimal 3 karakter." }),
@@ -35,6 +37,8 @@ export default function SignupForm() {
   const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
 
+  const functions = getFunctions(firebaseApp);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -49,8 +53,33 @@ export default function SignupForm() {
   const { setError } = form;
 
   const handleSignup = async (values: z.infer<typeof formSchema>) => {
-    // Temporarily disabled
-    toast({ title: "Fitur Dinonaktifkan", description: "Fitur pendaftaran sedang dalam perbaikan." });
+    setLoading(true);
+    setErrorState(null);
+    setSuccess(null);
+
+    try {
+        const createOwnerFn = httpsCallable(functions, 'createOwner');
+        const result = await createOwnerFn({
+            email: values.email,
+            password: values.password,
+            fullName: values.fullName,
+            organizationName: values.organizationName,
+        });
+
+        if ((result.data as any)?.status === 'success') {
+            setSuccess("Akun berhasil dibuat! Anda akan dialihkan ke halaman login untuk masuk.");
+            setTimeout(() => {
+                router.push('/');
+            }, 3000);
+        } else {
+            throw new Error((result.data as any)?.message || 'Terjadi kesalahan yang tidak diketahui.');
+        }
+    } catch (error: any) {
+        console.error("Signup error:", error);
+        setErrorState(error.message || "Gagal membuat akun. Silakan coba lagi.");
+    } finally {
+        setLoading(false);
+    }
   };
 
   return (
@@ -142,7 +171,7 @@ export default function SignupForm() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={true}>
+              <Button type="submit" className="w-full" disabled={loading || !!success}>
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Daftar sebagai Pemilik"}
               </Button>
             </form>
@@ -158,3 +187,5 @@ export default function SignupForm() {
     </div>
   );
 }
+
+    

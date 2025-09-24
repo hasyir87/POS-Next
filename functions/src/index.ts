@@ -95,8 +95,8 @@ export const createUser = onCall(async (request) => {
     }
 
     const { email, password, fullName, role, organizationId } = request.data;
-    if (!organizationId) {
-        throw new HttpsError("invalid-argument", "Organization ID is required to create a user.");
+    if (!organizationId || !email || !password || !fullName || !role) {
+        throw new HttpsError("invalid-argument", "Missing required fields.");
     }
     
     let newUserRecord;
@@ -109,12 +109,15 @@ export const createUser = onCall(async (request) => {
             throw new HttpsError("permission-denied", "You do not have permission to create users.");
         }
 
-        if (callingUserData.role !== "superadmin") {
-            const callerParentOrgId = (await db.doc(`organizations/${callingUserData.organization_id}`).get()).data()?.parent_organization_id || callingUserData.organization_id;
-            const targetParentOrgId = (await db.doc(`organizations/${organizationId}`).get()).data()?.parent_organization_id || organizationId;
-            if (callerParentOrgId !== targetParentOrgId) {
+        // In a multi-tenant setup, ensure user is created within the correct organizational structure
+        if (callingUserData.role !== 'superadmin' && callingUserData.organization_id !== organizationId) {
+             const callerOrg = await db.doc(`organizations/${callingUserData.organization_id}`).get();
+             const targetOrg = await db.doc(`organizations/${organizationId}`).get();
+             const callerRootId = callerOrg.data()?.parent_organization_id || callerOrg.id;
+             const targetRootId = targetOrg.data()?.parent_organization_id || targetOrg.id;
+             if(callerRootId !== targetRootId) {
                 throw new HttpsError("permission-denied", "You can only create users for your own organization structure.");
-            }
+             }
         }
         
         try {
@@ -215,12 +218,12 @@ export const createOutlet = onCall(async (request) => {
         const callingUid = request.auth.uid;
         const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
         const callingUserData = callingUserDoc.data();
-        if (!callingUserData || !['owner', 'superadmin', 'admin'].includes(callingUserData.role)) {
+        if (!callingUserData || !['owner', 'superadmin'].includes(callingUserData.role)) {
             throw new HttpsError("permission-denied", "You do not have permission to create outlets.");
         }
 
         const parentOrgDoc = await db.doc(`organizations/${parentOrganizationId}`).get();
-        if (!parentOrgDoc.exists) {
+        if (!parentOrgDoc.exists()) {
             throw new HttpsError("not-found", "Parent organization not found.");
         }
 
@@ -259,7 +262,7 @@ export const updateOutlet = onCall(async (request) => {
         const callingUid = request.auth.uid;
         const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
         const callingUserData = callingUserDoc.data();
-        if (!callingUserData || !['owner', 'superadmin', 'admin'].includes(callingUserData.role)) {
+        if (!callingUserData || !['owner', 'superadmin'].includes(callingUserData.role)) {
             throw new HttpsError("permission-denied", "You do not have permission to update outlets.");
         }
 
@@ -294,7 +297,7 @@ export const deleteOutlet = onCall(async (request) => {
         const callingUid = request.auth.uid;
         const callingUserDoc = await db.doc(`profiles/${callingUid}`).get();
         const callingUserData = callingUserDoc.data();
-        if (!callingUserData || !['owner', 'superadmin', 'admin'].includes(callingUserData.role)) {
+        if (!callingUserData || !['owner', 'superadmin'].includes(callingUserData.role)) {
             throw new HttpsError("permission-denied", "You do not have permission to delete outlets.");
         }
 

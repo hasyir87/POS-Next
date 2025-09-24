@@ -14,13 +14,15 @@ import { PlusCircle, MoreHorizontal, Users, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from '@/components/ui/badge';
-import { getFirestore, collection, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { firebaseApp } from '@/lib/firebase/config';
 
 export default function UsersPage() {
     const { toast } = useToast();
-    const { user, profile: currentProfile, loading: authLoading, selectedOrganizationId } = useAuth();
+    const { profile: currentProfile, loading: authLoading, selectedOrganizationId } = useAuth();
     const db = getFirestore(firebaseApp);
+    const functions = getFunctions(firebaseApp);
 
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -68,13 +70,56 @@ export default function UsersPage() {
     };
 
     const handleSaveUser = async () => {
-        // Temporarily disabled
-        toast({ title: "Fitur Dinonaktifkan", description: "Fitur simpan pengguna sedang dalam perbaikan." });
+        if (!editingUser.email || !editingUser.full_name || !editingUser.role) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Semua field wajib diisi.' });
+            return;
+        }
+        if (!editingUser.id && (!editingUser.password || editingUser.password.length < 6)) {
+             toast({ variant: 'destructive', title: 'Error', description: 'Password baru minimal 6 karakter.' });
+             return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            if (editingUser.id) {
+                // Update user logic is more complex (e.g., changing role might need backend logic)
+                // For now, we keep it simple and maybe add it later.
+                toast({ title: "Info", description: "Mengubah pengguna belum diimplementasikan." });
+            } else {
+                const createUserFn = httpsCallable(functions, 'createUser');
+                await createUserFn({
+                    email: editingUser.email,
+                    password: editingUser.password,
+                    fullName: editingUser.full_name,
+                    role: editingUser.role,
+                    organizationId: selectedOrganizationId,
+                });
+                toast({ title: 'Sukses', description: `Pengguna ${editingUser.full_name} berhasil dibuat.` });
+            }
+            setDialogOpen(false);
+            fetchUsers();
+        } catch (error: any) {
+            console.error("Error saving user:", error);
+            toast({ variant: 'destructive', title: 'Gagal Menyimpan', description: error.message });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleDeleteUser = async (userId: string) => {
-        // Temporarily disabled
-        toast({ title: "Fitur Dinonaktifkan", description: "Fitur hapus pengguna sedang dalam perbaikan." });
+        if (!confirm("Anda yakin ingin menghapus pengguna ini? Tindakan ini tidak bisa dibatalkan.")) return;
+        setIsSubmitting(true);
+        try {
+            const deleteUserFn = httpsCallable(functions, 'deleteUser');
+            await deleteUserFn({ uid: userId });
+            toast({ title: 'Sukses', description: 'Pengguna berhasil dihapus.' });
+            fetchUsers();
+        } catch (error: any) {
+            console.error("Error deleting user:", error);
+            toast({ variant: 'destructive', title: 'Gagal Menghapus', description: error.message });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
     
     if (authLoading) {
@@ -124,7 +169,7 @@ export default function UsersPage() {
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button onClick={handleSaveUser} type="submit" disabled={true}>
+                            <Button onClick={handleSaveUser} type="submit" disabled={isSubmitting}>
                                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Simpan
                             </Button>
@@ -161,12 +206,12 @@ export default function UsersPage() {
                                         <TableCell className="font-medium">{user.full_name || 'N/A'}</TableCell>
                                         <TableCell>{user.email}</TableCell>
                                         <TableCell className="text-center">
-                                            <Badge variant="secondary">{user.role}</Badge>
+                                            <Badge variant={user.role === 'owner' ? 'default' : 'secondary'}>{user.role}</Badge>
                                         </TableCell>
                                         <TableCell>
                                            <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" className="h-8 w-8 p-0" disabled={isSubmitting || user.id === currentProfile?.id}>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0" disabled={isSubmitting || user.id === currentProfile?.id || currentProfile?.role !== 'owner'}>
                                                         <MoreHorizontal className="h-4 w-4" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
@@ -188,3 +233,5 @@ export default function UsersPage() {
         </div>
     );
 }
+
+    

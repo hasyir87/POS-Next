@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, type Organization } from "@/context/auth-context";
 import { getFirestore, doc, updateDoc, addDoc, deleteDoc, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { firebaseApp } from '@/lib/firebase/config';
 
 // Local types
@@ -30,6 +31,7 @@ export default function SettingsPage() {
     const { toast } = useToast();
     const { user, profile, selectedOrganizationId, loading: authLoading, refreshProfile } = useAuth();
     const db = getFirestore(firebaseApp);
+    const functions = getFunctions(firebaseApp);
 
     const [outlets, setOutlets] = useState<Organization[]>([]);
     const [isLoadingOutlets, setIsLoadingOutlets] = useState(true);
@@ -67,6 +69,14 @@ export default function SettingsPage() {
         }
     }, [selectedOrganizationId, db, toast]);
     
+    const getRootOrganizationId = useCallback(async (orgId: string) => {
+        const orgDoc = await getDoc(doc(db, 'organizations', orgId));
+        if (!orgDoc.exists()) return orgId; // fallback
+        const orgData = orgDoc.data();
+        return orgData.parent_organization_id || orgId;
+    }, [db]);
+
+
     const fetchOutlets = useCallback(async () => {
         if (!profile?.organization_id) {
             setOutlets([]);
@@ -75,33 +85,22 @@ export default function SettingsPage() {
         }
         setIsLoadingOutlets(true);
         try {
-            const orgsRef = collection(db, 'organizations');
-            const mainOrgRef = doc(orgsRef, profile.organization_id);
-            const mainOrgSnap = await getDoc(mainOrgRef);
-            if (!mainOrgSnap.exists()) throw new Error("Organisasi utama tidak ditemukan.");
+            const rootOrgId = await getRootOrganizationId(profile.organization_id);
 
-            const mainOrgData = { id: mainOrgSnap.id, ...mainOrgSnap.data() } as Organization;
-            const parentId = mainOrgData.parent_organization_id || mainOrgData.id;
+            const orgsRef = collection(db, 'organizations');
+            const parentQuery = query(orgsRef, where('__name__', '==', rootOrgId));
+            const childrenQuery = query(orgsRef, where('parent_organization_id', '==', rootOrgId));
             
-            const q = query(orgsRef, where('parent_organization_id', '==', parentId));
-            const parentDoc = await getDoc(doc(orgsRef, parentId));
-            
-            const [parentSnap, childrenSnap] = await Promise.all([parentDoc, getDocs(q)]);
+            const [parentSnap, childrenSnap] = await Promise.all([
+                getDocs(parentQuery),
+                getDocs(childrenQuery)
+            ]);
 
             const orgMap = new Map<string, Organization>();
-            if (parentSnap.exists()) orgMap.set(parentSnap.id, { id: parentSnap.id, ...parentSnap.data() } as Organization);
+            parentSnap.forEach(doc => orgMap.set(doc.id, { id: doc.id, ...doc.data() } as Organization));
             childrenSnap.forEach(doc => orgMap.set(doc.id, { id: doc.id, ...doc.data() } as Organization));
-
-             // Make sure the main organization is included if it's not a child
-            if (profile.organization_id && !orgMap.has(profile.organization_id)) {
-                const mainOrgDoc = await getDoc(doc(db, 'organizations', profile.organization_id));
-                if (mainOrgDoc.exists()) {
-                    orgMap.set(mainOrgDoc.id, { id: mainOrgDoc.id, ...mainOrgDoc.data() } as Organization);
-                }
-            }
             
             const allOrgs = Array.from(orgMap.values());
-            
             setOutlets(allOrgs);
 
             const selectedOrgData = allOrgs.find(o => o.id === selectedOrganizationId);
@@ -117,7 +116,7 @@ export default function SettingsPage() {
         } finally {
             setIsLoadingOutlets(false);
         }
-    }, [profile, db, toast, selectedOrganizationId]);
+    }, [profile, db, toast, selectedOrganizationId, getRootOrganizationId]);
 
 
     useEffect(() => {
@@ -140,13 +139,46 @@ export default function SettingsPage() {
     };
 
     const handleSaveOutlet = async () => {
-       // Temporarily disabled
-       toast({ title: "Fitur Dinonaktifkan", description: "Fitur simpan outlet sedang dalam perbaikan." });
+        if (!editingOutlet || !editingOutlet.name) {
+             toast({ variant: "destructive", title: "Error", description: "Nama outlet harus diisi." });
+             return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            if (editingOutlet.id) { // Update
+                const updateOutletFn = httpsCallable(functions, 'updateOutlet');
+                await updateOutletFn({ outletId: editingOutlet.id, outletName: editingOutlet.name });
+            } else { // Create
+                const rootOrgId = await getRootOrganizationId(profile!.organization_id);
+                const createOutletFn = httpsCallable(functions, 'createOutlet');
+                await createOutletFn({ outletName: editingOutlet.name, parentOrganizationId: rootOrgId });
+            }
+            toast({ title: "Sukses", description: "Data outlet berhasil disimpan." });
+            setOutletDialogOpen(false);
+            fetchOutlets();
+        } catch (error: any) {
+            console.error("Error saving outlet:", error);
+            toast({ variant: "destructive", title: "Error", description: error.message });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
     
     const handleDeleteOutlet = async (outletId: string) => {
-       // Temporarily disabled
-       toast({ title: "Fitur Dinonaktifkan", description: "Fitur hapus outlet sedang dalam perbaikan." });
+       if (!confirm("Anda yakin ingin menghapus outlet ini? Ini tidak dapat dibatalkan.")) return;
+       setIsSubmitting(true);
+       try {
+           const deleteOutletFn = httpsCallable(functions, 'deleteOutlet');
+           await deleteOutletFn({ outletId });
+           toast({ title: "Sukses", description: "Outlet berhasil dihapus." });
+           fetchOutlets();
+       } catch (error: any) {
+           console.error("Error deleting outlet:", error);
+           toast({ variant: "destructive", title: "Error", description: error.message });
+       } finally {
+           setIsSubmitting(false);
+       }
     };
 
     const handleOpenGradeDialog = (grade: Partial<Grade> | null = null) => {
@@ -223,7 +255,7 @@ export default function SettingsPage() {
       return <div className="p-6 flex justify-center items-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
     }
 
-    const canManageOutlets = profile?.role === 'owner' || profile?.role === 'superadmin' || profile?.role === 'admin';
+    const canManageOutlets = profile?.role === 'owner' || profile?.role === 'superadmin';
 
     return (
         <div className="flex flex-col gap-6">
@@ -358,7 +390,7 @@ export default function SettingsPage() {
                                                 <Input id="outlet-name" value={editingOutlet?.name || ''} onChange={e => setEditingOutlet(prev => prev ? {...prev, name: e.target.value} : null)} className="col-span-3" />
                                             </div>
                                         </div>
-                                        <DialogFooter><Button onClick={handleSaveOutlet} disabled={true}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Simpan</Button></DialogFooter>
+                                        <DialogFooter><Button onClick={handleSaveOutlet} disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Simpan</Button></DialogFooter>
                                     </DialogContent>
                                 </Dialog>
                             </div>
@@ -378,18 +410,18 @@ export default function SettingsPage() {
                                         <TableRow><TableCell colSpan={3} className="text-center p-4 text-muted-foreground">Tidak ada outlet yang dikelola.</TableCell></TableRow>
                                     ) : outlets.map(outlet => (
                                         <TableRow key={outlet.id}>
-                                            <TableCell className="font-medium">{outlet.name} {outlet.id === profile?.organization?.parent_organization_id || (outlet.id === profile?.organization_id && !profile?.organization?.parent_organization_id) ? '(Induk)' : ''}</TableCell>
+                                            <TableCell className="font-medium">{outlet.name} {!outlet.parent_organization_id ? '(Induk)' : ''}</TableCell>
                                             <TableCell className="font-mono text-xs">{outlet.id}</TableCell>
                                             <TableCell className="text-right">
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" className="h-8 w-8 p-0" disabled={isSubmitting || !outlet.parent_organization_id}>
-                                                        <span className="sr-only">Buka menu</span><MoreHorizontal className="h-4 w-4" />
+                                                        <Button variant="ghost" className="h-8 w-8 p-0" disabled={isSubmitting}>
+                                                            <span className="sr-only">Buka menu</span><MoreHorizontal className="h-4 w-4" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuItem onClick={() => handleOpenOutletDialog(outlet)}>Ubah</DropdownMenuItem>
-                                                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteOutlet(outlet.id!)}>Hapus</DropdownMenuItem>
+                                                         {outlet.parent_organization_id && <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteOutlet(outlet.id!)}>Hapus</DropdownMenuItem>}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </TableCell>
@@ -421,3 +453,5 @@ export default function SettingsPage() {
         </div>
     )
 }
+
+    
