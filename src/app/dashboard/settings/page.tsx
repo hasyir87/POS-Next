@@ -155,7 +155,6 @@ export default function SettingsPage() {
         setIsSubmitting(true);
         try {
             if (editingOutlet.id) {
-                // UPDATE logic
                 const updateOutletFn = httpsCallable(functions, 'updateOutlet');
                 await updateOutletFn({
                     outletId: editingOutlet.id,
@@ -163,7 +162,6 @@ export default function SettingsPage() {
                 });
                 toast({ title: "Sukses", description: "Nama outlet berhasil diperbarui." });
             } else {
-                // CREATE logic
                 const mainOrganization = await getDoc(doc(db, 'organizations', profile.organization_id));
                 const parentId = mainOrganization.data()?.parent_organization_id || profile.organization_id;
                 
