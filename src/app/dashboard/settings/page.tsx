@@ -16,7 +16,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth, type Organization } from "@/context/auth-context";
 import { getFirestore, doc, updateDoc, addDoc, deleteDoc, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
-import { getFunctions, httpsCallable } from "firebase/functions";
 
 // Local types
 interface Grade {
@@ -29,9 +28,8 @@ interface Grade {
 
 export default function SettingsPage() {
     const { toast } = useToast();
-    const { profile, selectedOrganizationId, loading: authLoading, refreshProfile } = useAuth();
+    const { user, profile, selectedOrganizationId, loading: authLoading, refreshProfile } = useAuth();
     const db = getFirestore(firebaseApp);
-    const functions = getFunctions(firebaseApp);
 
     const [outlets, setOutlets] = useState<Organization[]>([]);
     const [isLoadingOutlets, setIsLoadingOutlets] = useState(true);
@@ -142,66 +140,13 @@ export default function SettingsPage() {
     };
 
     const handleSaveOutlet = async () => {
-        if (!editingOutlet || !editingOutlet.name) {
-            toast({ variant: "destructive", title: "Error", description: "Nama outlet tidak boleh kosong." });
-            return;
-        }
-
-        if (!profile?.organization_id) {
-            toast({ variant: "destructive", title: "Error", description: "Organisasi induk tidak ditemukan." });
-            return;
-        }
-        
-        setIsSubmitting(true);
-        try {
-            if (editingOutlet.id) {
-                const updateOutletFn = httpsCallable(functions, 'updateOutlet');
-                await updateOutletFn({
-                    outletId: editingOutlet.id,
-                    outletName: editingOutlet.name,
-                });
-                toast({ title: "Sukses", description: "Nama outlet berhasil diperbarui." });
-            } else {
-                const mainOrganization = await getDoc(doc(db, 'organizations', profile.organization_id));
-                const parentId = mainOrganization.data()?.parent_organization_id || profile.organization_id;
-                
-                const createOutletFn = httpsCallable(functions, 'createOutlet');
-                await createOutletFn({
-                    outletName: editingOutlet.name,
-                    parentOrganizationId: parentId,
-                });
-                toast({ title: "Sukses", description: "Outlet baru berhasil dibuat." });
-            }
-            setOutletDialogOpen(false);
-            setEditingOutlet(null);
-            await fetchOutlets();
-            await refreshProfile();
-        } catch (error: any) {
-            console.error("Error saving outlet:", error);
-            const errorMessage = error.message || "Terjadi kesalahan yang tidak diketahui.";
-            toast({ variant: "destructive", title: "Gagal Menyimpan", description: errorMessage });
-        } finally {
-            setIsSubmitting(false);
-        }
+       // Temporarily disabled
+       toast({ title: "Fitur Dinonaktifkan", description: "Fitur simpan outlet sedang dalam perbaikan." });
     };
     
     const handleDeleteOutlet = async (outletId: string) => {
-        if (!confirm("Apakah Anda yakin ingin menghapus outlet ini? Tindakan ini tidak dapat dibatalkan.")) return;
-        
-        setIsSubmitting(true);
-        try {
-            const deleteOutletFn = httpsCallable(functions, 'deleteOutlet');
-            await deleteOutletFn({ outletId });
-            toast({ title: "Sukses", description: "Outlet berhasil dihapus." });
-            await fetchOutlets();
-            await refreshProfile();
-        } catch (error: any) {
-             console.error("Error deleting outlet:", error);
-             const errorMessage = error.message || "Terjadi kesalahan yang tidak diketahui.";
-            toast({ variant: "destructive", title: "Gagal Menghapus", description: errorMessage });
-        } finally {
-            setIsSubmitting(false);
-        }
+       // Temporarily disabled
+       toast({ title: "Fitur Dinonaktifkan", description: "Fitur hapus outlet sedang dalam perbaikan." });
     };
 
     const handleOpenGradeDialog = (grade: Partial<Grade> | null = null) => {
@@ -413,7 +358,7 @@ export default function SettingsPage() {
                                                 <Input id="outlet-name" value={editingOutlet?.name || ''} onChange={e => setEditingOutlet(prev => prev ? {...prev, name: e.target.value} : null)} className="col-span-3" />
                                             </div>
                                         </div>
-                                        <DialogFooter><Button onClick={handleSaveOutlet} disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Simpan</Button></DialogFooter>
+                                        <DialogFooter><Button onClick={handleSaveOutlet} disabled={true}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Simpan</Button></DialogFooter>
                                     </DialogContent>
                                 </Dialog>
                             </div>
@@ -444,7 +389,7 @@ export default function SettingsPage() {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuItem onClick={() => handleOpenOutletDialog(outlet)}>Ubah</DropdownMenuItem>
-                                                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteOutlet(outlet.id)}>Hapus</DropdownMenuItem>
+                                                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteOutlet(outlet.id!)}>Hapus</DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </TableCell>

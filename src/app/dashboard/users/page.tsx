@@ -15,14 +15,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from '@/components/ui/badge';
 import { getFirestore, collection, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { firebaseApp } from '@/lib/firebase/config';
 
 export default function UsersPage() {
     const { toast } = useToast();
-    const { profile: currentProfile, loading: authLoading, selectedOrganizationId } = useAuth();
+    const { user, profile: currentProfile, loading: authLoading, selectedOrganizationId } = useAuth();
     const db = getFirestore(firebaseApp);
-    const functions = getFunctions(firebaseApp);
 
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -70,67 +68,13 @@ export default function UsersPage() {
     };
 
     const handleSaveUser = async () => {
-        if (!editingUser || !editingUser.full_name || !editingUser.email || !editingUser.role) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Nama, Email, dan Peran harus diisi.' });
-            return;
-        }
-        
-        if(!editingUser.id && (!editingUser.password || editingUser.password.length < 6)){
-             toast({ variant: 'destructive', title: 'Error', description: 'Password harus diisi minimal 6 karakter.' });
-            return;
-        }
-        
-        if (!selectedOrganizationId) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Outlet belum dipilih.' });
-            return;
-        }
-
-        setIsSubmitting(true);
-        try {
-            if (editingUser.id) { // Update existing user
-                const userDocRef = doc(db, 'profiles', editingUser.id);
-                await updateDoc(userDocRef, {
-                    full_name: editingUser.full_name,
-                    role: editingUser.role,
-                });
-                toast({ title: 'Sukses', description: `Pengguna berhasil diperbarui.` });
-
-            } else { // Create new user
-                const createUserFn = httpsCallable(functions, 'createUser');
-                await createUserFn({
-                    email: editingUser.email,
-                    password: editingUser.password,
-                    fullName: editingUser.full_name,
-                    role: editingUser.role,
-                    organizationId: selectedOrganizationId
-                });
-                 toast({ title: 'Sukses', description: `Pengguna baru telah ditambahkan.` });
-            }
-            setDialogOpen(false);
-            fetchUsers();
-        } catch (error: any) {
-            const errorMessage = error.message || "Terjadi kesalahan internal.";
-            toast({ variant: 'destructive', title: 'Error', description: errorMessage });
-        } finally {
-            setIsSubmitting(false);
-        }
+        // Temporarily disabled
+        toast({ title: "Fitur Dinonaktifkan", description: "Fitur simpan pengguna sedang dalam perbaikan." });
     };
 
     const handleDeleteUser = async (userId: string) => {
-        if (!confirm('Apakah Anda yakin ingin menghapus pengguna ini? Ini akan menghapus akun login mereka secara permanen.')) return;
-        
-        setIsSubmitting(true);
-        try {
-            const deleteUserFn = httpsCallable(functions, 'deleteUser');
-            await deleteUserFn({ uid: userId });
-            toast({ title: 'Sukses', description: 'Pengguna berhasil dihapus.' });
-            fetchUsers();
-        } catch (error: any) {
-             const errorMessage = error.message || "Terjadi kesalahan internal.";
-             toast({ variant: 'destructive', title: 'Error', description: errorMessage });
-        } finally {
-            setIsSubmitting(false);
-        }
+        // Temporarily disabled
+        toast({ title: "Fitur Dinonaktifkan", description: "Fitur hapus pengguna sedang dalam perbaikan." });
     };
     
     if (authLoading) {
@@ -180,7 +124,7 @@ export default function UsersPage() {
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button onClick={handleSaveUser} type="submit" disabled={isSubmitting}>
+                            <Button onClick={handleSaveUser} type="submit" disabled={true}>
                                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Simpan
                             </Button>

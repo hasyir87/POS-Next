@@ -15,8 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SniposLogo } from "./snipos-logo";
 import { AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { firebaseApp } from "@/lib/firebase/config";
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   fullName: z.string().min(3, { message: "Nama lengkap minimal 3 karakter." }),
@@ -30,11 +29,11 @@ const formSchema = z.object({
 });
 
 export default function SignupForm() {
+  const { toast } = useToast();
   const [error, setErrorState] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
-  const functions = getFunctions(firebaseApp);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -50,45 +49,8 @@ export default function SignupForm() {
   const { setError } = form;
 
   const handleSignup = async (values: z.infer<typeof formSchema>) => {
-    setErrorState(null);
-    setSuccess(null);
-    setLoading(true);
-
-    try {
-      const createOwnerFn = httpsCallable(functions, 'createOwner');
-      const result: any = await createOwnerFn({
-        email: values.email,
-        password: values.password,
-        fullName: values.fullName,
-        organizationName: values.organizationName,
-      });
-
-      if (result.data.status === 'error') {
-        throw new Error(result.data.message);
-      }
-      
-      setSuccess("Pendaftaran berhasil! Anda akan diarahkan ke halaman login untuk masuk dengan akun baru Anda.");
-      setTimeout(() => {
-        router.push('/');
-      }, 3000);
-
-    } catch (err: any) {
-      console.error("Client-side signup error:", err);
-      let errorMessage = err.message || "Terjadi kesalahan yang tidak terduga.";
-      
-      // Menangani error spesifik dari backend
-      if (errorMessage.includes("Organization name is already in use")) {
-         errorMessage = "Nama organisasi sudah digunakan. Silakan pilih nama lain.";
-         setError('organizationName', { type: 'manual', message: errorMessage });
-      } else if (errorMessage.includes("Email is already in use")) {
-         errorMessage = "Email ini sudah terdaftar. Silakan gunakan email lain.";
-         setError('email', { type: 'manual', message: errorMessage });
-      }
-      
-      setErrorState(errorMessage);
-    } finally {
-      setLoading(false);
-    }
+    // Temporarily disabled
+    toast({ title: "Fitur Dinonaktifkan", description: "Fitur pendaftaran sedang dalam perbaikan." });
   };
 
   return (
@@ -180,7 +142,7 @@ export default function SignupForm() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={loading || !!success}>
+              <Button type="submit" className="w-full" disabled={true}>
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Daftar sebagai Pemilik"}
               </Button>
             </form>
@@ -196,5 +158,3 @@ export default function SignupForm() {
     </div>
   );
 }
-
-    
