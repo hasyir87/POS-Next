@@ -1,5 +1,6 @@
 
 {
+  "$schema": "https://json.schemastore.org/package.json",
   "name": "functions",
   "scripts": {
     "lint": "eslint --ext .js,.ts .",
@@ -16,6 +17,7 @@
   },
   "main": "lib/index.js",
   "dependencies": {
+    "cors": "^2.8.5",
     "firebase-admin": "^12.1.1",
     "firebase-functions": "^5.0.1"
   },
@@ -29,5 +31,3 @@
   },
   "private": true
 }
-
-    
