@@ -51,8 +51,17 @@ export default function SignupForm() {
     setErrorState(null);
     setSuccess(null);
 
+    const functionUrl = process.env.NEXT_PUBLIC_FIREBASE_FUNCTIONS_URL;
+    if (!functionUrl) {
+      setErrorState("URL untuk fungsi backend tidak dikonfigurasi.");
+      setLoading(false);
+      return;
+    }
+    const url = `${functionUrl}/createOwner`;
+
+
     try {
-        const result = await fetch('/api/functions/createOwner', {
+        const result = await fetch(url, {
              method: 'POST',
              headers: { 'Content-Type': 'application/json' },
              body: JSON.stringify({

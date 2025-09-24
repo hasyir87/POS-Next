@@ -10,8 +10,15 @@ export async function callFirebaseFunction(functionName: string, body: any) {
     }
 
     const token = await user.getIdToken();
+    const functionUrl = process.env.NEXT_PUBLIC_FIREBASE_FUNCTIONS_URL;
 
-    const response = await fetch(`/api/functions/${functionName}`, {
+    if (!functionUrl) {
+        throw new Error("Firebase Functions URL is not configured.");
+    }
+
+    const url = `${functionUrl}/${functionName}`;
+
+    const response = await fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -25,16 +32,16 @@ export async function callFirebaseFunction(functionName: string, body: any) {
         try {
             errorData = await response.json();
         } catch (e) {
-            throw new Error(response.statusText || 'An unknown network error occurred.');
+            throw new Error(response.statusText || `An unknown network error occurred (${response.status}).`);
         }
-        throw new Error(errorData.message || 'An unknown error occurred.');
+        throw new Error(errorData.message || `An unknown error occurred (${response.status}).`);
     }
-
-    // Handle cases where the response might be empty (e.g., for a 204 No Content)
+    
+    // Handle empty responses
     const responseText = await response.text();
     if (!responseText) {
         return { status: 'success' };
     }
     
-    return await JSON.parse(responseText);
+    return JSON.parse(responseText);
 }

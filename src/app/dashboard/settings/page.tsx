@@ -161,7 +161,7 @@ export default function SettingsPage() {
             fetchOutlets();
         } catch (error: any) {
             console.error("Error saving outlet:", error);
-            toast({ variant: "destructive", title: "Error", description: error.message });
+            toast({ variant: "destructive", title: "Gagal Menyimpan Outlet", description: error.message });
         } finally {
             setIsSubmitting(false);
         }

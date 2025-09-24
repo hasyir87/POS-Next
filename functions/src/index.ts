@@ -25,6 +25,11 @@ const getAuthenticatedUid = async (request: functions.https.Request): Promise<st
 
 export const createOwner = functions.https.onRequest((request, response) => {
     corsMiddleware(request, response, async () => {
+        if (request.method === 'OPTIONS') {
+            response.status(204).send('');
+            return;
+        }
+
         if (request.method !== 'POST') {
             response.status(405).send('Method Not Allowed');
             return;
@@ -115,6 +120,11 @@ export const createOwner = functions.https.onRequest((request, response) => {
 
 export const createUser = functions.https.onRequest((request, response) => {
     corsMiddleware(request, response, async () => {
+        if (request.method === 'OPTIONS') {
+            response.status(204).send('');
+            return;
+        }
+
         if (request.method !== 'POST') {
             response.status(405).send('Method Not Allowed');
             return;
@@ -178,6 +188,11 @@ export const createUser = functions.https.onRequest((request, response) => {
 
 export const deleteUser = functions.https.onRequest((request, response) => {
     corsMiddleware(request, response, async () => {
+        if (request.method === 'OPTIONS') {
+            response.status(204).send('');
+            return;
+        }
+
         if (request.method !== 'POST') {
             response.status(405).send('Method Not Allowed');
             return;
@@ -226,6 +241,10 @@ export const deleteUser = functions.https.onRequest((request, response) => {
 
 export const createOutlet = functions.https.onRequest((request, response) => {
     corsMiddleware(request, response, async () => {
+        if (request.method === 'OPTIONS') {
+            response.status(204).send('');
+            return;
+        }
         if (request.method !== 'POST') {
             response.status(405).send('Method Not Allowed');
             return;
@@ -244,7 +263,13 @@ export const createOutlet = functions.https.onRequest((request, response) => {
                 throw new functions.https.HttpsError("permission-denied", "You do not have permission to create outlets.");
             }
             
-            const rootOrgId = callingUserData.parent_organization_id || callingUserData.organization_id;
+            const rootOrgRef = await db.doc(`organizations/${callingUserData.organization_id}`).get();
+            if(!rootOrgRef.exists) {
+                throw new functions.https.HttpsError("failed-precondition", "User's main organization not found.");
+            }
+            const rootOrgData = rootOrgRef.data();
+            const rootOrgId = rootOrgData?.parent_organization_id || callingUserData.organization_id;
+
             if(!rootOrgId) {
                 throw new functions.https.HttpsError("failed-precondition", "User has no root organization.");
             }
@@ -277,6 +302,10 @@ export const createOutlet = functions.https.onRequest((request, response) => {
 
 export const updateOutlet = functions.https.onRequest((request, response) => {
     corsMiddleware(request, response, async () => {
+        if (request.method === 'OPTIONS') {
+            response.status(204).send('');
+            return;
+        }
         if (request.method !== 'POST') {
             response.status(405).send('Method Not Allowed');
             return;
@@ -318,6 +347,10 @@ export const updateOutlet = functions.https.onRequest((request, response) => {
 
 export const deleteOutlet = functions.https.onRequest((request, response) => {
     corsMiddleware(request, response, async () => {
+        if (request.method === 'OPTIONS') {
+            response.status(204).send('');
+            return;
+        }
         if (request.method !== 'POST') {
             response.status(405).send('Method Not Allowed');
             return;
