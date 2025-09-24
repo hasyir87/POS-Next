@@ -1,0 +1,36 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ATURAN UMUM: Izinkan pengguna yang terotentikasi untuk mengakses data
+    // yang sesuai dengan organization_id mereka.
+    // Ini berlaku untuk SEMUA koleksi (products, customers, transactions, dll.)
+    // kecuali yang didefinisikan secara spesifik di bawah.
+    match /{collection}/{docId} {
+      allow read, write: if request.auth != null &&
+                            request.auth.uid != null &&
+                            get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.organization_id == resource.data.organization_id;
+    }
+
+    // ATURAN SPESIFIK 1: Aturan untuk koleksi 'profiles'.
+    // Aturan ini menimpa aturan umum di atas.
+    // Hanya izinkan pengguna membaca/memperbarui profil mereka sendiri.
+    match /profiles/{userId} {
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      // Melarang pembuatan atau penghapusan profil dari sisi klien.
+      allow create, delete: if false; 
+    }
+
+    // ATURAN SPESIFIK 2: Aturan untuk koleksi 'organizations'.
+    // Aturan ini juga menimpa aturan umum.
+    // Izinkan semua pengguna yang login untuk membaca data organisasi.
+    match /organizations/{orgId} {
+        allow read: if request.auth != null;
+        // Penulisan (create, update, delete) dikelola oleh Cloud Functions,
+        // jadi kita bisa lebih ketat di sini atau mengandalkan validasi di fungsi.
+        // Untuk keamanan, kita hanya izinkan admin/owner/superadmin.
+        allow write: if request.auth != null && get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role in ['owner', 'superadmin', 'admin'];
+    }
+  }
+}

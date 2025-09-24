@@ -51,40 +51,21 @@ export default function SignupForm() {
     setErrorState(null);
     setSuccess(null);
 
-    const functionUrl = process.env.NEXT_PUBLIC_FIREBASE_FUNCTIONS_URL;
-    if (!functionUrl) {
-      setErrorState("URL untuk fungsi backend tidak dikonfigurasi.");
-      setLoading(false);
-      return;
-    }
-    const url = `${functionUrl}/createOwner`;
-
-
     try {
-        const result = await fetch(url, {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({
-                email: values.email,
-                password: values.password,
-                fullName: values.fullName,
-                organizationName: values.organizationName,
-            })
+        const result: any = await callFirebaseFunction('createOwner', {
+            email: values.email,
+            password: values.password,
+            fullName: values.fullName,
+            organizationName: values.organizationName,
         });
 
-        const data = await result.json();
-
-        if (!result.ok) {
-            throw new Error(data.message || 'Terjadi kesalahan yang tidak diketahui.');
-        }
-
-        if (data?.status === 'success') {
+        if (result?.status === 'success') {
             setSuccess("Akun berhasil dibuat! Anda akan dialihkan ke halaman login untuk masuk.");
             setTimeout(() => {
                 router.push('/');
             }, 3000);
         } else {
-            throw new Error(data?.message || 'Terjadi kesalahan yang tidak diketahui.');
+            throw new Error(result?.message || 'Terjadi kesalahan yang tidak diketahui.');
         }
     } catch (error: any) {
         console.error("Signup error:", error);
