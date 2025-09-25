@@ -25,14 +25,11 @@ initializeApp();
 const db = getFirestore();
 const auth = getAuth();
 
-// Wrapper untuk menangani otentikasi dan error
+// Wrapper untuk menangani otentikasi dan error pada fungsi onCall
 const createCallable = (handler: (data: any, context: any) => Promise<any>) => {
   return onCall(async (request) => {
     try {
-      // Jika fungsi memerlukan auth, cek di sini
-      // if (!request.auth) {
-      //   throw new HttpsError("unauthenticated", "Authentication required.");
-      // }
+      // Panggil handler asli dengan data dan konteks
       const result = await handler(request.data, request);
       return result;
     } catch (error: any) {
@@ -42,11 +39,12 @@ const createCallable = (handler: (data: any, context: any) => Promise<any>) => {
             details: error.details,
         });
 
+        // Jika error sudah berupa HttpsError, lempar kembali
         if (error instanceof HttpsError) {
             throw error;
         }
         
-        // Bungkus error umum ke dalam HttpsError
+        // Bungkus error umum ke dalam HttpsError agar bisa diterima klien
         throw new HttpsError("internal", error.message || "An unexpected error occurred.");
     }
   });
