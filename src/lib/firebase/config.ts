@@ -1,8 +1,11 @@
+
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, connectAuthEmulator } from "firebase/auth";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -20,8 +23,13 @@ const firebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp()
 // In development, connect to the emulators
 if (process.env.NODE_ENV === 'development') {
     try {
+        // It's important to disable app check in emulator mode
+        if (typeof window !== "undefined") {
+          self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+        }
+
         const auth = getAuth(firebaseApp);
-        connectAuthEmulator(auth, 'http://localhost:9099');
+        connectAuthEmulator(auth, 'http://localhost:9099', { disableEmulatorWarnings: true });
 
         const db = getFirestore(firebaseApp);
         connectFirestoreEmulator(db, 'localhost', 8080);
