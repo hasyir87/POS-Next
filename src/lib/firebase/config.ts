@@ -1,10 +1,10 @@
 
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, connectAuthEmulator } from "firebase/auth";
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
-import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
-import { initializeAppCheck, ReCaptchaV3Provider, onTokenChanged } from "firebase/app-check";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 
 // Your web app's Firebase configuration
@@ -20,34 +20,17 @@ const firebaseConfig = {
 // Initialize Firebase
 const firebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// In development, connect to the emulators
-if (process.env.NODE_ENV === 'development') {
-    try {
-        // This is the crucial part for emulators. 
-        // It tells App Check to use a debug token and not try to use reCAPTCHA.
-        if (typeof window !== "undefined") {
-            (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-        }
+// In development, we use emulators, but we only connect server-side code to them.
+// The client-side code will connect to the real Firebase services.
+// This is necessary because the browser (client) running on your local machine
+// cannot directly access the emulators running inside the cloud (Firebase Studio) container.
 
-        const auth = getAuth(firebaseApp);
-        connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableEmulatorWarnings: true });
-
-        const db = getFirestore(firebaseApp);
-        connectFirestoreEmulator(db, '127.0.0.1', 8080);
-        
-        const functions = getFunctions(firebaseApp, 'us-central1');
-        connectFunctionsEmulator(functions, '127.0.0.1', 5001);
-    } catch(e) {
-        console.error("Error connecting to Firebase emulators. Make sure they are running. `npm run emulators:start`", e);
-    }
-} else {
-    // Only initialize real App Check in production
-    if (typeof window !== "undefined") {
-        initializeAppCheck(firebaseApp, {
-            provider: new ReCaptchaV3Provider(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!),
-            isTokenAutoRefreshEnabled: true,
-        });
-    }
+// App Check is only initialized in production for the client.
+if (process.env.NODE_ENV === 'production' && typeof window !== 'undefined') {
+    initializeAppCheck(firebaseApp, {
+        provider: new ReCaptchaV3Provider(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!),
+        isTokenAutoRefreshEnabled: true,
+    });
 }
 
 
