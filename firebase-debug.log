@@ -443,3 +443,293 @@ io.netty.handler.codec.http2.Http2Exception: HTTP/2 client preface string missin
 └─────────────────────────┴───────────────┴─────────────────────┘
 Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
  
+[debug] [2025-09-25T08:30:32.579Z] Sep 25, 2025 8:30:32 AM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketChannelHandler channelClosed
+INFO: Websocket client disconnected
+ {"metadata":{"emulator":{"name":"firestore"},"message":"Sep 25, 2025 8:30:32 AM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketChannelHandler channelClosed\nINFO: Websocket client disconnected\n"}}
+[debug] [2025-09-25T08:49:54.856Z] ----------------------------------------------------------------------
+[debug] [2025-09-25T08:49:54.859Z] Command:       /nix/store/ws50yvm6vzlzf7jzz6n7xh4szddrack1-nodejs-20.19.1/bin/node /home/user/studio/node_modules/.bin/firebase emulators:start --import=./firebase-emulator-data --export-on-exit
+[debug] [2025-09-25T08:49:54.860Z] CLI Version:   13.35.1
+[debug] [2025-09-25T08:49:54.860Z] Platform:      linux
+[debug] [2025-09-25T08:49:54.860Z] Node Version:  v20.19.1
+[debug] [2025-09-25T08:49:54.861Z] Time:          Thu Sep 25 2025 08:49:54 GMT+0000 (Coordinated Universal Time)
+[debug] [2025-09-25T08:49:54.861Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-09-25T08:49:55.458Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-09-25T08:49:55.459Z] > authorizing via signed-in user (hasyir87@gmail.com)
+[debug] [2025-09-25T08:49:56.225Z] openjdk version "21.0.4" 2024-07-16 LTS
+OpenJDK Runtime Environment Zulu21.36+17-CA (build 21.0.4+7-LTS)
+OpenJDK 64-Bit Server VM Zulu21.36+17-CA (build 21.0.4+7-LTS, mixed mode, sharing)
+
+[debug] [2025-09-25T08:49:56.258Z] Parsed Java major version: 21
+[info] i  emulators: Starting emulators: auth, functions, firestore, extensions {"metadata":{"emulator":{"name":"hub"},"message":"Starting emulators: auth, functions, firestore, extensions"}}
+[debug] [2025-09-25T08:49:56.266Z] Checked if tokens are valid: false, expires at: 1758789537391
+[debug] [2025-09-25T08:49:56.266Z] Checked if tokens are valid: false, expires at: 1758789537391
+[debug] [2025-09-25T08:49:56.267Z] > refreshing access token with scopes: []
+[debug] [2025-09-25T08:49:56.275Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-09-25T08:49:56.275Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-09-25T08:49:56.326Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-09-25T08:49:56.327Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-09-25T08:49:56.361Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/scentpos [none]
+[debug] [2025-09-25T08:49:57.175Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/scentpos 200
+[debug] [2025-09-25T08:49:57.175Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/scentpos {"projectNumber":"709879248580","projectId":"scentpos","lifecycleState":"ACTIVE","name":"SNIPOS","labels":{"monospace-workspace-id":"studio-6978185199","firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-08-03T14:09:14.000672Z"}
+[warn] ⚠  hub: Error when trying to check port 4400 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:4400 {"metadata":{"emulator":{"name":"hub"},"message":"Error when trying to check port 4400 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:4400"}}
+[warn] ⚠  hub: Port 4400 is available on 127.0.0.1 but not ::1. This may cause issues with some clients. {"metadata":{"emulator":{"name":"hub"},"message":"Port 4400 is available on 127.0.0.1 but not ::1. This may cause issues with some clients."}}
+[warn] ⚠  hub: If you encounter connectivity issues, consider switching to a different port or explicitly specifying "host": "<ip address>" instead of hostname in firebase.json {"metadata":{"emulator":{"name":"hub"},"message":"If you encounter connectivity issues, consider switching to a different port or explicitly specifying \u001b[33m\"host\": \"<ip address>\"\u001b[39m instead of hostname in firebase.json"}}
+[warn] ⚠  ui: Error when trying to check port 4000 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:4000 {"metadata":{"emulator":{"name":"ui"},"message":"Error when trying to check port 4000 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:4000"}}
+[warn] ⚠  ui: Port 4000 is available on 127.0.0.1 but not ::1. This may cause issues with some clients. {"metadata":{"emulator":{"name":"ui"},"message":"Port 4000 is available on 127.0.0.1 but not ::1. This may cause issues with some clients."}}
+[warn] ⚠  ui: If you encounter connectivity issues, consider switching to a different port or explicitly specifying "host": "<ip address>" instead of hostname in firebase.json {"metadata":{"emulator":{"name":"ui"},"message":"If you encounter connectivity issues, consider switching to a different port or explicitly specifying \u001b[33m\"host\": \"<ip address>\"\u001b[39m instead of hostname in firebase.json"}}
+[warn] ⚠  logging: Error when trying to check port 4500 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:4500 {"metadata":{"emulator":{"name":"logging"},"message":"Error when trying to check port 4500 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:4500"}}
+[warn] ⚠  logging: Port 4500 is available on 127.0.0.1 but not ::1. This may cause issues with some clients. {"metadata":{"emulator":{"name":"logging"},"message":"Port 4500 is available on 127.0.0.1 but not ::1. This may cause issues with some clients."}}
+[warn] ⚠  logging: If you encounter connectivity issues, consider switching to a different port or explicitly specifying "host": "<ip address>" instead of hostname in firebase.json {"metadata":{"emulator":{"name":"logging"},"message":"If you encounter connectivity issues, consider switching to a different port or explicitly specifying \u001b[33m\"host\": \"<ip address>\"\u001b[39m instead of hostname in firebase.json"}}
+[warn] ⚠  auth: Error when trying to check port 9099 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:9099 {"metadata":{"emulator":{"name":"auth"},"message":"Error when trying to check port 9099 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:9099"}}
+[warn] ⚠  auth: Port 9099 is available on 127.0.0.1 but not ::1. This may cause issues with some clients. {"metadata":{"emulator":{"name":"auth"},"message":"Port 9099 is available on 127.0.0.1 but not ::1. This may cause issues with some clients."}}
+[warn] ⚠  auth: If you encounter connectivity issues, consider switching to a different port or explicitly specifying "host": "<ip address>" instead of hostname in firebase.json {"metadata":{"emulator":{"name":"auth"},"message":"If you encounter connectivity issues, consider switching to a different port or explicitly specifying \u001b[33m\"host\": \"<ip address>\"\u001b[39m instead of hostname in firebase.json"}}
+[warn] ⚠  firestore: Error when trying to check port 8080 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:8080 {"metadata":{"emulator":{"name":"firestore"},"message":"Error when trying to check port 8080 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:8080"}}
+[warn] ⚠  firestore: Port 8080 is available on 127.0.0.1 but not ::1. This may cause issues with some clients. {"metadata":{"emulator":{"name":"firestore"},"message":"Port 8080 is available on 127.0.0.1 but not ::1. This may cause issues with some clients."}}
+[warn] ⚠  firestore: If you encounter connectivity issues, consider switching to a different port or explicitly specifying "host": "<ip address>" instead of hostname in firebase.json {"metadata":{"emulator":{"name":"firestore"},"message":"If you encounter connectivity issues, consider switching to a different port or explicitly specifying \u001b[33m\"host\": \"<ip address>\"\u001b[39m instead of hostname in firebase.json"}}
+[warn] ⚠  firestore.websocket: Error when trying to check port 9150 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:9150 {"metadata":{"emulator":{"name":"firestore"},"message":"Error when trying to check port 9150 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:9150"}}
+[warn] ⚠  firestore: Port 9150 is available on 127.0.0.1 but not ::1. This may cause issues with some clients. {"metadata":{"emulator":{"name":"firestore"},"message":"Port 9150 is available on 127.0.0.1 but not ::1. This may cause issues with some clients."}}
+[warn] ⚠  firestore: If you encounter connectivity issues, consider switching to a different port or explicitly specifying "host": "<ip address>" instead of hostname in firebase.json {"metadata":{"emulator":{"name":"firestore"},"message":"If you encounter connectivity issues, consider switching to a different port or explicitly specifying \u001b[33m\"host\": \"<ip address>\"\u001b[39m instead of hostname in firebase.json"}}
+[debug] [2025-09-25T08:49:57.199Z] assigned listening specs for emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"auth":[{"address":"127.0.0.1","family":"IPv4","port":9099}],"firestore":[{"address":"127.0.0.1","family":"IPv4","port":8080}],"firestore.websocket":[{"address":"127.0.0.1","family":"IPv4","port":9150}]},"metadata":{"message":"assigned listening specs for emulators"}}
+[debug] [2025-09-25T08:49:57.210Z] [hub] writing locator at /tmp/hub-scentpos.json
+[debug] [2025-09-25T08:49:57.230Z] [Extensions] Started Extensions emulator, this is a noop.
+[warn] ⚠  functions: Error when trying to check port 5001 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:5001 {"metadata":{"emulator":{"name":"functions"},"message":"Error when trying to check port 5001 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:5001"}}
+[warn] ⚠  functions: Port 5001 is available on 127.0.0.1 but not ::1. This may cause issues with some clients. {"metadata":{"emulator":{"name":"functions"},"message":"Port 5001 is available on 127.0.0.1 but not ::1. This may cause issues with some clients."}}
+[warn] ⚠  functions: If you encounter connectivity issues, consider switching to a different port or explicitly specifying "host": "<ip address>" instead of hostname in firebase.json {"metadata":{"emulator":{"name":"functions"},"message":"If you encounter connectivity issues, consider switching to a different port or explicitly specifying \u001b[33m\"host\": \"<ip address>\"\u001b[39m instead of hostname in firebase.json"}}
+[warn] ⚠  eventarc: Error when trying to check port 9299 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:9299 {"metadata":{"emulator":{"name":"eventarc"},"message":"Error when trying to check port 9299 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:9299"}}
+[warn] ⚠  eventarc: Port 9299 is available on 127.0.0.1 but not ::1. This may cause issues with some clients. {"metadata":{"emulator":{"name":"eventarc"},"message":"Port 9299 is available on 127.0.0.1 but not ::1. This may cause issues with some clients."}}
+[warn] ⚠  eventarc: If you encounter connectivity issues, consider switching to a different port or explicitly specifying "host": "<ip address>" instead of hostname in firebase.json {"metadata":{"emulator":{"name":"eventarc"},"message":"If you encounter connectivity issues, consider switching to a different port or explicitly specifying \u001b[33m\"host\": \"<ip address>\"\u001b[39m instead of hostname in firebase.json"}}
+[warn] ⚠  tasks: Error when trying to check port 9499 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:9499 {"metadata":{"emulator":{"name":"tasks"},"message":"Error when trying to check port 9499 on ::1: Error: listen EADDRNOTAVAIL: address not available ::1:9499"}}
+[warn] ⚠  tasks: Port 9499 is available on 127.0.0.1 but not ::1. This may cause issues with some clients. {"metadata":{"emulator":{"name":"tasks"},"message":"Port 9499 is available on 127.0.0.1 but not ::1. This may cause issues with some clients."}}
+[warn] ⚠  tasks: If you encounter connectivity issues, consider switching to a different port or explicitly specifying "host": "<ip address>" instead of hostname in firebase.json {"metadata":{"emulator":{"name":"tasks"},"message":"If you encounter connectivity issues, consider switching to a different port or explicitly specifying \u001b[33m\"host\": \"<ip address>\"\u001b[39m instead of hostname in firebase.json"}}
+[debug] [2025-09-25T08:49:57.235Z] late-assigned ports for functions and eventarc emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"auth":[{"address":"127.0.0.1","family":"IPv4","port":9099}],"firestore":[{"address":"127.0.0.1","family":"IPv4","port":8080}],"firestore.websocket":[{"address":"127.0.0.1","family":"IPv4","port":9150}],"functions":[{"address":"127.0.0.1","family":"IPv4","port":5001}],"eventarc":[{"address":"127.0.0.1","family":"IPv4","port":9299}],"tasks":[{"address":"127.0.0.1","family":"IPv4","port":9499}]},"metadata":{"message":"late-assigned ports for functions and eventarc emulators"}}
+[warn] ⚠  functions: The following emulators are not running, calls to these services from the Functions emulator will affect production: apphosting, database, hosting, pubsub, storage, dataconnect {"metadata":{"emulator":{"name":"functions"},"message":"The following emulators are not running, calls to these services from the Functions emulator will affect production: \u001b[1mapphosting, database, hosting, pubsub, storage, dataconnect\u001b[22m"}}
+[warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
+[debug] [2025-09-25T08:50:23.766Z] Checked if tokens are valid: true, expires at: 1758793795327
+[debug] [2025-09-25T08:50:23.766Z] Checked if tokens are valid: true, expires at: 1758793795327
+[debug] [2025-09-25T08:50:23.766Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/scentpos/adminSdkConfig [none]
+[debug] [2025-09-25T08:50:24.039Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/scentpos/adminSdkConfig 200
+[debug] [2025-09-25T08:50:24.039Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/scentpos/adminSdkConfig {"projectId":"scentpos","databaseURL":"https://scentpos-default-rtdb.asia-southeast1.firebasedatabase.app","storageBucket":"scentpos.firebasestorage.app"}
+[info] i  firestore: Importing data from /home/user/studio/firebase-emulator-data/firestore_export/firestore_export.overall_export_metadata {"metadata":{"emulator":{"name":"firestore"},"message":"Importing data from /home/user/studio/firebase-emulator-data/firestore_export/firestore_export.overall_export_metadata"}}
+[warn] ⚠  firestore: Cloud Firestore Emulator does not support multiple databases yet. {"metadata":{"emulator":{"name":"firestore"},"message":"Cloud Firestore Emulator does not support multiple databases yet."}}
+[warn] ⚠  firestore: Did not find a Cloud Firestore rules file specified in a firebase.json config file. {"metadata":{"emulator":{"name":"firestore"},"message":"Did not find a Cloud Firestore rules file specified in a firebase.json config file."}}
+[warn] ⚠  firestore: The emulator will default to allowing all reads and writes. Learn more about this option: https://firebase.google.com/docs/emulator-suite/install_and_configure#security_rules_configuration. {"metadata":{"emulator":{"name":"firestore"},"message":"The emulator will default to allowing all reads and writes. Learn more about this option: https://firebase.google.com/docs/emulator-suite/install_and_configure#security_rules_configuration."}}
+[debug] [2025-09-25T08:50:24.218Z] Ignoring unsupported arg: auto_download {"metadata":{"emulator":{"name":"firestore"},"message":"Ignoring unsupported arg: auto_download"}}
+[debug] [2025-09-25T08:50:24.218Z] Ignoring unsupported arg: single_project_mode_error {"metadata":{"emulator":{"name":"firestore"},"message":"Ignoring unsupported arg: single_project_mode_error"}}
+[debug] [2025-09-25T08:50:24.219Z] Starting Firestore Emulator with command {"binary":"java","args":["-Dgoogle.cloud_firestore.debug_log_level=FINE","-Duser.language=en","-jar","/home/user/.cache/firebase/emulators/cloud-firestore-emulator-v1.19.8.jar","--host","127.0.0.1","--port",8080,"--websocket_port",9150,"--project_id","scentpos","--seed_from_export","/home/user/studio/firebase-emulator-data/firestore_export/firestore_export.overall_export_metadata","--single_project_mode",true,"--functions_emulator","127.0.0.1:5001"],"optionalArgs":["port","webchannel_port","host","rules","websocket_port","functions_emulator","seed_from_export","project_id","single_project_mode"],"joinArgs":false,"shell":false,"port":8080} {"metadata":{"emulator":{"name":"firestore"},"message":"Starting Firestore Emulator with command {\"binary\":\"java\",\"args\":[\"-Dgoogle.cloud_firestore.debug_log_level=FINE\",\"-Duser.language=en\",\"-jar\",\"/home/user/.cache/firebase/emulators/cloud-firestore-emulator-v1.19.8.jar\",\"--host\",\"127.0.0.1\",\"--port\",8080,\"--websocket_port\",9150,\"--project_id\",\"scentpos\",\"--seed_from_export\",\"/home/user/studio/firebase-emulator-data/firestore_export/firestore_export.overall_export_metadata\",\"--single_project_mode\",true,\"--functions_emulator\",\"127.0.0.1:5001\"],\"optionalArgs\":[\"port\",\"webchannel_port\",\"host\",\"rules\",\"websocket_port\",\"functions_emulator\",\"seed_from_export\",\"project_id\",\"single_project_mode\"],\"joinArgs\":false,\"shell\":false,\"port\":8080}"}}
+[info] i  firestore: Firestore Emulator logging to firestore-debug.log {"metadata":{"emulator":{"name":"firestore"},"message":"Firestore Emulator logging to \u001b[1mfirestore-debug.log\u001b[22m"}}
+[debug] [2025-09-25T08:50:26.126Z] Functions emulator received unknown request at path /
+[debug] [2025-09-25T08:50:26.215Z] Eventarc emulator received unknown request at path / {"metadata":{"emulator":{"name":"eventarc"},"message":"Eventarc emulator received unknown request at path /"}}
+[debug] [2025-09-25T08:50:26.239Z] Functions emulator received unknown request at path /
+[debug] [2025-09-25T08:50:26.313Z] Eventarc emulator received unknown request at path / {"metadata":{"emulator":{"name":"eventarc"},"message":"Eventarc emulator received unknown request at path /"}}
+[debug] [2025-09-25T08:50:28.646Z] Sep 25, 2025 8:50:28 AM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketServer start
+INFO: Started WebSocket server on ws://127.0.0.1:9150
+ {"metadata":{"emulator":{"name":"firestore"},"message":"Sep 25, 2025 8:50:28 AM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketServer start\nINFO: Started WebSocket server on ws://127.0.0.1:9150\n"}}
+[debug] [2025-09-25T08:50:28.711Z] API endpoint: http:// {"metadata":{"emulator":{"name":"firestore"},"message":"API endpoint: http://"}}
+[debug] [2025-09-25T08:50:28.717Z] 127.0.0.1:8080
+If you are using a library that supports the FIRESTORE_EMULATOR_HOST environment variable, run:
+
+   export FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
+
+If you are running a Firestore in Datastore Mode project, run:
+
+   export DATASTORE_EMULATOR_HOST=127.0.0.1:8080
+
+Note: Support for Datastore Mode is in preview. If you encounter any bugs please file at https://github.com/firebase/firebase-tools/issues.
+Dev App Server is now running.
+
+ {"metadata":{"emulator":{"name":"firestore"},"message":"127.0.0.1:8080\nIf you are using a library that supports the FIRESTORE_EMULATOR_HOST environment variable, run:\n\n   export FIRESTORE_EMULATOR_HOST=127.0.0.1:8080\n\nIf you are running a Firestore in Datastore Mode project, run:\n\n   export DATASTORE_EMULATOR_HOST=127.0.0.1:8080\n\nNote: Support for Datastore Mode is in preview. If you encounter any bugs please file at https://github.com/firebase/firebase-tools/issues.\nDev App Server is now running.\n\n"}}
+[info] ✔  firestore: Firestore Emulator UI websocket is running on 9150. {"metadata":{"emulator":{"name":"firestore"},"message":"Firestore Emulator UI websocket is running on 9150."}}
+[debug] [2025-09-25T08:50:49.494Z] Sep 25, 2025 8:50:31 AM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketChannelHandler initChannel
+INFO: Connected to new websocket client
+Sep 25, 2025 8:50:31 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead
+INFO: Detected non-HTTP/2 connection.
+Sep 25, 2025 8:50:31 AM io.grpc.netty.NettyServerTransport notifyTerminated
+INFO: Transport failed
+io.netty.handler.codec.http2.Http2Exception: Unexpected HTTP/1.x request: GET / 
+	at io.netty.handler.codec.http2.Http2Exception.connectionError(Http2Exception.java:107)
+	at io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.readClientPrefaceString(Http2ConnectionHandler.java:315)
+	at io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.decode(Http2ConnectionHandler.java:245)
+	at io.netty.handler.codec.http2.Http2ConnectionHandler.decode(Http2ConnectionHandler.java:451)
+	at io.netty.handler.codec.ByteToMessageDecoder.decodeRemovalReentryProtection(ByteToMessageDecoder.java:530)
+	at io.netty.handler.codec.ByteToMessageDecoder.callDecode(ByteToMessageDecoder.java:469)
+	at io.netty.handler.codec.ByteToMessageDecoder.channelRead(ByteToMessageDecoder.java:290)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:444)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:412)
+	at io.netty.channel.DefaultChannelPipeline$HeadContext.channelRead(DefaultChannelPipeline.java:1407)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:440)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)
+	at io.netty.channel.DefaultChannelPipeline.fireChannelRead(DefaultChannelPipeline.java:918)
+	at io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:166)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:788)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:994)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+
+Sep 25, 2025 8:50:31 AM io.grpc.netty.NettyServerTransport notifyTerminated
+INFO: Transport failed
+io.netty.handler.codec.http2.Http2Exception: HTTP/2 client preface string missing or corrupt. Hex dump for received bytes: 16030105a8010005a40303abb35d1c919f475ad3dd26934c
+	at io.netty.handler.codec.http2.Http2Exception.connectionError(Http2Exception.java:107)
+	at io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.readClientPrefaceString(Http2ConnectionHandler.java:319)
+	at io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.decode(Http2ConnectionHandler.java:245)
+	at io.netty.handler.codec.http2.Http2ConnectionHandler.decode(Http2ConnectionHandler.java:451)
+	at io.netty.handler.codec.ByteToMessageDecoder.decodeRemovalReentryProtection(ByteToMessageDecoder.java:530)
+	at io.netty.handler.codec.ByteToMessageDecoder.callDecode(ByteToMessageDecoder.java:469)
+	at io.netty.handler.codec.ByteToMessageDecoder.channelRead(ByteToMessageDecoder.java:290)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:444)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:412)
+	at io.netty.channel.DefaultChannelPipeline$HeadContext.channelRead(DefaultChannelPipeline.java:1407)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:440)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)
+	at io.netty.channel.DefaultChannelPipeline.fireChannelRead(DefaultChannelPipeline.java:918)
+	at io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:166)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:788)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:994)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+
+Sep 25, 2025 8:50:31 AM io.grpc.netty.NettyServerTransport notifyTerminated
+INFO: Transport failed
+io.netty.handler.codec.http2.Http2Exception: Unexpected HTTP/1.x request: GET / 
+	at io.netty.handler.codec.http2.Http2Exception.connectionError(Http2Exception.java:107)
+	at io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.readClientPrefaceString(Http2ConnectionHandler.java:315)
+	at io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.decode(Http2ConnectionHandler.java:245)
+	at io.netty.handler.codec.http2.Http2ConnectionHandler.decode(Http2ConnectionHandler.java:451)
+	at io.netty.handler.codec.ByteToMessageDecoder.decodeRemovalReentryProtection(ByteToMessageDecoder.java:530)
+	at io.netty.handler.codec.ByteToMessageDecoder.callDecode(ByteToMessageDecoder.java:469)
+	at io.netty.handler.codec.ByteToMessageDecoder.channelRead(ByteToMessageDecoder.java:290)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:444)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:412)
+	at io.netty.channel.DefaultChannelPipeline$HeadContext.channelRead(DefaultChannelPipeline.java:1407)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:440)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)
+	at io.netty.channel.DefaultChannelPipeline.fireChannelRead(DefaultChannelPipeline.java:918)
+	at io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:166)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:788)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:994)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+
+Sep 25, 2025 8:50:32 AM io.grpc.netty.NettyServerTransport notifyTerminated
+INFO: Transport failed
+io.netty.handler.codec.http2.Http2Exception: HTTP/2 client preface string missing or corrupt. Hex dump for received bytes: 16030105a8010005a40303db586cc79ee89df61b68832c3c
+	at io.netty.handler.codec.http2.Http2Exception.connectionError(Http2Exception.java:107)
+	at io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.readClientPrefaceString(Http2ConnectionHandler.java:319)
+	at io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.decode(Http2ConnectionHandler.java:245)
+	at io.netty.handler.codec.http2.Http2ConnectionHandler.decode(Http2ConnectionHandler.java:451)
+	at io.netty.handler.codec.ByteToMessageDecoder.decodeRemovalReentryProtection(ByteToMessageDecoder.java:530)
+	at io.netty.handler.codec.ByteToMessageDecoder.callDecode(ByteToMessageDecoder.java:469)
+	at io.netty.handler.codec.ByteToMessageDecoder.channelRead(ByteToMessageDecoder.java:290)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:444)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:412)
+	at io.netty.channel.DefaultChannelPipeline$HeadContext.channelRead(DefaultChannelPipeline.java:1407)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:440)
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)
+	at io.netty.channel.DefaultChannelPipeline.fireChannelRead(DefaultChannelPipeline.java:918)
+	at io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:166)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:788)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:994)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+
+ {"metadata":{"emulator":{"name":"firestore"},"message":"Sep 25, 2025 8:50:31 AM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketChannelHandler initChannel\nINFO: Connected to new websocket client\nSep 25, 2025 8:50:31 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead\nINFO: Detected non-HTTP/2 connection.\nSep 25, 2025 8:50:31 AM io.grpc.netty.NettyServerTransport notifyTerminated\nINFO: Transport failed\nio.netty.handler.codec.http2.Http2Exception: Unexpected HTTP/1.x request: GET / \n\tat io.netty.handler.codec.http2.Http2Exception.connectionError(Http2Exception.java:107)\n\tat io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.readClientPrefaceString(Http2ConnectionHandler.java:315)\n\tat io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.decode(Http2ConnectionHandler.java:245)\n\tat io.netty.handler.codec.http2.Http2ConnectionHandler.decode(Http2ConnectionHandler.java:451)\n\tat io.netty.handler.codec.ByteToMessageDecoder.decodeRemovalReentryProtection(ByteToMessageDecoder.java:530)\n\tat io.netty.handler.codec.ByteToMessageDecoder.callDecode(ByteToMessageDecoder.java:469)\n\tat io.netty.handler.codec.ByteToMessageDecoder.channelRead(ByteToMessageDecoder.java:290)\n\tat io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:444)\n\tat io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)\n\tat io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:412)\n\tat io.netty.channel.DefaultChannelPipeline$HeadContext.channelRead(DefaultChannelPipeline.java:1407)\n\tat io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:440)\n\tat io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)\n\tat io.netty.channel.DefaultChannelPipeline.fireChannelRead(DefaultChannelPipeline.java:918)\n\tat io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:166)\n\tat io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:788)\n\tat io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724)\n\tat io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650)\n\tat io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)\n\tat io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:994)\n\tat io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)\n\tat io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)\n\tat java.base/java.lang.Thread.run(Thread.java:1583)\n\nSep 25, 2025 8:50:31 AM io.grpc.netty.NettyServerTransport notifyTerminated\nINFO: Transport failed\nio.netty.handler.codec.http2.Http2Exception: HTTP/2 client preface string missing or corrupt. Hex dump for received bytes: 16030105a8010005a40303abb35d1c919f475ad3dd26934c\n\tat io.netty.handler.codec.http2.Http2Exception.connectionError(Http2Exception.java:107)\n\tat io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.readClientPrefaceString(Http2ConnectionHandler.java:319)\n\tat io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.decode(Http2ConnectionHandler.java:245)\n\tat io.netty.handler.codec.http2.Http2ConnectionHandler.decode(Http2ConnectionHandler.java:451)\n\tat io.netty.handler.codec.ByteToMessageDecoder.decodeRemovalReentryProtection(ByteToMessageDecoder.java:530)\n\tat io.netty.handler.codec.ByteToMessageDecoder.callDecode(ByteToMessageDecoder.java:469)\n\tat io.netty.handler.codec.ByteToMessageDecoder.channelRead(ByteToMessageDecoder.java:290)\n\tat io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:444)\n\tat io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)\n\tat io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:412)\n\tat io.netty.channel.DefaultChannelPipeline$HeadContext.channelRead(DefaultChannelPipeline.java:1407)\n\tat io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:440)\n\tat io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)\n\tat io.netty.channel.DefaultChannelPipeline.fireChannelRead(DefaultChannelPipeline.java:918)\n\tat io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:166)\n\tat io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:788)\n\tat io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724)\n\tat io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650)\n\tat io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)\n\tat io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:994)\n\tat io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)\n\tat io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)\n\tat java.base/java.lang.Thread.run(Thread.java:1583)\n\nSep 25, 2025 8:50:31 AM io.grpc.netty.NettyServerTransport notifyTerminated\nINFO: Transport failed\nio.netty.handler.codec.http2.Http2Exception: Unexpected HTTP/1.x request: GET / \n\tat io.netty.handler.codec.http2.Http2Exception.connectionError(Http2Exception.java:107)\n\tat io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.readClientPrefaceString(Http2ConnectionHandler.java:315)\n\tat io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.decode(Http2ConnectionHandler.java:245)\n\tat io.netty.handler.codec.http2.Http2ConnectionHandler.decode(Http2ConnectionHandler.java:451)\n\tat io.netty.handler.codec.ByteToMessageDecoder.decodeRemovalReentryProtection(ByteToMessageDecoder.java:530)\n\tat io.netty.handler.codec.ByteToMessageDecoder.callDecode(ByteToMessageDecoder.java:469)\n\tat io.netty.handler.codec.ByteToMessageDecoder.channelRead(ByteToMessageDecoder.java:290)\n\tat io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:444)\n\tat io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)\n\tat io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:412)\n\tat io.netty.channel.DefaultChannelPipeline$HeadContext.channelRead(DefaultChannelPipeline.java:1407)\n\tat io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:440)\n\tat io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)\n\tat io.netty.channel.DefaultChannelPipeline.fireChannelRead(DefaultChannelPipeline.java:918)\n\tat io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:166)\n\tat io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:788)\n\tat io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724)\n\tat io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650)\n\tat io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)\n\tat io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:994)\n\tat io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)\n\tat io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)\n\tat java.base/java.lang.Thread.run(Thread.java:1583)\n\nSep 25, 2025 8:50:32 AM io.grpc.netty.NettyServerTransport notifyTerminated\nINFO: Transport failed\nio.netty.handler.codec.http2.Http2Exception: HTTP/2 client preface string missing or corrupt. Hex dump for received bytes: 16030105a8010005a40303db586cc79ee89df61b68832c3c\n\tat io.netty.handler.codec.http2.Http2Exception.connectionError(Http2Exception.java:107)\n\tat io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.readClientPrefaceString(Http2ConnectionHandler.java:319)\n\tat io.netty.handler.codec.http2.Http2ConnectionHandler$PrefaceDecoder.decode(Http2ConnectionHandler.java:245)\n\tat io.netty.handler.codec.http2.Http2ConnectionHandler.decode(Http2ConnectionHandler.java:451)\n\tat io.netty.handler.codec.ByteToMessageDecoder.decodeRemovalReentryProtection(ByteToMessageDecoder.java:530)\n\tat io.netty.handler.codec.ByteToMessageDecoder.callDecode(ByteToMessageDecoder.java:469)\n\tat io.netty.handler.codec.ByteToMessageDecoder.channelRead(ByteToMessageDecoder.java:290)\n\tat io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:444)\n\tat io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)\n\tat io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:412)\n\tat io.netty.channel.DefaultChannelPipeline$HeadContext.channelRead(DefaultChannelPipeline.java:1407)\n\tat io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:440)\n\tat io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420)\n\tat io.netty.channel.DefaultChannelPipeline.fireChannelRead(DefaultChannelPipeline.java:918)\n\tat io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:166)\n\tat io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:788)\n\tat io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724)\n\tat io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650)\n\tat io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562)\n\tat io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:994)\n\tat io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)\n\tat io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)\n\tat java.base/java.lang.Thread.run(Thread.java:1583)\n\n"}}
+[info] i  auth: Importing config from /home/user/studio/firebase-emulator-data/auth_export/config.json {"metadata":{"emulator":{"name":"auth"},"message":"Importing config from /home/user/studio/firebase-emulator-data/auth_export/config.json"}}
+[info] i  auth: Importing accounts from /home/user/studio/firebase-emulator-data/auth_export/accounts.json {"metadata":{"emulator":{"name":"auth"},"message":"Importing accounts from /home/user/studio/firebase-emulator-data/auth_export/accounts.json"}}
+[debug] [2025-09-25T08:50:49.835Z] [Extensions] Connecting Extensions emulator, this is a noop.
+[info] i  functions: Watching "/home/user/studio/functions" for Cloud Functions... {"metadata":{"emulator":{"name":"functions"},"message":"Watching \"/home/user/studio/functions\" for Cloud Functions..."}}
+[debug] [2025-09-25T08:50:49.865Z] Validating nodejs source
+[debug] [2025-09-25T08:50:51.825Z] > [functions] package.json contents: {
+  "name": "functions",
+  "scripts": {
+    "lint": "eslint --ext .js,.ts .",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "shell": "npm run build && firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "lib/index.js",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^5.12.0",
+    "@typescript-eslint/parser": "^5.12.0",
+    "eslint": "^8.9.0",
+    "eslint-config-google": "^0.14.0",
+    "eslint-plugin-import": "^2.25.4",
+    "firebase-functions-test": "^3.1.0",
+    "typescript": "^5.7.3"
+  },
+  "private": true
+}
+[debug] [2025-09-25T08:50:51.825Z] Building nodejs source
+[debug] [2025-09-25T08:50:51.827Z] Failed to find version of module node: reached end of search path /home/user/studio/functions/node_modules
+[warn] ⚠  functions: Your requested "node" version "22" doesn't match your global version "20". Using node@20 from host. 
+[debug] [2025-09-25T08:50:51.836Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-09-25T08:50:51.846Z] Found firebase-functions binary at '/home/user/studio/functions/node_modules/.bin/firebase-functions'
+[debug] [2025-09-25T08:50:51.885Z] Sep 25, 2025 8:50:51 AM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketChannelHandler initChannel
+INFO: Connected to new websocket client
+ {"metadata":{"emulator":{"name":"firestore"},"message":"Sep 25, 2025 8:50:51 AM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketChannelHandler initChannel\nINFO: Connected to new websocket client\n"}}
+[info] Serving at port 8872
+
+[debug] [2025-09-25T08:50:55.894Z] Got response from /__/functions.yaml {"endpoints":{"createOwner":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"httpsTrigger":{},"entryPoint":"createOwner"},"createUser":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"callableTrigger":{},"entryPoint":"createUser"},"deleteUser":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"callableTrigger":{},"entryPoint":"deleteUser"},"setupInitialData":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"callableTrigger":{},"entryPoint":"setupInitialData"},"getDashboardAnalytics":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"callableTrigger":{},"entryPoint":"getDashboardAnalytics"}},"specVersion":"v1alpha1","requiredAPIs":[],"extensions":{}}
+[warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
+[info] ✔  functions: Loaded functions definitions from source: createOwner, createUser, deleteUser, setupInitialData, getDashboardAnalytics. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: createOwner, createUser, deleteUser, setupInitialData, getDashboardAnalytics."}}
+[info] ✔  functions[us-central1-createOwner]: http function initialized (http://127.0.0.1:5001/scentpos/us-central1/createOwner). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/scentpos/us-central1/createOwner)."}}
+[info] ✔  functions[us-central1-createUser]: http function initialized (http://127.0.0.1:5001/scentpos/us-central1/createUser). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/scentpos/us-central1/createUser)."}}
+[info] ✔  functions[us-central1-deleteUser]: http function initialized (http://127.0.0.1:5001/scentpos/us-central1/deleteUser). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/scentpos/us-central1/deleteUser)."}}
+[info] ✔  functions[us-central1-setupInitialData]: http function initialized (http://127.0.0.1:5001/scentpos/us-central1/setupInitialData). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/scentpos/us-central1/setupInitialData)."}}
+[info] ✔  functions[us-central1-getDashboardAnalytics]: http function initialized (http://127.0.0.1:5001/scentpos/us-central1/getDashboardAnalytics). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/scentpos/us-central1/getDashboardAnalytics)."}}
+[debug] [2025-09-25T08:51:00.025Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: connect ECONNREFUSED 127.0.0.1:40001. If you are not running the Firebase Data Connect VSCode extension, this is expected and not an issue.
+[info] 
+┌─────────────────────────────────────────────────────────────┐
+│ ✔  All emulators ready! It is now safe to connect your app. │
+│ i  View Emulator UI at http://127.0.0.1:4000/               │
+└─────────────────────────────────────────────────────────────┘
+
+┌────────────────┬────────────────┬──────────────────────────────────┐
+│ Emulator       │ Host:Port      │ View in Emulator UI              │
+├────────────────┼────────────────┼──────────────────────────────────┤
+│ Authentication │ 127.0.0.1:9099 │ http://127.0.0.1:4000/auth       │
+├────────────────┼────────────────┼──────────────────────────────────┤
+│ Functions      │ 127.0.0.1:5001 │ http://127.0.0.1:4000/functions  │
+├────────────────┼────────────────┼──────────────────────────────────┤
+│ Firestore      │ 127.0.0.1:8080 │ http://127.0.0.1:4000/firestore  │
+├────────────────┼────────────────┼──────────────────────────────────┤
+│ Extensions     │ 127.0.0.1:5001 │ http://127.0.0.1:4000/extensions │
+└────────────────┴────────────────┴──────────────────────────────────┘
+  Emulator Hub host: 127.0.0.1 port: 4400
+  Other reserved ports: 4500, 9150
+┌─────────────────────────┬───────────────┬─────────────────────┐
+│ Extension Instance Name │ Extension Ref │ View in Emulator UI │
+└─────────────────────────┴───────────────┴─────────────────────┘
+Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
+ 

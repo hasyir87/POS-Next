@@ -25,17 +25,17 @@ if (process.env.NODE_ENV === 'development') {
     try {
         // It's important to disable app check in emulator mode
         if (typeof window !== "undefined") {
-          self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+          (window as any).self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
         }
 
         const auth = getAuth(firebaseApp);
-        connectAuthEmulator(auth, 'http://localhost:9099', { disableEmulatorWarnings: true });
+        connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableEmulatorWarnings: true });
 
         const db = getFirestore(firebaseApp);
-        connectFirestoreEmulator(db, 'localhost', 8080);
+        connectFirestoreEmulator(db, '127.0.0.1', 8080);
         
         const functions = getFunctions(firebaseApp, 'us-central1');
-        connectFunctionsEmulator(functions, 'localhost', 5001);
+        connectFunctionsEmulator(functions, '127.0.0.1', 5001);
     } catch(e) {
         console.error("Error connecting to Firebase emulators. Make sure they are running. `npm run emulators:start`", e);
     }
