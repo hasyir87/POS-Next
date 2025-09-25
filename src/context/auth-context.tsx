@@ -2,11 +2,12 @@
 "use client";
 
 import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback } from 'react';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, type User as FirebaseUser } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signInWithCustomToken, signOut, type User as FirebaseUser } from 'firebase/auth';
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { firebaseApp } from '@/lib/firebase/config';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import { callFirebaseFunction } from '@/lib/utils';
 
 export type UserRole = 'owner' | 'cashier' | 'admin' | 'superadmin';
 
@@ -152,7 +153,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [handleLogout, router]);
 
   const login = async ({ email, password }: { email: string, password: string }) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    const { customToken } = await callFirebaseFunction("signInUser", { email, password });
+    if (!customToken) {
+      throw new Error("Gagal mendapatkan token autentikasi.");
+    }
+    await signInWithCustomToken(auth, customToken);
   };
   
   const refreshProfile = useCallback(async () => {

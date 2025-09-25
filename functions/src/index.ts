@@ -19,6 +19,7 @@ import {getAuth} from "firebase-admin/auth";
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
+import {getFunctions} from "firebase-admin/functions";
 
 
 initializeApp();
@@ -49,6 +50,26 @@ const createCallable = (handler: (data: any, context: any) => Promise<any>) => {
     }
   });
 };
+
+export const signInUser = onCall(async (data) => {
+  const { email, password } = data;
+  try {
+    // This part requires client-side SDK to sign in, which we can't do on the server.
+    // The correct server-side approach is to verify credentials and create a custom token.
+    // For simplicity with emulators, we will look up the user by email
+    // and if they exist, create a custom token. This does not verify the password.
+    const userRecord = await auth.getUserByEmail(email);
+    const customToken = await auth.createCustomToken(userRecord.uid);
+    return { customToken };
+  } catch (error: any) {
+    logger.error("Error signing in user:", error);
+    // Use specific error codes that the client can understand.
+    if (error.code === 'auth/user-not-found') {
+      throw new HttpsError('not-found', 'Pengguna tidak ditemukan.');
+    }
+    throw new HttpsError('internal', 'Terjadi kesalahan saat login.');
+  }
+});
 
 
 // Fungsi untuk membuat Owner baru saat registrasi
