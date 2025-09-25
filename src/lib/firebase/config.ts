@@ -4,7 +4,7 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, connectAuthEmulator } from "firebase/auth";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import { initializeAppCheck, ReCaptchaV3Provider, onTokenChanged } from "firebase/app-check";
 
 
 // Your web app's Firebase configuration
@@ -23,15 +23,10 @@ const firebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp()
 // In development, connect to the emulators
 if (process.env.NODE_ENV === 'development') {
     try {
-        // It's important to disable app check in emulator mode
+        // This is the crucial part for emulators. 
+        // It tells App Check to use a debug token and not try to use reCAPTCHA.
         if (typeof window !== "undefined") {
-          // Pass `true` to the `initializeAppCheck` function to turn off App Check verification.
-          // This is purely for development purposes and SHOULD NOT be used in production.
-          initializeAppCheck(firebaseApp, {
-            provider: new ReCaptchaV3Provider("6Ld_..."), // Use a dummy key
-            isTokenAutoRefreshEnabled: false,
-          });
-          (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+            (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
         }
 
         const auth = getAuth(firebaseApp);
@@ -45,6 +40,15 @@ if (process.env.NODE_ENV === 'development') {
     } catch(e) {
         console.error("Error connecting to Firebase emulators. Make sure they are running. `npm run emulators:start`", e);
     }
+} else {
+    // Only initialize real App Check in production
+    if (typeof window !== "undefined") {
+        initializeAppCheck(firebaseApp, {
+            provider: new ReCaptchaV3Provider(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!),
+            isTokenAutoRefreshEnabled: true,
+        });
+    }
 }
+
 
 export { firebaseApp };
