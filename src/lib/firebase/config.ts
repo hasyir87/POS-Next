@@ -25,7 +25,13 @@ if (process.env.NODE_ENV === 'development') {
     try {
         // It's important to disable app check in emulator mode
         if (typeof window !== "undefined") {
-          (window as any).self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+          // Pass `true` to the `initializeAppCheck` function to turn off App Check verification.
+          // This is purely for development purposes and SHOULD NOT be used in production.
+          initializeAppCheck(firebaseApp, {
+            provider: new ReCaptchaV3Provider("6Ld_..."), // Use a dummy key
+            isTokenAutoRefreshEnabled: false,
+          });
+          (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
         }
 
         const auth = getAuth(firebaseApp);
