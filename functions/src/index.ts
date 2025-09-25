@@ -18,6 +18,9 @@ import {initializeApp} from "firebase-admin/app";
 import {getAuth} from "firebase-admin/auth";
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
+import * as cors from "cors";
+
+const corsHandler = cors({origin: true});
 
 // Inisialisasi Firebase Admin SDK
 initializeApp();
@@ -119,63 +122,65 @@ export const deleteUser = onCall(async (request) => {
 
 // Fungsi untuk membuat outlet baru
 export const createOutlet = onCall(async (request) => {
-    if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Anda harus login untuk membuat outlet.");
-    }
-    const {outletName} = request.data;
-    const callerUid = request.auth.uid;
+  if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Anda harus login untuk membuat outlet.");
+  }
+  const {outletName} = request.data;
+  const callerUid = request.auth.uid;
 
-    const callerProfileSnap = await db.collection("profiles").doc(callerUid).get();
-    if (!callerProfileSnap.exists) {
-        throw new HttpsError("not-found", "Profil pemanggil tidak ditemukan.");
-    }
-    const callerProfile = callerProfileSnap.data();
-    if (callerProfile?.role !== "owner" && callerProfile?.role !== "superadmin") {
-        throw new HttpsError("permission-denied", "Hanya pemilik yang dapat membuat outlet.");
-    }
+  const callerProfileSnap = await db.collection("profiles").doc(callerUid).get();
+  if (!callerProfileSnap.exists) {
+      throw new HttpsError("not-found", "Profil pemanggil tidak ditemukan.");
+  }
+  const callerProfile = callerProfileSnap.data();
+  if (callerProfile?.role !== "owner" && callerProfile?.role !== "superadmin") {
+      throw new HttpsError("permission-denied", "Hanya pemilik yang dapat membuat outlet.");
+  }
 
-    try {
-        const newOutletRef = await db.collection("organizations").add({
-            name: outletName,
-            owner_id: callerUid,
-            parent_organization_id: callerProfile.organization_id, // tautkan ke organisasi induk
-            is_setup_complete: false,
-            created_at: FieldValue.serverTimestamp(),
-            updated_at: FieldValue.serverTimestamp(),
-        });
-        return {status: "success", outletId: newOutletRef.id};
-    } catch (error: any) {
-        throw new HttpsError("internal", error.message);
-    }
+  try {
+      const newOutletRef = await db.collection("organizations").add({
+          name: outletName,
+          owner_id: callerUid,
+          parent_organization_id: callerProfile.organization_id, // tautkan ke organisasi induk
+          is_setup_complete: false,
+          created_at: FieldValue.serverTimestamp(),
+          updated_at: FieldValue.serverTimestamp(),
+      });
+      return {status: "success", outletId: newOutletRef.id};
+  } catch (error: any) {
+      throw new HttpsError("internal", error.message);
+  }
 });
+
 
 // Fungsi untuk mengubah outlet
 export const updateOutlet = onCall(async (request) => {
-    if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required.");
-    const {outletId, outletName} = request.data;
-    // Tambahkan validasi izin di sini jika perlu
-    try {
-        await db.collection("organizations").doc(outletId).update({
-            name: outletName,
-            updated_at: FieldValue.serverTimestamp(),
-        });
-        return {status: "success"};
-    } catch (error: any) {
-        throw new HttpsError("internal", error.message);
-    }
+  if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required.");
+  const {outletId, outletName} = request.data;
+  // Tambahkan validasi izin di sini jika perlu
+  try {
+      await db.collection("organizations").doc(outletId).update({
+          name: outletName,
+          updated_at: FieldValue.serverTimestamp(),
+      });
+      return {status: "success"};
+  } catch (error: any) {
+      throw new HttpsError("internal", error.message);
+  }
 });
+
 
 // Fungsi untuk menghapus outlet
 export const deleteOutlet = onCall(async (request) => {
-    if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required.");
-    const {outletId} = request.data;
-    // Tambahkan validasi izin di sini jika perlu
-    try {
-        // Hati-hati: Fungsi ini hanya menghapus dokumen outlet.
-        // Data lain yang terkait (produk, transaksi) tidak ikut terhapus.
-        await db.collection("organizations").doc(outletId).delete();
-        return {status: "success"};
-    } catch (error: any) {
-        throw new HttpsError("internal", error.message);
-    }
+  if (!request.auth) throw new HttpsError("unauthenticated", "Authentication required.");
+  const {outletId} = request.data;
+  // Tambahkan validasi izin di sini jika perlu
+  try {
+      // Hati-hati: Fungsi ini hanya menghapus dokumen outlet.
+      // Data lain yang terkait (produk, transaksi) tidak ikut terhapus.
+      await db.collection("organizations").doc(outletId).delete();
+      return {status: "success"};
+  } catch (error: any) {
+      throw new HttpsError("internal", error.message);
+  }
 });
