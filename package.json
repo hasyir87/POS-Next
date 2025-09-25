@@ -9,7 +9,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
-    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts"
+    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
+    "emulators:start": "firebase emulators:start --import=./firebase-emulator-data --export-on-exit"
   },
   "dependencies": {
     "@dataconnect/generated": "file:src/dataconnect-generated",
