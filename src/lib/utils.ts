@@ -6,13 +6,13 @@ import { firebaseApp } from './firebase/config';
 const getFunctionsBaseUrl = () => {
     // Di lingkungan produksi/staging, kita akan menggunakan URL asli.
     // Di lokal, kita akan menargetkan emulator.
-    const isEmulator = process.env.NODE_ENV !== 'production' && typeof window !== 'undefined' && window.location.hostname === 'localhost';
+    const isEmulator = process.env.NODE_ENV !== 'production';
     if (isEmulator) {
         const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
         // Port default untuk emulator functions adalah 5001
         return `http://127.0.0.1:5001/${projectId}/us-central1`;
     }
-    // Ganti 'scentpos' dengan ID proyek Firebase Anda jika berbeda
+    // Ganti dengan ID proyek Firebase Anda jika berbeda
     return `https://us-central1-${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net`;
 }
 
