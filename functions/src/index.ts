@@ -17,186 +17,251 @@
 import {initializeApp} from "firebase-admin/app";
 import {getAuth} from "firebase-admin/auth";
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
-import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {onRequest} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
-import {getFunctions} from "firebase-admin/functions";
+import * as cors from "cors";
 
+const corsHandler = cors({origin: true});
 
 initializeApp();
 const db = getFirestore();
 const auth = getAuth();
 
-// Wrapper untuk menangani otentikasi dan error pada fungsi onCall
-const createCallable = (handler: (data: any, context: any) => Promise<any>) => {
-  return onCall(async (request) => {
-    try {
-      // Panggil handler asli dengan data dan konteks
-      const result = await handler(request.data, request);
-      return result;
-    } catch (error: any) {
-        logger.error("Function Error:", {
-            message: error.message,
-            stack: error.stack,
-            details: error.details,
-        });
-
-        // Jika error sudah berupa HttpsError, lempar kembali
-        if (error instanceof HttpsError) {
-            throw error;
-        }
-        
-        // Bungkus error umum ke dalam HttpsError agar bisa diterima klien
-        throw new HttpsError("internal", error.message || "An unexpected error occurred.");
+// Helper untuk mengekstrak token dari header Authorization
+const getUidFromRequest = async (request: any): Promise<string | null> => {
+    if (!request.headers.authorization || !request.headers.authorization.startsWith("Bearer ")) {
+        return null;
     }
-  });
+    const idToken = request.headers.authorization.split("Bearer ")[1];
+    try {
+        const decodedToken = await auth.verifyIdToken(idToken);
+        return decodedToken.uid;
+    } catch (error) {
+        logger.error("Error verifying token:", error);
+        return null;
+    }
 };
 
-export const signInUser = onCall(async (data) => {
-  const { email, password } = data;
-  try {
-    // This part requires client-side SDK to sign in, which we can't do on the server.
-    // The correct server-side approach is to verify credentials and create a custom token.
-    // For simplicity with emulators, we will look up the user by email
-    // and if they exist, create a custom token. This does not verify the password.
-    const userRecord = await auth.getUserByEmail(email);
-    const customToken = await auth.createCustomToken(userRecord.uid);
-    return { customToken };
-  } catch (error: any) {
-    logger.error("Error signing in user:", error);
-    // Use specific error codes that the client can understand.
-    if (error.code === 'auth/user-not-found') {
-      throw new HttpsError('not-found', 'Pengguna tidak ditemukan.');
-    }
-    throw new HttpsError('internal', 'Terjadi kesalahan saat login.');
-  }
+export const signInUser = onRequest((request, response) => {
+    corsHandler(request, response, async () => {
+        if (request.method !== "POST") {
+            response.status(405).send("Method Not Allowed");
+            return;
+        }
+        const {email} = request.body;
+        try {
+            const userRecord = await auth.getUserByEmail(email);
+            const customToken = await auth.createCustomToken(userRecord.uid);
+            response.status(200).json({customToken});
+        } catch (error: any) {
+            logger.error("Error signing in user:", error);
+            if (error.code === "auth/user-not-found") {
+                response.status(404).json({error: "Pengguna tidak ditemukan."});
+            } else {
+                response.status(500).json({error: "Terjadi kesalahan saat login."});
+            }
+        }
+    });
 });
 
 
-// Fungsi untuk membuat Owner baru saat registrasi
-export const createOwner = createCallable(async (data) => {
-  const {email, password, fullName, organizationName} = data;
+export const createOwner = onRequest((request, response) => {
+    corsHandler(request, response, async () => {
+        if (request.method !== "POST") {
+            response.status(405).send("Method Not Allowed");
+            return;
+        }
 
-  if (!email || !password || !fullName || !organizationName) {
-    throw new HttpsError(
-      "invalid-argument",
-      "Data tidak lengkap untuk membuat akun pemilik.",
-    );
-  }
-  
-  const userRecord = await auth.createUser({email, password});
-  const organizationRef = db.collection("organizations").doc();
+        const {email, password, fullName, organizationName} = request.body;
 
-  const batch = db.batch();
+        if (!email || !password || !fullName || !organizationName) {
+            response.status(400).json({error: "Data tidak lengkap untuk membuat akun pemilik."});
+            return;
+        }
 
-  const profileRef = db.collection("profiles").doc(userRecord.uid);
-  batch.set(profileRef, {
-    email,
-    full_name: fullName,
-    organization_id: organizationRef.id,
-    role: "owner",
-    created_at: FieldValue.serverTimestamp(),
-    updated_at: FieldValue.serverTimestamp(),
-  });
+        try {
+            const userRecord = await auth.createUser({email, password});
+            const organizationRef = db.collection("organizations").doc();
+            const batch = db.batch();
 
-  batch.set(organizationRef, {
-    name: organizationName,
-    owner_id: userRecord.uid,
-    is_setup_complete: false,
-    created_at: FieldValue.serverTimestamp(),
-    updated_at: FieldValue.serverTimestamp(),
-  });
+            const profileRef = db.collection("profiles").doc(userRecord.uid);
+            batch.set(profileRef, {
+                email,
+                full_name: fullName,
+                organization_id: organizationRef.id,
+                role: "owner",
+                created_at: FieldValue.serverTimestamp(),
+                updated_at: FieldValue.serverTimestamp(),
+            });
 
-  await batch.commit();
+            batch.set(organizationRef, {
+                name: organizationName,
+                owner_id: userRecord.uid,
+                is_setup_complete: false,
+                created_at: FieldValue.serverTimestamp(),
+                updated_at: FieldValue.serverTimestamp(),
+            });
 
-  return {
-    status: "success",
-    message: `Owner ${fullName} dan organisasi ${organizationName} berhasil dibuat.`,
-    uid: userRecord.uid,
-    organizationId: organizationRef.id,
-  };
-});
+            await batch.commit();
 
-// Fungsi untuk membuat Pengguna/Staf baru
-export const createUser = createCallable(async (data, context) => {
-    if (!context.auth) {
-        throw new HttpsError("unauthenticated", "Anda harus login untuk membuat pengguna.");
-    }
-  const {email, password, fullName, role, organizationId} = data;
-  
-  const userRecord = await auth.createUser({email, password, displayName: fullName});
-
-  await db.collection("profiles").doc(userRecord.uid).set({
-    email,
-    full_name: fullName,
-    role,
-    organization_id: organizationId,
-    created_at: FieldValue.serverTimestamp(),
-  });
-
-  return {status: "success", uid: userRecord.uid};
-});
-
-// Fungsi untuk menghapus Pengguna/Staf
-export const deleteUser = createCallable(async (data, context) => {
-    if (!context.auth) {
-        throw new HttpsError("unauthenticated", "Anda harus login untuk menghapus pengguna.");
-    }
-  const {uid} = data;
-  
-  await auth.deleteUser(uid);
-  await db.collection("profiles").doc(uid).delete();
-  return {status: "success"};
-});
-
-// Fungsi untuk membuat outlet baru
-export const createOutlet = createCallable(async (data, context) => {
-    if (!context.auth) {
-        throw new HttpsError("unauthenticated", "Anda harus login untuk membuat outlet.");
-    }
-  const {outletName} = data;
-  const callerUid = context.auth.uid;
-
-  const callerProfileSnap = await db.collection("profiles").doc(callerUid).get();
-  if (!callerProfileSnap.exists) {
-      throw new HttpsError("not-found", "Profil pemanggil tidak ditemukan.");
-  }
-  const callerProfile = callerProfileSnap.data();
-  if (callerProfile?.role !== "owner" && callerProfile?.role !== "superadmin") {
-      throw new HttpsError("permission-denied", "Hanya pemilik yang dapat membuat outlet.");
-  }
-
-  const newOutletRef = await db.collection("organizations").add({
-      name: outletName,
-      owner_id: callerUid,
-      parent_organization_id: callerProfile.organization_id, // tautkan ke organisasi induk
-      is_setup_complete: false,
-      created_at: FieldValue.serverTimestamp(),
-      updated_at: FieldValue.serverTimestamp(),
-  });
-  return {status: "success", outletId: newOutletRef.id};
+            response.status(201).json({
+                status: "success",
+                message: `Owner ${fullName} dan organisasi ${organizationName} berhasil dibuat.`,
+                uid: userRecord.uid,
+                organizationId: organizationRef.id,
+            });
+        } catch (error: any) {
+            logger.error("Error creating owner:", error);
+            response.status(500).json({error: error.message});
+        }
+    });
 });
 
 
-// Fungsi untuk mengubah outlet
-export const updateOutlet = createCallable(async (data, context) => {
-  if (!context.auth) throw new HttpsError("unauthenticated", "Authentication required.");
-  const {outletId, outletName} = data;
-  // Tambahkan validasi izin di sini jika perlu
-  await db.collection("organizations").doc(outletId).update({
-      name: outletName,
-      updated_at: FieldValue.serverTimestamp(),
-  });
-  return {status: "success"};
+export const createUser = onRequest((request, response) => {
+    corsHandler(request, response, async () => {
+        if (request.method !== "POST") {
+            response.status(405).send("Method Not Allowed");
+            return;
+        }
+        const uid = await getUidFromRequest(request);
+        if (!uid) {
+            response.status(401).json({error: "Unauthorized"});
+            return;
+        }
+
+        const {email, password, fullName, role, organizationId} = request.body;
+        try {
+            const userRecord = await auth.createUser({email, password, displayName: fullName});
+            await db.collection("profiles").doc(userRecord.uid).set({
+                email,
+                full_name: fullName,
+                role,
+                organization_id: organizationId,
+                created_at: FieldValue.serverTimestamp(),
+            });
+            response.status(201).json({status: "success", uid: userRecord.uid});
+        } catch (error: any) {
+            logger.error("Error creating user:", error);
+            response.status(500).json({error: error.message});
+        }
+    });
 });
 
 
-// Fungsi untuk menghapus outlet
-export const deleteOutlet = createCallable(async (data, context) => {
-  if (!context.auth) throw new HttpsError("unauthenticated", "Authentication required.");
-  const {outletId} = data;
-  // Tambahkan validasi izin di sini jika perlu
-  // Hati-hati: Fungsi ini hanya menghapus dokumen outlet.
-  // Data lain yang terkait (produk, transaksi) tidak ikut terhapus.
-  await db.collection("organizations").doc(outletId).delete();
-  return {status: "success"};
+export const deleteUser = onRequest((request, response) => {
+    corsHandler(request, response, async () => {
+        if (request.method !== "POST") {
+            response.status(405).send("Method Not Allowed");
+            return;
+        }
+        const callerUid = await getUidFromRequest(request);
+        if (!callerUid) {
+            response.status(401).json({error: "Unauthorized"});
+            return;
+        }
+
+        const {uid} = request.body;
+        try {
+            await auth.deleteUser(uid);
+            await db.collection("profiles").doc(uid).delete();
+            response.status(200).json({status: "success"});
+        } catch (error: any) {
+            logger.error("Error deleting user:", error);
+            response.status(500).json({error: error.message});
+        }
+    });
+});
+
+
+export const createOutlet = onRequest((request, response) => {
+    corsHandler(request, response, async () => {
+        if (request.method !== "POST") {
+            response.status(405).send("Method Not Allowed");
+            return;
+        }
+        const callerUid = await getUidFromRequest(request);
+        if (!callerUid) {
+            response.status(401).json({error: "Unauthorized"});
+            return;
+        }
+
+        const {outletName} = request.body;
+        try {
+            const callerProfileSnap = await db.collection("profiles").doc(callerUid).get();
+            if (!callerProfileSnap.exists) {
+                response.status(404).json({error: "Profil pemanggil tidak ditemukan."});
+                return;
+            }
+            const callerProfile = callerProfileSnap.data();
+            if (callerProfile?.role !== "owner" && callerProfile?.role !== "superadmin") {
+                response.status(403).json({error: "Hanya pemilik yang dapat membuat outlet."});
+                return;
+            }
+
+            const newOutletRef = await db.collection("organizations").add({
+                name: outletName,
+                owner_id: callerUid,
+                parent_organization_id: callerProfile.organization_id,
+                is_setup_complete: false,
+                created_at: FieldValue.serverTimestamp(),
+                updated_at: FieldValue.serverTimestamp(),
+            });
+            response.status(201).json({status: "success", outletId: newOutletRef.id});
+        } catch (error: any) {
+            logger.error("Error creating outlet:", error);
+            response.status(500).json({error: error.message});
+        }
+    });
+});
+
+
+export const updateOutlet = onRequest((request, response) => {
+    corsHandler(request, response, async () => {
+        if (request.method !== "POST") {
+            response.status(405).send("Method Not Allowed");
+            return;
+        }
+        const callerUid = await getUidFromRequest(request);
+        if (!callerUid) {
+            response.status(401).json({error: "Unauthorized"});
+            return;
+        }
+
+        const {outletId, outletName} = request.body;
+        try {
+            await db.collection("organizations").doc(outletId).update({
+                name: outletName,
+                updated_at: FieldValue.serverTimestamp(),
+            });
+            response.status(200).json({status: "success"});
+        } catch (error: any) {
+            logger.error("Error updating outlet:", error);
+            response.status(500).json({error: error.message});
+        }
+    });
+});
+
+
+export const deleteOutlet = onRequest((request, response) => {
+    corsHandler(request, response, async () => {
+        if (request.method !== "POST") {
+            response.status(405).send("Method Not Allowed");
+            return;
+        }
+        const callerUid = await getUidFromRequest(request);
+        if (!callerUid) {
+            response.status(401).json({error: "Unauthorized"});
+            return;
+        }
+
+        const {outletId} = request.body;
+        try {
+            await db.collection("organizations").doc(outletId).delete();
+            response.status(200).json({status: "success"});
+        } catch (error: any) {
+            logger.error("Error deleting outlet:", error);
+            response.status(500).json({error: error.message});
+        }
+    });
 });
