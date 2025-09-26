@@ -153,11 +153,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [handleLogout, router]);
 
   const login = async ({ email, password }: { email: string, password: string }) => {
-    const { customToken } = await callFirebaseFunction("signInUser", { email, password });
-    if (!customToken) {
-      throw new Error("Gagal mendapatkan token autentikasi.");
+    const response: any = await callFirebaseFunction("signInUser", { email, password });
+    if (!response.customToken) {
+      throw new Error(response.error || "Gagal mendapatkan token autentikasi.");
     }
-    await signInWithCustomToken(auth, customToken);
+    await signInWithCustomToken(auth, response.customToken);
   };
   
   const refreshProfile = useCallback(async () => {
