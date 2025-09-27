@@ -2,29 +2,114 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Fungsi untuk memeriksa apakah pengguna adalah bagian dari organisasi
-    function isUserInOrg(orgId) {
-      return exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.organization_id == orgId;
+
+    // Helper function to get user's profile data from Firestore.
+    // This is used to check the user's role and organization.
+    function getUserProfile() {
+      return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data;
     }
 
-    // Izinkan pemilik organisasi untuk membaca data organisasi mereka
-    match /organizations/{orgId} {
-      allow read: if request.auth != null && resource.data.owner_id == request.auth.uid;
-      allow write: if request.auth != null && resource.data.owner_id == request.auth.uid;
+    // Helper function to check if a user is an admin or owner for a specific organization.
+    function isOrgAdmin(orgId) {
+      let profile = getUserProfile();
+      return profile.organization_id == orgId && (profile.role == 'admin' || profile.role == 'owner' || profile.role == 'superadmin');
+    }
+    
+    // Helper function to check if a user is a member of a specific organization.
+    function isOrgMember(orgId) {
+       let profile = getUserProfile();
+       return profile.organization_id == orgId;
     }
 
-    // Izinkan pengguna membaca profil mereka sendiri
+    // Profiles Collection
+    // Users can read and update their own profile.
     match /profiles/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, update: if request.auth.uid == userId;
+      
+      // Admins/owners can read profiles within their organization.
+      allow list: if request.auth != null &&
+                    isOrgAdmin(request.query.filters[0][2]); // Assumes query is where('organization_id', '==', orgId)
     }
 
-    // Aturan umum untuk koleksi lain yang memiliki organization_id
-    // Ini berlaku untuk: products, raw_materials, customers, transactions, grades,
-    // expenses, payables, receivables, shifts.
-    match /{collection}/{docId} {
-      allow read, write, create, delete: if request.auth != null && isUserInOrg(request.resource.data.organization_id);
-      allow list: if request.auth != null && isUserInOrg(request.query.organization_id);
+    // Organizations Collection
+    // Users can read their own organization document.
+    match /organizations/{orgId} {
+      allow read: if request.auth != null && isOrgMember(orgId);
+      allow create: if request.auth.uid == request.resource.data.owner_id;
+      allow update: if request.auth != null && isOrgAdmin(orgId);
+    }
+    
+    // Generic rules for most data collections (products, customers, etc.)
+    function dataRules(orgId) {
+      return {
+        // Any authenticated member of the organization can read data.
+        'read': isOrgMember(orgId),
+        // Only admins/owners of the organization can create, update, or delete data.
+        'write': isOrgAdmin(orgId),
+      }
+    }
+
+    match /products/{docId} {
+      allow read: if dataRules(resource.data.organization_id).read;
+      allow write: if dataRules(request.resource.data.organization_id).write; // For create
+      allow write: if dataRules(resource.data.organization_id).write; // For update/delete
+      allow list: if isOrgMember(request.query.filters[0][2]);
+    }
+    
+    match /raw_materials/{docId} {
+      allow read: if dataRules(resource.data.organization_id).read;
+      allow write: if dataRules(request.resource.data.organization_id).write;
+      allow write: if dataRules(resource.data.organization_id).write;
+      allow list: if isOrgMember(request.query.filters[0][2]);
+    }
+
+    match /customers/{docId} {
+      allow read: if dataRules(resource.data.organization_id).read;
+      allow write: if dataRules(request.resource.data.organization_id).write;
+      allow write: if dataRules(resource.data.organization_id).write;
+      allow list: if isOrgMember(request.query.filters[0][2]);
+    }
+
+    match /transactions/{docId} {
+      allow read: if dataRules(resource.data.organization_id).read;
+      allow write: if dataRules(request.resource.data.organization_id).write;
+      allow write: if dataRules(resource.data.organization_id).write;
+      allow list: if isOrgMember(request.query.filters[0][2]);
+    }
+
+    match /grades/{docId} {
+      allow read: if dataRules(resource.data.organization_id).read;
+      allow write: if dataRules(request.resource.data.organization_id).write;
+      allow write: if dataRules(resource.data.organization_id).write;
+      allow list: if isOrgMember(request.query.filters[0][2]);
+    }
+    
+    match /expenses/{docId} {
+      allow read: if dataRules(resource.data.organization_id).read;
+      allow write: if dataRules(request.resource.data.organization_id).write;
+      allow write: if dataRules(resource.data.organization_id).write;
+      allow list: if isOrgMember(request.query.filters[0][2]);
+    }
+
+    match /shifts/{docId} {
+      allow read: if dataRules(resource.data.organization_id).read;
+      allow write: if dataRules(request.resource.data.organization_id).write;
+      allow write: if dataRules(resource.data.organization_id).write;
+      allow list: if isOrgMember(request.query.filters[0][2]);
+    }
+    
+    match /payables/{docId} {
+      allow read: if dataRules(resource.data.organization_id).read;
+      allow write: if dataRules(request.resource.data.organization_id).write;
+      allow write: if dataRules(resource.data.organization_id).write;
+      allow list: if isOrgMember(request.query.filters[0][2]);
+    }
+    
+    match /receivables/{docId} {
+      allow read: if dataRules(resource.data.organization_id).read;
+      allow write: if dataRules(request.resource.data.organization_id).write;
+      allow write: if dataRules(resource.data.organization_id).write;
+      allow list: if isOrgMember(request.query.filters[0][2]);
     }
   }
 }
