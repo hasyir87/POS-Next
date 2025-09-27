@@ -1,115 +1,47 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to get user's profile data from Firestore.
-    // This is used to check the user's role and organization.
-    function getUserProfile() {
-      return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data;
+    // --- HELPER FUNCTIONS ---
+    function isUserAuthenticated() {
+      return request.auth != null;
     }
 
-    // Helper function to check if a user is an admin or owner for a specific organization.
-    function isOrgAdmin(orgId) {
-      let profile = getUserProfile();
-      return profile.organization_id == orgId && (profile.role == 'admin' || profile.role == 'owner' || profile.role == 'superadmin');
-    }
-    
-    // Helper function to check if a user is a member of a specific organization.
-    function isOrgMember(orgId) {
-       let profile = getUserProfile();
-       return profile.organization_id == orgId;
+    function getUserOrgId() {
+      return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.organization_id;
     }
 
-    // Profiles Collection
-    // Users can read and update their own profile.
+    // --- COLLECTION: profiles ---
+    // Users can read/update their own profile.
     match /profiles/{userId} {
-      allow read, update: if request.auth.uid == userId;
-      
-      // Admins/owners can read profiles within their organization.
-      allow list: if request.auth != null &&
-                    isOrgAdmin(request.query.filters[0][2]); // Assumes query is where('organization_id', '==', orgId)
+      allow read, update: if isUserAuthenticated() && request.auth.uid == userId;
+      // Allow creation during signup process.
+      allow create: if isUserAuthenticated();
     }
 
-    // Organizations Collection
-    // Users can read their own organization document.
+    // --- COLLECTION: organizations ---
+    // Users can read organizations that are either their main one or a sub-outlet.
     match /organizations/{orgId} {
-      allow read: if request.auth != null && isOrgMember(orgId);
-      allow create: if request.auth.uid == request.resource.data.owner_id;
-      allow update: if request.auth != null && isOrgAdmin(orgId);
-    }
-    
-    // Generic rules for most data collections (products, customers, etc.)
-    function dataRules(orgId) {
-      return {
-        // Any authenticated member of the organization can read data.
-        'read': isOrgMember(orgId),
-        // Only admins/owners of the organization can create, update, or delete data.
-        'write': isOrgAdmin(orgId),
-      }
+      allow read: if isUserAuthenticated() && 
+                   (getUserOrgId() == orgId || resource.data.parent_organization_id == getUserOrgId());
+      // Only owners can create/update outlets (handled by Cloud Functions).
+      allow write: if false; 
     }
 
-    match /products/{docId} {
-      allow read: if dataRules(resource.data.organization_id).read;
-      allow write: if dataRules(request.resource.data.organization_id).write; // For create
-      allow write: if dataRules(resource.data.organization_id).write; // For update/delete
-      allow list: if isOrgMember(request.query.filters[0][2]);
-    }
-    
-    match /raw_materials/{docId} {
-      allow read: if dataRules(resource.data.organization_id).read;
-      allow write: if dataRules(request.resource.data.organization_id).write;
-      allow write: if dataRules(resource.data.organization_id).write;
-      allow list: if isOrgMember(request.query.filters[0][2]);
-    }
-
-    match /customers/{docId} {
-      allow read: if dataRules(resource.data.organization_id).read;
-      allow write: if dataRules(request.resource.data.organization_id).write;
-      allow write: if dataRules(resource.data.organization_id).write;
-      allow list: if isOrgMember(request.query.filters[0][2]);
-    }
-
-    match /transactions/{docId} {
-      allow read: if dataRules(resource.data.organization_id).read;
-      allow write: if dataRules(request.resource.data.organization_id).write;
-      allow write: if dataRules(resource.data.organization_id).write;
-      allow list: if isOrgMember(request.query.filters[0][2]);
-    }
-
-    match /grades/{docId} {
-      allow read: if dataRules(resource.data.organization_id).read;
-      allow write: if dataRules(request.resource.data.organization_id).write;
-      allow write: if dataRules(resource.data.organization_id).write;
-      allow list: if isOrgMember(request.query.filters[0][2]);
-    }
-    
-    match /expenses/{docId} {
-      allow read: if dataRules(resource.data.organization_id).read;
-      allow write: if dataRules(request.resource.data.organization_id).write;
-      allow write: if dataRules(resource.data.organization_id).write;
-      allow list: if isOrgMember(request.query.filters[0][2]);
-    }
-
-    match /shifts/{docId} {
-      allow read: if dataRules(resource.data.organization_id).read;
-      allow write: if dataRules(request.resource.data.organization_id).write;
-      allow write: if dataRules(resource.data.organization_id).write;
-      allow list: if isOrgMember(request.query.filters[0][2]);
-    }
-    
-    match /payables/{docId} {
-      allow read: if dataRules(resource.data.organization_id).read;
-      allow write: if dataRules(request.resource.data.organization_id).write;
-      allow write: if dataRules(resource.data.organization_id).write;
-      allow list: if isOrgMember(request.query.filters[0][2]);
-    }
-    
-    match /receivables/{docId} {
-      allow read: if dataRules(resource.data.organization_id).read;
-      allow write: if dataRules(request.resource.data.organization_id).write;
-      allow write: if dataRules(resource.data.organization_id).write;
-      allow list: if isOrgMember(request.query.filters[0][2]);
+    // --- GENERIC RULE FOR TENANT DATA ---
+    // This rule applies to products, customers, transactions, raw_materials, etc.
+    match /{collection}/{docId} {
+      // READ, UPDATE, DELETE: Allow if the document's org_id matches the user's org_id.
+      allow read, update, delete: if isUserAuthenticated() && resource.data.organization_id == getUserOrgId();
+      
+      // CREATE: Allow if the new document's org_id matches the user's org_id.
+      allow create: if isUserAuthenticated() && request.resource.data.organization_id == getUserOrgId();
+      
+      // LIST (QUERY): This is the critical fix.
+      // Enforce that any query on the collection MUST be filtered by the user's organization_id.
+      allow list: if isUserAuthenticated() && request.query.get("organization_id") == getUserOrgId();
     }
   }
 }
