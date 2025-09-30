@@ -9,6 +9,10 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { callFirebaseFunction } from '@/lib/utils';
 
+// --- DEVELOPMENT BYPASS ---
+// Set to true to bypass Firebase Auth and simulate a logged-in 'owner'.
+const AUTH_BYPASS_ENABLED = true;
+
 export type UserRole = 'owner' | 'cashier' | 'admin' | 'superadmin';
 
 export interface Organization {
@@ -76,7 +80,6 @@ async function fetchUserProfile(firebaseUser: FirebaseUser): Promise<UserProfile
     return profileData;
 }
 
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const { toast } = useToast();
@@ -99,6 +102,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
   
   const handleLogout = useCallback(async (message?: {title: string, description: string}) => {
+    if (AUTH_BYPASS_ENABLED) {
+        console.log("Auth bypass is enabled. Logout is disabled.");
+        toast({ title: "Mode Bypass Aktif", description: "Logout dinonaktifkan."});
+        return;
+    }
     await signOut(auth);
     setUser(null);
     setProfile(null);
@@ -114,6 +122,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [setSelectedOrganizationId, toast, router]);
 
   useEffect(() => {
+    // --- Bypass Logic ---
+    if (AUTH_BYPASS_ENABLED) {
+        const mockOrgId = "mock_org_123";
+        const mockUserId = "mock_user_123";
+        
+        const mockUser = { uid: mockUserId } as FirebaseUser;
+        const mockProfile: UserProfile = {
+            id: mockUserId,
+            email: 'dev@snipos.com',
+            full_name: 'Developer',
+            role: 'owner',
+            organization_id: mockOrgId,
+            organization: {
+                id: mockOrgId,
+                name: 'Toko SNIPOS (Mode Dev)',
+                owner_id: mockUserId,
+                is_setup_complete: true
+            }
+        };
+
+        setUser(mockUser);
+        setProfile(mockProfile);
+        setSelectedOrganizationId(mockOrgId);
+        setLoading(false);
+        return;
+    }
+
+    // --- Real Auth Logic ---
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
       if (firebaseUser) {
@@ -150,10 +186,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [handleLogout, router]);
+  }, [handleLogout, router, setSelectedOrganizationId]);
 
   const login = async ({ email, password }: { email: string, password: string }) => {
-    const response: any = await callFirebaseFunction("signInUser", { email, password });
+    if (AUTH_BYPASS_ENABLED) {
+        console.log("Auth bypass is enabled. Login is disabled.");
+        toast({ title: "Mode Bypass Aktif", description: "Login dinonaktifkan."});
+        return;
+    }
+    const response: any = await callFirebaseFunction("signInUser", { email });
     if (!response.customToken) {
       throw new Error(response.error || "Gagal mendapatkan token autentikasi.");
     }
@@ -161,6 +202,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const refreshProfile = useCallback(async () => {
+    if (AUTH_BYPASS_ENABLED) {
+        console.log("Auth bypass is enabled. Profile refresh is disabled.");
+        return;
+    }
     if (user) {
         try {
             const refreshedProfile = await fetchUserProfile(user);
