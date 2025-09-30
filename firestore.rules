@@ -1,47 +1,95 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // --- HELPER FUNCTIONS ---
-    function isUserAuthenticated() {
-      return request.auth != null;
-    }
-
-    function getUserOrgId() {
+    
+    // --- Helper Functions ---
+    function userOrgId() {
       return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.organization_id;
     }
 
-    // --- COLLECTION: profiles ---
-    // Users can read/update their own profile.
+    function userRole() {
+      return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role;
+    }
+    
+    function isUserInOrg(orgId) {
+      return userOrgId() == orgId;
+    }
+
+    function isOwner(orgId) {
+        return request.auth.uid == get(/databases/$(database)/documents/organizations/$(orgId)).data.owner_id;
+    }
+    
+    function isSuperAdmin() {
+        return userRole() == 'superadmin';
+    }
+
+    // --- Collection Rules ---
+
+    // Profiles: Users can read/update their own profile.
     match /profiles/{userId} {
-      allow read, update: if isUserAuthenticated() && request.auth.uid == userId;
-      // Allow creation during signup process.
-      allow create: if isUserAuthenticated();
+      allow read, update: if request.auth.uid == userId;
+      // allow create: Needed for signup, handled by backend functions.
     }
 
-    // --- COLLECTION: organizations ---
-    // Users can read organizations that are either their main one or a sub-outlet.
+    // Organizations: Users can read organizations they belong to.
     match /organizations/{orgId} {
-      allow read: if isUserAuthenticated() && 
-                   (getUserOrgId() == orgId || resource.data.parent_organization_id == getUserOrgId());
-      // Only owners can create/update outlets (handled by Cloud Functions).
-      allow write: if false; 
+      allow read: if isUserInOrg(orgId) || isOwner(orgId) || isSuperAdmin();
+      allow list: if isSuperAdmin() || (request.query.get("owner_id") == request.auth.uid) || (request.query.get("parent_organization_id") == userOrgId());
+      allow update: if isOwner(orgId) || isSuperAdmin();
+      allow create: if request.auth.uid == request.resource.data.owner_id;
     }
 
-    // --- GENERIC RULE FOR TENANT DATA ---
-    // This rule applies to products, customers, transactions, raw_materials, etc.
-    match /{collection}/{docId} {
-      // READ, UPDATE, DELETE: Allow if the document's org_id matches the user's org_id.
-      allow read, update, delete: if isUserAuthenticated() && resource.data.organization_id == getUserOrgId();
-      
-      // CREATE: Allow if the new document's org_id matches the user's org_id.
-      allow create: if isUserAuthenticated() && request.resource.data.organization_id == getUserOrgId();
-      
-      // LIST (QUERY): This is the critical fix.
-      // Enforce that any query on the collection MUST be filtered by the user's organization_id.
-      allow list: if isUserAuthenticated() && request.query.get("organization_id") == getUserOrgId();
+    // Products: Can be managed by members of the organization.
+    match /products/{productId} {
+      allow read, list, update, delete: if isUserInOrg(resource.data.organization_id);
+      allow create: if isUserInOrg(request.resource.data.organization_id);
+    }
+    
+    // Raw Materials: Can be managed by members of the organization.
+    match /raw_materials/{materialId} {
+       allow read, list, update, delete: if isUserInOrg(resource.data.organization_id);
+       allow create: if isUserInOrg(request.resource.data.organization_id);
+    }
+
+    // Customers: Can be managed by members of the organization.
+    match /customers/{customerId} {
+      allow read, list, update, delete: if isUserInOrg(resource.data.organization_id);
+      allow create: if isUserInOrg(request.resource.data.organization_id);
+    }
+
+    // Transactions: Can be created and read by members.
+    match /transactions/{transactionId} {
+      allow read, list: if isUserInOrg(resource.data.organization_id);
+      allow create: if isUserInOrg(request.resource.data.organization_id);
+    }
+
+    // Grades: Can be managed by members of the organization.
+    match /grades/{gradeId} {
+      allow read, list, update, delete: if isUserInOrg(resource.data.organization_id);
+      allow create: if isUserInOrg(request.resource.data.organization_id);
+    }
+
+    // Expenses: Can be managed by members of the organization.
+    match /expenses/{expenseId} {
+      allow read, list, update, delete: if isUserInOrg(resource.data.organization_id);
+      allow create: if isUserInOrg(request.resource.data.organization_id);
+    }
+    
+    // Shifts: Can be managed by members of the organization.
+    match /shifts/{shiftId} {
+      allow read, list, update, delete: if isUserInOrg(resource.data.organization_id);
+      allow create: if isUserInOrg(request.resource.data.organization_id);
+    }
+    
+    // Payables & Receivables: Can be managed by members.
+    match /payables/{payableId} {
+        allow read, list, update, delete: if isUserInOrg(resource.data.organization_id);
+        allow create: if isUserInOrg(request.resource.data.organization_id);
+    }
+     match /receivables/{receivableId} {
+        allow read, list, update, delete: if isUserInOrg(resource.data.organization_id);
+        allow create: if isUserInOrg(request.resource.data.organization_id);
     }
   }
 }
