@@ -51,6 +51,13 @@ export const createOwner = onCall(async (request) => {
     try {
         const userRecord = await auth.createUser({email, password});
         const organizationRef = db.collection("organizations").doc();
+        
+        // Set custom claims for the new user
+        await auth.setCustomUserClaims(userRecord.uid, {
+            role: "owner",
+            organization_id: organizationRef.id,
+        });
+
         const batch = db.batch();
 
         const profileRef = db.collection("profiles").doc(userRecord.uid);
@@ -91,9 +98,21 @@ export const createUser = onCall(async (request) => {
         throw new HttpsError("unauthenticated", "Fungsi ini memerlukan autentikasi.");
     }
     const {email, password, fullName, role, organizationId} = request.data;
+    const callerRole = request.auth.token.role;
+
+    if (callerRole !== 'owner' && callerRole !== 'admin') {
+         throw new HttpsError("permission-denied", "Hanya owner atau admin yang dapat membuat pengguna baru.");
+    }
 
     try {
         const userRecord = await auth.createUser({email, password, displayName: fullName});
+        
+        // Set custom claims for the new user
+        await auth.setCustomUserClaims(userRecord.uid, {
+            role: role,
+            organization_id: organizationId,
+        });
+
         await db.collection("profiles").doc(userRecord.uid).set({
             email,
             full_name: fullName,
@@ -113,6 +132,11 @@ export const deleteUser = onCall(async (request) => {
         throw new HttpsError("unauthenticated", "Fungsi ini memerlukan autentikasi.");
     }
     const {uid} = request.data;
+    const callerRole = request.auth.token.role;
+
+    if (callerRole !== 'owner' && callerRole !== 'admin') {
+         throw new HttpsError("permission-denied", "Hanya owner atau admin yang dapat menghapus pengguna.");
+    }
 
     try {
         await auth.deleteUser(uid);
@@ -132,25 +156,25 @@ export const createOutlet = onCall(async (request) => {
     }
     const callerUid = request.auth.uid;
     const {outletName} = request.data;
+    const callerRole = request.auth.token.role;
+    const callerOrgId = request.auth.token.organization_id;
+
+    if (callerRole !== "owner" && callerRole !== "superadmin") {
+        throw new HttpsError("permission-denied", "Hanya pemilik yang dapat membuat outlet.");
+    }
 
     try {
-        const callerProfileSnap = await db.collection("profiles").doc(callerUid).get();
-        if (!callerProfileSnap.exists) {
-            throw new HttpsError("not-found", "Profil pemanggil tidak ditemukan.");
+        const rootOrgDoc = await db.collection("organizations").doc(callerOrgId).get();
+        if (!rootOrgDoc.exists) {
+            throw new HttpsError("not-found", "Organisasi induk tidak ditemukan.");
         }
-        const callerProfile = callerProfileSnap.data();
-        if (!callerProfile) {
-            throw new HttpsError("internal", "Gagal membaca data profil.");
-        }
-
-        if (callerProfile.role !== "owner" && callerProfile.role !== "superadmin") {
-            throw new HttpsError("permission-denied", "Hanya pemilik yang dapat membuat outlet.");
-        }
+        const rootOrgData = rootOrgDoc.data();
+        const parentId = rootOrgData?.parent_organization_id || callerOrgId;
 
         const newOutletRef = await db.collection("organizations").add({
             name: outletName,
             owner_id: callerUid,
-            parent_organization_id: callerProfile.organization_id, // tautkan ke org induk
+            parent_organization_id: parentId,
             is_setup_complete: false,
             created_at: FieldValue.serverTimestamp(),
             updated_at: FieldValue.serverTimestamp(),
@@ -169,8 +193,11 @@ export const updateOutlet = onCall(async (request) => {
         throw new HttpsError("unauthenticated", "Fungsi ini memerlukan autentikasi.");
     }
     const {outletId, outletName} = request.data;
+    const callerRole = request.auth.token.role;
 
-    // Tambahkan validasi izin di sini jika diperlukan
+    if (callerRole !== "owner" && callerRole !== "superadmin") {
+        throw new HttpsError("permission-denied", "Hanya pemilik yang dapat mengubah outlet.");
+    }
 
     try {
         await db.collection("organizations").doc(outletId).update({
@@ -190,8 +217,11 @@ export const deleteOutlet = onCall(async (request) => {
         throw new HttpsError("unauthenticated", "Fungsi ini memerlukan autentikasi.");
     }
     const {outletId} = request.data;
+    const callerRole = request.auth.token.role;
 
-    // Tambahkan validasi izin di sini jika diperlukan
+    if (callerRole !== "owner" && callerRole !== "superadmin") {
+        throw new HttpsError("permission-denied", "Hanya pemilik yang dapat menghapus outlet.");
+    }
 
     try {
         await db.collection("organizations").doc(outletId).delete();
