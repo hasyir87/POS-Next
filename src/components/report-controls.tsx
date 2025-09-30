@@ -7,7 +7,7 @@ import { id } from "date-fns/locale"
 import { Calendar as CalendarIcon, FileDown } from "lucide-react"
 import { DateRange } from "react-day-picker"
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/cn"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
