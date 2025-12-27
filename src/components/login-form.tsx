@@ -1,11 +1,10 @@
 
-"use client"
-
-import { useContext } from "react";
+"use client";
+import React from "react";
+import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -16,17 +15,13 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { MPerfumeAmalLogo } from "./m-perfume-amal-logo"
-import { AuthContext } from "@/context/auth-context";
+import { Card, CardContent } from "@/components/ui/card"
+import { useAuth } from "@/context/auth-context";
+import { Loader2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const formSchema = z.object({
   email: z.string().email({
@@ -35,14 +30,11 @@ const formSchema = z.object({
   password: z.string().min(6, {
     message: "Kata sandi harus minimal 6 karakter.",
   }),
-  role: z.enum(["cashier", "admin", "owner"], {
-    required_error: "Anda harus memilih peran.",
-  }),
 })
 
 export function LoginForm() {
+  const { login } = useAuth();
   const router = useRouter();
-  const { login } = useContext(AuthContext);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -52,23 +44,41 @@ export function LoginForm() {
     },
   })
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    // In a real app, you would handle real authentication here.
-    // For this example, we'll just log the user in with the selected role.
-    const userName = values.email.split('@')[0];
-    login({ name: userName, role: values.role });
-    router.push("/dashboard");
+  const [loginError, setLoginError] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
+
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    setLoginError(null);
+    setIsLoading(true);
+    
+    try {
+      await login({ email: values.email, password: values.password });
+      // Redirect is handled by the onAuthStateChanged listener in AuthContext,
+      // which will detect the new user and redirect to /dashboard.
+      router.push('/dashboard');
+    } catch (error: any) {
+      let msg = "Login gagal. Silakan coba lagi.";
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+        msg = "Email atau password salah.";
+      }
+      setLoginError(msg);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader className="items-center text-center">
-        <MPerfumeAmalLogo className="w-16 h-16 mb-2 text-primary" />
-        <CardTitle className="font-headline text-3xl">M Perfume Amal</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <Card>
+      <CardContent className="p-6">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {loginError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{loginError}</AlertDescription>
+              </Alert>
+            )}
             <FormField
               control={form.control}
               name="email"
@@ -95,29 +105,11 @@ export function LoginForm() {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Peran</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih peran Anda" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="cashier">Kasir</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="owner">Pemilik</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" className="w-full">Masuk</Button>
+            
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Masuk
+            </Button>
           </form>
         </Form>
       </CardContent>

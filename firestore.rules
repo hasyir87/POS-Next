@@ -1,0 +1,57 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions using efficient token claims instead of expensive get() calls.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isUserInOrg(orgId) {
+      return isSignedIn() && request.auth.token.organization_id == orgId;
+    }
+
+    function usersOrgId() {
+      return request.auth.token.organization_id;
+    }
+
+    function userRole() {
+      return request.auth.token.role;
+    }
+
+    function isRole(role) {
+      return isSignedIn() && userRole() == role;
+    }
+
+    // Profiles: Users can read/update their own profile.
+    // Owners can read profiles within their organization.
+    match /profiles/{userId} {
+      allow read, update: if isSignedIn() && request.auth.uid == userId;
+      allow list: if isRole('owner') && request.query.organization_id == usersOrgId();
+    }
+
+    // Organizations: Users can read documents associated with their own organization.
+    match /organizations/{orgId} {
+      allow read: if isUserInOrg(orgId) || isUserInOrg(resource.data.parent_organization_id);
+      allow create: if isRole('owner') && request.auth.uid == request.resource.data.owner_id;
+      allow update: if isRole('owner') && isUserInOrg(orgId);
+    }
+    
+    // Generic Rules for organization-scoped data
+    match /{collection}/{docId} 
+      where collection in ['products', 'raw_materials', 'customers', 'transactions', 'grades', 'expenses', 'shifts'] {
+      
+      // Allow list queries ONLY if they are filtered by the user's organization_id
+      allow list: if request.query.where.size() > 0 &&
+                   request.query.where[0].field == 'organization_id' &&
+                   request.query.where[0].value == usersOrgId();
+
+      // Allow read, update, delete if the user belongs to the document's organization
+      allow read, update, delete: if isUserInOrg(resource.data.organization_id);
+
+      // Allow create if the user is creating a document for their own organization
+      allow create: if isUserInOrg(request.resource.data.organization_id);
+    }
+  }
+}

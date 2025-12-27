@@ -1,114 +1,236 @@
+
 "use client";
 
-import React, { createContext, useState, useEffect, ReactNode, useContext } from 'react';
-import { supabase } from '../lib/supabase';
-import { User as SupabaseUser } from '@supabase/supabase-js';
+import React, { createContext, useState, useEffect, ReactNode, useContext, useCallback } from 'react';
+import { getAuth, onAuthStateChanged, signInWithCustomToken, signOut, type User as FirebaseUser } from 'firebase/auth';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { firebaseApp } from '@/lib/firebase/config';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
+import { callFirebaseFunction } from '@/lib/utils';
 
-// Definisikan tipe untuk data profil tambahan kita
-export interface UserProfile {
+// --- DEVELOPMENT BYPASS ---
+// Set to true to bypass Firebase Auth and simulate a logged-in 'owner'.
+const AUTH_BYPASS_ENABLED = true;
+
+export type UserRole = 'owner' | 'cashier' | 'admin' | 'superadmin';
+
+export interface Organization {
   id: string;
   name: string;
-  role: "owner" | "admin" | "cashier";
-  organization_id: string;
+  is_setup_complete: boolean;
+  owner_id: string;
+  parent_organization_id?: string;
 }
 
-// Definisikan tipe untuk AuthContext
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  organization_id: string;
+  role: UserRole;
+  avatar_url?: string;
+  organization?: Organization;
+}
+
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
+
 interface AuthContextType {
-  user: SupabaseUser | null;
+  user: FirebaseUser | null;
   profile: UserProfile | null;
   loading: boolean;
   selectedOrganizationId: string | null;
   setSelectedOrganizationId: (orgId: string | null) => void;
+  login: ({ email, password }: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
-// Buat AuthContext dengan nilai default
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// AuthProvider component
+async function fetchUserProfile(firebaseUser: FirebaseUser): Promise<UserProfile | null> {
+    if (!firebaseUser) return null;
+  
+    const profileDocRef = doc(db, 'profiles', firebaseUser.uid);
+    const profileDocSnap = await getDoc(profileDocRef);
+  
+    if (!profileDocSnap.exists()) {
+      console.error("User profile does not exist in Firestore for UID:", firebaseUser.uid);
+      return null;
+    }
+  
+    const profileData = { id: profileDocSnap.id, ...profileDocSnap.data() } as UserProfile;
+  
+    if (profileData.organization_id) {
+        const orgDocRef = doc(db, 'organizations', profileData.organization_id);
+        const orgDocSnap = await getDoc(orgDocRef);
+    
+        if (orgDocSnap.exists()) {
+            profileData.organization = { id: orgDocSnap.id, ...orgDocSnap.data() } as Organization;
+        } else {
+             console.error(`Organization with ID ${profileData.organization_id} not found.`);
+             profileData.organization = { id: profileData.organization_id, name: 'Organisasi Tidak Ditemukan', is_setup_complete: false, owner_id: profileData.id };
+        }
+    } else {
+        console.error(`User ${profileData.id} has no organization_id.`);
+        profileData.organization = { id: '', name: 'Tidak Ada Organisasi', is_setup_complete: false, owner_id: profileData.id };
+    }
+    
+    return profileData;
+}
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<SupabaseUser | null>(null);
+  const router = useRouter();
+  const { toast } = useToast();
+  const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null);
+  const [selectedOrganizationId, setSelectedOrganizationIdState] = useState<string | null>(null);
+
+  const setSelectedOrganizationId = useCallback((orgId: string | null) => {
+    try {
+      if (orgId) {
+        localStorage.setItem('selectedOrgId', orgId);
+      } else {
+        localStorage.removeItem('selectedOrgId');
+      }
+      setSelectedOrganizationIdState(orgId);
+    } catch (error) {
+      console.error("Could not access localStorage. Running in a non-browser environment?");
+    }
+  }, []);
+  
+  const handleLogout = useCallback(async (message?: {title: string, description: string}) => {
+    if (AUTH_BYPASS_ENABLED) {
+        console.log("Auth bypass is enabled. Logout is disabled.");
+        toast({ title: "Mode Bypass Aktif", description: "Logout dinonaktifkan."});
+        return;
+    }
+    await signOut(auth);
+    setUser(null);
+    setProfile(null);
+    setSelectedOrganizationId(null);
+    if (message) {
+      toast({
+        variant: "destructive",
+        title: message.title,
+        description: message.description,
+      });
+    }
+    router.push('/');
+  }, [setSelectedOrganizationId, toast, router]);
 
   useEffect(() => {
-    setLoading(true);
-    // Ambil sesi pengguna saat pertama kali dimuat
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user);
-      }
-      setLoading(false);
-    };
+    // --- Bypass Logic ---
+    if (AUTH_BYPASS_ENABLED) {
+        const mockOrgId = "mock_org_123";
+        const mockUserId = "mock_user_123";
+        
+        const mockUser = { uid: mockUserId } as FirebaseUser;
+        const mockProfile: UserProfile = {
+            id: mockUserId,
+            email: 'dev@snipos.com',
+            full_name: 'Developer',
+            role: 'owner',
+            organization_id: mockOrgId,
+            organization: {
+                id: mockOrgId,
+                name: 'Toko SNIPOS (Mode Dev)',
+                owner_id: mockUserId,
+                is_setup_complete: true
+            }
+        };
 
-    getInitialSession();
+        setUser(mockUser);
+        setProfile(mockProfile);
+        setSelectedOrganizationId(mockOrgId);
+        setLoading(false);
+        return;
+    }
 
-    // Berlangganan perubahan state otentikasi
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user);
+    // --- Real Auth Logic ---
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setLoading(true);
+      if (firebaseUser) {
+        try {
+            const userProfile = await fetchUserProfile(firebaseUser);
+            
+            if (!userProfile) {
+                await handleLogout({title: "Sesi Tidak Valid", description: "Profil pengguna tidak ditemukan. Sesi diakhiri."});
+                setLoading(false);
+                return;
+            }
+
+            setUser(firebaseUser);
+            setProfile(userProfile);
+            
+            const storedOrgId = localStorage.getItem('selectedOrgId');
+            if (storedOrgId) {
+                setSelectedOrganizationIdState(storedOrgId);
+            } else if (userProfile.organization_id) {
+                setSelectedOrganizationIdState(userProfile.organization_id);
+                localStorage.setItem('selectedOrgId', userProfile.organization_id);
+            }
+
+        } catch (error: any) {
+            console.error("Auth state change error:", error.message);
+            await handleLogout({title: "Sesi Tidak Valid", description: "Gagal memuat data profil. Sesi diakhiri."});
+        }
       } else {
-        setProfile(null); // Kosongkan profil jika logout
-        setSelectedOrganizationId(null); // Kosongkan organisasi jika logout
+        setUser(null);
+        setProfile(null);
+        setSelectedOrganizationId(null);
       }
       setLoading(false);
     });
 
-    // Cleanup subscription saat komponen unmount
-    return () => {
-      subscription?.unsubscribe();
-    };
-  }, []);
+    return () => unsubscribe();
+  }, [handleLogout, router, setSelectedOrganizationId]);
 
-  // Fungsi untuk mengambil data profil pengguna dari tabel 'profiles'
-  const fetchProfile = async (supabaseUser: SupabaseUser) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', supabaseUser.id)
-        .single();
-
-      if (error) {
-        console.error("Error fetching profile:", error);
-        setProfile(null);
-      } else if (data) {
-        setProfile(data as UserProfile);
-        // Atur organisasi terpilih default ke organisasi pengguna saat profil dimuat
-        setSelectedOrganizationId(data.organization_id);
-      }
-    } catch (e) {
-      console.error("An unexpected error occurred while fetching profile:", e);
-      setProfile(null);
+  const login = async ({ email, password }: { email: string, password: string }) => {
+    if (AUTH_BYPASS_ENABLED) {
+        console.log("Auth bypass is enabled. Login is disabled.");
+        toast({ title: "Mode Bypass Aktif", description: "Login dinonaktifkan."});
+        return;
     }
+    const response: any = await callFirebaseFunction("signInUser", { email });
+    if (!response.customToken) {
+      throw new Error(response.error || "Gagal mendapatkan token autentikasi.");
+    }
+    await signInWithCustomToken(auth, response.customToken);
   };
   
-  // Fungsi logout
-  const logout = async () => {
-    await supabase.auth.signOut();
-  };
+  const refreshProfile = useCallback(async () => {
+    if (AUTH_BYPASS_ENABLED) {
+        console.log("Auth bypass is enabled. Profile refresh is disabled.");
+        return;
+    }
+    if (user) {
+        try {
+            const refreshedProfile = await fetchUserProfile(user);
+            setProfile(refreshedProfile);
+        } catch (error) {
+            console.error("Failed to refresh profile:", error);
+            await handleLogout({title: "Gagal Memuat Ulang", description: "Tidak dapat memuat ulang data profil. Sesi diakhiri."});
+        }
+    }
+  }, [user, handleLogout]);
 
-  const value = {
+  const value: AuthContextType = {
     user,
     profile,
     loading,
     selectedOrganizationId,
     setSelectedOrganizationId,
-    logout,
+    login,
+    logout: () => handleLogout(),
+    refreshProfile,
   };
-
-  return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
-    </AuthContext.Provider>
-  );
+  
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Custom hook untuk menggunakan AuthContext
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

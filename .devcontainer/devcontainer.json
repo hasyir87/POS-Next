@@ -1,0 +1,11 @@
+{
+  "name": "AI Workspace - deepseek-coder",
+  "postCreateCommand": "bash .devcontainer/post-start.sh",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.shell.linux": "/bin/bash"
+      }
+    }
+  }
+}
